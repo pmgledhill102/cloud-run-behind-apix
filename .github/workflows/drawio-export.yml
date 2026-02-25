@@ -25,6 +25,7 @@ jobs:
 
       - name: Rename exported SVGs to match expected paths
         run: |
+          sudo chown -R "$(id -u):$(id -g)" docs/diagrams/export
           for drawio_file in docs/diagrams/*.drawio; do
             base="$(basename "$drawio_file" .drawio)"
             svg="$(ls docs/diagrams/export/"${base}"-*.svg 2>/dev/null | head -1)"
