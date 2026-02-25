@@ -1,0 +1,174 @@
+<mxfile host="app.diagrams.net" modified="2026-02-25T09:00:00.000Z">
+  <diagram name="Option D — PSC Service Attachment" id="option-d">
+    <mxGraphModel dx="1422" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="900" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+
+        <!-- Title -->
+        <mxCell id="title" value="Option D: PSC Published Service / Service Attachment" style="text;html=1;fontSize=18;fontStyle=1;align=center;fontColor=#202124;" vertex="1" parent="1">
+          <mxGeometry x="250" y="10" width="1100" height="35" as="geometry"/>
+        </mxCell>
+        <mxCell id="subtitle" value="Apigee X → PSC Endpoint → PSC Tunnel → Service Attachment → Internal ALB → Serverless NEG → Cloud Run" style="text;html=1;fontSize=11;align=center;fontColor=#5F6368;" vertex="1" parent="1">
+          <mxGeometry x="250" y="42" width="1100" height="20" as="geometry"/>
+        </mxCell>
+
+        <!-- ==================== APIGEE X ==================== -->
+        <mxCell id="apigee-box" value="Apigee X" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FCE4EC;strokeColor=#E91E63;strokeWidth=2;verticalAlign=top;fontStyle=1;fontSize=16;fontColor=#C2185B;arcSize=4;container=1;collapsible=0;spacingTop=5;" vertex="1" parent="1">
+          <mxGeometry x="40" y="120" width="220" height="180" as="geometry"/>
+        </mxCell>
+        <mxCell id="apigee-proxy" value="API Proxy" style="shape=mxgraph.gcp2.api_monetization;fillColor=#F8BBD0;strokeColor=none;verticalLabelPosition=bottom;verticalAlign=top;align=center;fontSize=10;fontColor=#3C4043;fontStyle=1;" vertex="1" parent="apigee-box">
+          <mxGeometry x="76" y="45" width="68" height="53" as="geometry"/>
+        </mxCell>
+        <mxCell id="apigee-desc" value="Target: api.internal.example.com" style="text;fontSize=9;fontColor=#80868B;align=center;" vertex="1" parent="apigee-box">
+          <mxGeometry x="20" y="125" width="180" height="20" as="geometry"/>
+        </mxCell>
+
+        <!-- ==================== CONSUMER SIDE (APIGEE VPC) ==================== -->
+        <mxCell id="vpc-consumer" value="Apigee VPC — Consumer Side" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8F0FE;strokeColor=#4285F4;strokeWidth=2;verticalAlign=top;fontStyle=1;fontSize=14;fontColor=#1A73E8;arcSize=4;container=1;collapsible=0;spacingTop=5;" vertex="1" parent="1">
+          <mxGeometry x="330" y="80" width="320" height="400" as="geometry"/>
+        </mxCell>
+
+        <!-- Peering -->
+        <mxCell id="peering-label" value="VPC Peering" style="text;fontSize=9;fontColor=#E91E63;align=center;fontStyle=3;" vertex="1" parent="1">
+          <mxGeometry x="260" y="190" width="70" height="16" as="geometry"/>
+        </mxCell>
+        <mxCell id="peering-line" value="" style="endArrow=classic;startArrow=classic;strokeColor=#E91E63;strokeWidth=2;dashed=1;dashPattern=8 4;html=1;" edge="1" parent="1" source="apigee-box" target="vpc-consumer">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- PSC Endpoint (Consumer) -->
+        <mxCell id="psc-endpoint-sub" value="PSC Endpoint" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#DADCE0;strokeWidth=1;dashed=1;dashPattern=5 5;verticalAlign=top;fontSize=10;fontColor=#5F6368;fontStyle=1;arcSize=6;container=1;collapsible=0;spacingTop=2;" vertex="1" parent="vpc-consumer">
+          <mxGeometry x="20" y="45" width="280" height="110" as="geometry"/>
+        </mxCell>
+        <mxCell id="psc-consumer" value="PSC Endpoint" style="shape=mxgraph.gcp2.cloud_endpoints;fillColor=#B39DDB;strokeColor=none;verticalLabelPosition=bottom;verticalAlign=top;align=center;fontSize=10;fontColor=#3C4043;fontStyle=1;" vertex="1" parent="psc-endpoint-sub">
+          <mxGeometry x="20" y="25" width="68" height="53" as="geometry"/>
+        </mxCell>
+        <mxCell id="psc-consumer-ip" value="10.0.0.50&#xa;→ Service Attachment" style="text;fontSize=9;fontColor=#5F6368;align=center;" vertex="1" parent="psc-endpoint-sub">
+          <mxGeometry x="100" y="30" width="160" height="30" as="geometry"/>
+        </mxCell>
+        <mxCell id="step1" value="&#10102;" style="text;fontSize=16;fontColor=#1A73E8;fontStyle=1;align=center;" vertex="1" parent="psc-endpoint-sub">
+          <mxGeometry x="245" y="5" width="30" height="30" as="geometry"/>
+        </mxCell>
+
+        <!-- DNS Zone -->
+        <mxCell id="dns-zone" value="Private DNS Zone" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#DADCE0;strokeWidth=1;dashed=1;dashPattern=5 5;verticalAlign=top;fontSize=10;fontColor=#5F6368;fontStyle=1;arcSize=6;container=1;collapsible=0;spacingTop=2;" vertex="1" parent="vpc-consumer">
+          <mxGeometry x="20" y="180" width="280" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="dns-record" value="api.internal.example.com → 10.0.0.50" style="text;fontSize=9;fontColor=#3C4043;align=center;" vertex="1" parent="dns-zone">
+          <mxGeometry x="20" y="28" width="240" height="20" as="geometry"/>
+        </mxCell>
+
+        <!-- VPN (greyed out) -->
+        <mxCell id="vpn-unused" value="HA VPN (NOT used)&#xa;PSC bypasses VPN entirely" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F5F5F5;strokeColor=#BDBDBD;strokeWidth=1;dashed=1;fontSize=9;fontColor=#9E9E9E;fontStyle=2;arcSize=8;" vertex="1" parent="vpc-consumer">
+          <mxGeometry x="40" y="290" width="240" height="45" as="geometry"/>
+        </mxCell>
+
+        <!-- ==================== PSC TUNNEL ==================== -->
+        <mxCell id="psc-tunnel-line" value="" style="endArrow=classic;strokeColor=#7B1FA2;strokeWidth=4;html=1;" edge="1" parent="1" source="vpc-consumer" target="vpc-producer">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="psc-tunnel-label" value="PSC Tunnel" style="text;fontSize=11;fontColor=#7B1FA2;align=center;fontStyle=1;fillColor=#F3E5F5;rounded=1;strokeColor=#CE93D8;" vertex="1" parent="1">
+          <mxGeometry x="678" y="260" width="90" height="24" as="geometry"/>
+        </mxCell>
+        <mxCell id="step2" value="&#10103;" style="text;fontSize=16;fontColor=#1A73E8;fontStyle=1;align=center;" vertex="1" parent="1">
+          <mxGeometry x="688" y="230" width="30" height="30" as="geometry"/>
+        </mxCell>
+
+        <!-- ==================== PRODUCER SIDE (WORKLOADS VPC) ==================== -->
+        <mxCell id="vpc-producer" value="Workloads VPC — Producer Side" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8F0FE;strokeColor=#4285F4;strokeWidth=2;verticalAlign=top;fontStyle=1;fontSize=14;fontColor=#1A73E8;arcSize=4;container=1;collapsible=0;spacingTop=5;" vertex="1" parent="1">
+          <mxGeometry x="780" y="80" width="780" height="540" as="geometry"/>
+        </mxCell>
+
+        <!-- PSC NAT Subnet -->
+        <mxCell id="psc-nat-sub" value="PSC NAT Subnet — 10.100.10.0/24&#xa;(purpose: PRIVATE_SERVICE_CONNECT)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F3E5F5;strokeColor=#CE93D8;fontSize=9;fontColor=#5F6368;arcSize=8;fontStyle=1;" vertex="1" parent="vpc-producer">
+          <mxGeometry x="20" y="45" width="250" height="50" as="geometry"/>
+        </mxCell>
+
+        <!-- Service Attachment -->
+        <mxCell id="service-attachment" value="Service Attachment" style="shape=mxgraph.gcp2.cloud_endpoints;fillColor=#CE93D8;strokeColor=none;verticalLabelPosition=bottom;verticalAlign=top;align=center;fontSize=10;fontColor=#3C4043;fontStyle=1;" vertex="1" parent="vpc-producer">
+          <mxGeometry x="80" y="145" width="68" height="53" as="geometry"/>
+        </mxCell>
+        <mxCell id="sa-desc" value="Accept list: [apigee-project]&#xa;NAT subnet: psc-nat-sub" style="text;fontSize=8;fontColor=#80868B;align=center;" vertex="1" parent="vpc-producer">
+          <mxGeometry x="40" y="210" width="148" height="30" as="geometry"/>
+        </mxCell>
+        <mxCell id="step3" value="&#10104;" style="text;fontSize=16;fontColor=#1A73E8;fontStyle=1;align=center;" vertex="1" parent="vpc-producer">
+          <mxGeometry x="160" y="140" width="30" height="30" as="geometry"/>
+        </mxCell>
+
+        <!-- ILB Subnet -->
+        <mxCell id="sub-ilb" value="ilb-subnet — 10.100.0.0/24" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#DADCE0;strokeWidth=1;dashed=1;dashPattern=5 5;verticalAlign=top;fontSize=10;fontColor=#5F6368;fontStyle=1;arcSize=6;container=1;collapsible=0;spacingTop=2;" vertex="1" parent="vpc-producer">
+          <mxGeometry x="280" y="45" width="470" height="210" as="geometry"/>
+        </mxCell>
+
+        <!-- ILB -->
+        <mxCell id="ilb" value="Internal ALB" style="shape=mxgraph.gcp2.cloud_load_balancing;fillColor=#F8BBD0;strokeColor=none;verticalLabelPosition=bottom;verticalAlign=top;align=center;fontSize=10;fontColor=#3C4043;fontStyle=1;" vertex="1" parent="sub-ilb">
+          <mxGeometry x="25" y="40" width="68" height="53" as="geometry"/>
+        </mxCell>
+        <mxCell id="ilb-desc" value="10.100.0.10&#xa;HTTPS :443" style="text;fontSize=8;fontColor=#80868B;align=center;" vertex="1" parent="sub-ilb">
+          <mxGeometry x="9" y="105" width="100" height="24" as="geometry"/>
+        </mxCell>
+        <mxCell id="step4" value="&#10105;" style="text;fontSize=16;fontColor=#1A73E8;fontStyle=1;align=center;" vertex="1" parent="sub-ilb">
+          <mxGeometry x="5" y="10" width="30" height="30" as="geometry"/>
+        </mxCell>
+
+        <!-- URL Map -->
+        <mxCell id="urlmap" value="URL Map" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F1F3F4;strokeColor=#DADCE0;fontSize=10;fontColor=#3C4043;fontStyle=1;" vertex="1" parent="sub-ilb">
+          <mxGeometry x="145" y="45" width="100" height="45" as="geometry"/>
+        </mxCell>
+        <mxCell id="urlmap-desc" value="/svc-a → NEG-A&#xa;/svc-b → NEG-B" style="text;fontSize=8;fontColor=#80868B;align=center;" vertex="1" parent="sub-ilb">
+          <mxGeometry x="145" y="100" width="100" height="30" as="geometry"/>
+        </mxCell>
+
+        <!-- Serverless NEGs -->
+        <mxCell id="neg-a" value="Serverless NEG A" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8F5E9;strokeColor=#4CAF50;fontSize=9;fontColor=#3C4043;fontStyle=1;" vertex="1" parent="sub-ilb">
+          <mxGeometry x="300" y="25" width="140" height="35" as="geometry"/>
+        </mxCell>
+        <mxCell id="neg-b" value="Serverless NEG B" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8F5E9;strokeColor=#4CAF50;fontSize=9;fontColor=#3C4043;fontStyle=1;" vertex="1" parent="sub-ilb">
+          <mxGeometry x="300" y="75" width="140" height="35" as="geometry"/>
+        </mxCell>
+        <mxCell id="step5" value="&#10106;" style="text;fontSize=16;fontColor=#1A73E8;fontStyle=1;align=center;" vertex="1" parent="sub-ilb">
+          <mxGeometry x="270" y="10" width="30" height="30" as="geometry"/>
+        </mxCell>
+
+        <!-- Arrows within ILB subnet -->
+        <mxCell id="ilb-to-urlmap" value="" style="endArrow=classic;strokeColor=#5F6368;strokeWidth=1.5;html=1;" edge="1" parent="sub-ilb" source="ilb" target="urlmap">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="urlmap-to-nega" value="" style="endArrow=classic;strokeColor=#5F6368;strokeWidth=1.5;html=1;" edge="1" parent="sub-ilb" source="urlmap" target="neg-a">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="urlmap-to-negb" value="" style="endArrow=classic;strokeColor=#5F6368;strokeWidth=1.5;html=1;" edge="1" parent="sub-ilb" source="urlmap" target="neg-b">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- Arrow from SA to ILB -->
+        <mxCell id="sa-to-ilb" value="" style="endArrow=classic;strokeColor=#7B1FA2;strokeWidth=2;html=1;" edge="1" parent="vpc-producer" source="service-attachment" target="ilb">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- Proxy-only subnet -->
+        <mxCell id="proxy-sub" value="proxy-only-subnet — 10.100.64.0/26&#xa;(Envoy proxies)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F8F9FA;strokeColor=#DADCE0;fontSize=9;fontColor=#5F6368;arcSize=8;" vertex="1" parent="vpc-producer">
+          <mxGeometry x="280" y="280" width="220" height="45" as="geometry"/>
+        </mxCell>
+
+        <!-- Cloud Run services -->
+        <mxCell id="cr-a" value="Cloud Run A" style="shape=mxgraph.gcp2.cloud_run;fillColor=#AECBFA;strokeColor=none;verticalLabelPosition=bottom;verticalAlign=top;align=center;fontSize=10;fontColor=#3C4043;fontStyle=1;" vertex="1" parent="vpc-producer">
+          <mxGeometry x="560" y="330" width="68" height="53" as="geometry"/>
+        </mxCell>
+        <mxCell id="cr-b" value="Cloud Run B" style="shape=mxgraph.gcp2.cloud_run;fillColor=#AECBFA;strokeColor=none;verticalLabelPosition=bottom;verticalAlign=top;align=center;fontSize=10;fontColor=#3C4043;fontStyle=1;" vertex="1" parent="vpc-producer">
+          <mxGeometry x="670" y="330" width="68" height="53" as="geometry"/>
+        </mxCell>
+        <mxCell id="step6" value="&#10107;" style="text;fontSize=16;fontColor=#1A73E8;fontStyle=1;align=center;" vertex="1" parent="vpc-producer">
+          <mxGeometry x="540" y="300" width="30" height="30" as="geometry"/>
+        </mxCell>
+
+        <!-- ==================== KEY FINDINGS ==================== -->
+        <mxCell id="findings" value="Traffic Flow: &#10102; PSC endpoint (10.0.0.50) in consumer VPC  &#10103; PSC tunnel crosses VPC boundary  &#10104; Service Attachment receives traffic  &#10105; ILB (10.100.0.10) routes via URL Map  &#10106; Serverless NEG selects backend  &#10107; Cloud Run service&#xa;&#xa;Pros: Strongest isolation, cross-org access control, approval-based, no VPN dependency, custom domains, full traffic control&#xa;Cons: Most complex setup, highest per-service cost (~$36/mo per group), ILB + SA per service group" style="text;fontSize=10;fontColor=#3C4043;align=left;verticalAlign=top;fillColor=#FFF8E1;rounded=1;strokeColor=#F9A825;spacingLeft=10;spacingRight=10;spacingTop=6;spacingBottom=6;whiteSpace=wrap;" vertex="1" parent="1">
+          <mxGeometry x="40" y="660" width="1520" height="80" as="geometry"/>
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
