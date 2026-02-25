@@ -1,1 +1,64 @@
-# Cloud Run Behind Apifee
+# Cloud Run Behind Apigee X
+
+## What This Explores
+
+When Apigee X needs to reach Cloud Run services in a separate Workloads VPC — connected via HA VPN, not direct peering — which connectivity pattern should you use?
+
+This repo documents four architecture options and helps you choose based on:
+
+- **Is a load balancer required?** Only for Options A and D. Options B and C reach Cloud Run directly via Google's internal network.
+- **Can PGA/PSC bypass the VPN entirely?** Yes. Options B and C send traffic over Google's backbone, not through VPN tunnels.
+- **Which scales best to 1000s of Cloud Run services?** Options B and C — no per-service infrastructure needed.
+
+### Apigee Provisioning Models
+
+Each option is documented for both Apigee X provisioning models:
+
+| Model | Southbound connectivity | When to use |
+|---|---|---|
+| **VPC Peering** (legacy) | Apigee peers to a customer "Apigee VPC" which connects to the Workloads VPC via HA VPN | Existing Apigee X instances provisioned with peering |
+| **PSC (non-peering)** | Apigee uses PSC endpoint attachments for southbound traffic; a customer VPC connects to the Workloads VPC via HA VPN | New Apigee X instances (recommended) |
+
+## Comparison Matrix
+
+| | Option A | Option B | Option C | Option D |
+|---|---|---|---|---|
+| **Pattern** | ILB + Serverless NEG | Private Google Access | PSC for Google APIs | PSC Service Attachment |
+| **Traffic path** | Via VPN tunnels | Google backbone | Google backbone | Via PSC tunnel |
+| **LB required** | Yes (Internal ALB) | No | No | Yes (Internal ALB) |
+| **DNS complexity** | Medium — A records for ILB IPs | Low — `*.run.app` zone | Medium — PSC endpoint zone | Medium — PSC endpoint zone |
+| **Cost (monthly)** | ~$18 (ILB) + VPN | ~$0.20 (DNS only) | ~$18 (PSC rule) + DNS | ~$36+ (ILB + PSC) |
+| **Traffic control** | Full (path routing, Cloud Armor, TLS) | Limited (run.app URLs only) | Limited (run.app URLs only) | Full (path routing, TLS) |
+| **Custom domains** | Yes | No | No | Yes |
+| **Scale to 1000s** | Needs multiple ILBs | No bottleneck | No bottleneck | Needs ILB + SA per group |
+| **VPC-SC support** | Via firewall rules | With restricted VIP | Native | Native |
+| **VPN dependency** | Yes | No | No | No |
+
+## Architecture Overview
+
+![Architecture Overview](docs/diagrams/overview.drawio.svg)
+
+## Deep Dives
+
+| Option | Pattern | Doc | Diagram |
+|---|---|---|---|
+| **A** | Internal ALB + Serverless NEG via VPN | [docs/option-a-ilb-via-vpn.md](docs/option-a-ilb-via-vpn.md) | [diagram](docs/diagrams/option-a-architecture.drawio.svg) |
+| **B** | Private Google Access | [docs/option-b-pga.md](docs/option-b-pga.md) | [diagram](docs/diagrams/option-b-architecture.drawio.svg) |
+| **C** | PSC Endpoint for Google APIs | [docs/option-c-psc-google-apis.md](docs/option-c-psc-google-apis.md) | [diagram](docs/diagrams/option-c-architecture.drawio.svg) |
+| **D** | PSC Published Service | [docs/option-d-psc-service-attachment.md](docs/option-d-psc-service-attachment.md) | [diagram](docs/diagrams/option-d-architecture.drawio.svg) |
+
+### Cross-Cutting References
+
+- [DNS Guide](docs/dns-guide.md) — Private zones, restricted VIP, PSC auto-DNS, forwarding
+- [Scaling Analysis](docs/scaling-analysis.md) — How each option behaves at 1000+ services
+
+## Testing Requirements Summary
+
+Each option has specific testing requirements in its deep-dive doc. Core networking validation only (no VPC-SC testing).
+
+| Option | What to Deploy | What to Validate |
+|---|---|---|
+| **A** | ILB + serverless NEG, VPN tunnels, DNS zone | Apigee proxy → ILB IP → Cloud Run response |
+| **B** | PGA on subnet, DNS zone for `*.run.app` | Apigee proxy → run.app URL → Cloud Run response |
+| **C** | PSC endpoint for `run.googleapis.com`, DNS zone | Apigee proxy → PSC IP → Cloud Run response |
+| **D** | ILB + serverless NEG, PSC service attachment, PSC endpoint | Apigee proxy → PSC endpoint → service attachment → ILB → Cloud Run response |
