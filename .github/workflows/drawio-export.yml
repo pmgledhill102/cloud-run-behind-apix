@@ -23,8 +23,19 @@ jobs:
           format: svg
           transparent: true
 
+      - name: Rename exported SVGs to match expected paths
+        run: |
+          for drawio_file in docs/diagrams/*.drawio; do
+            base="$(basename "$drawio_file" .drawio)"
+            svg="$(ls docs/diagrams/export/"${base}"-*.svg 2>/dev/null | head -1)"
+            if [ -n "$svg" ]; then
+              mv "$svg" "docs/diagrams/${base}.drawio.svg"
+            fi
+          done
+          rm -rf docs/diagrams/export
+
       - name: Commit exported SVGs
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
           commit_message: "chore: auto-export drawio diagrams to SVG"
-          file_pattern: '*.svg'
+          file_pattern: 'docs/diagrams/*.svg docs/diagrams/export'
