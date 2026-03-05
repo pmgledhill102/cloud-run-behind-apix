@@ -10,14 +10,11 @@ This repo documents four architecture options and helps you choose based on:
 - **Can PGA/PSC bypass the VPN entirely?** Yes. Options B and C send traffic over Google's backbone, not through VPN tunnels.
 - **Which scales best to 1000s of Cloud Run services?** Options B and C — no per-service infrastructure needed.
 
-### Apigee Provisioning Models
+### Apigee Provisioning Model
 
-Each option is documented for both Apigee X provisioning models:
+This repository assumes the **VPC Peering** provisioning model, matching the organisation's existing Apigee X deployment. Apigee peers to a customer-managed "Apigee VPC" which connects to the Workloads VPC via HA VPN.
 
-| Model | Southbound connectivity | When to use |
-|---|---|---|
-| **VPC Peering** (legacy) | Apigee peers to a customer "Apigee VPC" which connects to the Workloads VPC via HA VPN | Existing Apigee X instances provisioned with peering |
-| **PSC (non-peering)** | Apigee uses PSC endpoint attachments for southbound traffic; a customer VPC connects to the Workloads VPC via HA VPN | New Apigee X instances (recommended) |
+The PSC (non-peering) alternative is documented for reference in each option's deep-dive. See [Provisioning Decision](docs/apigee-provisioning-decision.md) for rationale and cost analysis.
 
 ## Comparison Matrix
 
@@ -49,6 +46,7 @@ Each option is documented for both Apigee X provisioning models:
 
 ### Cross-Cutting References
 
+- [Provisioning Decision](docs/apigee-provisioning-decision.md) — VPC Peering model choice, pay-as-you-go cost analysis
 - [DNS Guide](docs/dns-guide.md) — Private zones, restricted VIP, PSC auto-DNS, forwarding
 - [Scaling Analysis](docs/scaling-analysis.md) — How each option behaves at 1000+ services
 

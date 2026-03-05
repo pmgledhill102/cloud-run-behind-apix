@@ -6,6 +6,8 @@ Private Google Access (PGA) allows VMs and other resources without external IP a
 
 This is the simplest and cheapest connectivity option. There is no per-service infrastructure to deploy: no load balancers, no NEGs, no PSC service attachments. You enable PGA on a subnet, configure a private DNS zone, and point Apigee at the `*.run.app` URL.
 
+> **Provisioning model:** This document assumes **VPC Peering** provisioning for Apigee. The PSC (non-peering) alternative is covered in [Section 4](#4-how-it-works-psc-non-peering-model).
+
 **Best when:** you want the simplest, cheapest option with no per-service infrastructure, you do not need custom domains or advanced traffic management (path-based routing, Cloud Armor), and you are comfortable using the default `*.run.app` URLs that Cloud Run assigns.
 
 ---
@@ -38,6 +40,8 @@ The HA VPN tunnels between the Apigee VPC and Workloads VPC are **not used** for
 ---
 
 ## 4. How It Works: PSC (Non-Peering) Model
+
+> **Note:** This section covers the PSC non-peering alternative. This repository assumes VPC Peering provisioning -- see [Provisioning Decision](apigee-provisioning-decision.md).
 
 In the PSC (non-peering) provisioning model, Apigee uses **PSC endpoint attachments** for southbound traffic rather than VPC peering. There is no direct peering between Apigee's infrastructure and the customer VPC.
 
@@ -204,7 +208,7 @@ gcloud dns record-sets create "private.googleapis.com." \
 
 ### Zone Visibility
 
-The private DNS zone **must be authoritative** in the VPC where Apigee resolves DNS. For the VPC Peering model, this is the Apigee VPC. For the PSC model, this may be the customer VPC where the PSC endpoint attachment lands.
+The private DNS zone **must be authoritative** in the VPC where Apigee resolves DNS. Under VPC Peering provisioning (the assumed default), this is the **Apigee VPC**. If you are using the PSC non-peering model instead, the zone must be visible in the customer VPC where the PSC endpoint attachment lands.
 
 Verify zone visibility:
 

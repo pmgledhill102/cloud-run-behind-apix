@@ -4,6 +4,8 @@
 
 Private Service Connect (PSC) endpoints for Google APIs assign a concrete internal IP address within your VPC to access Google APIs -- including Cloud Run. Unlike Private Google Access (Option B), which routes traffic through special Google-owned VIPs (`199.36.153.4/30` or `199.36.153.8/30`), PSC gives you an explicit, auditable internal IP from one of your own subnets.
 
+> **Provisioning model:** This document assumes the **VPC Peering** provisioning model as the default. The PSC (non-peering) alternative is covered in [Section 4](#4-how-it-works-psc-non-peering-model).
+
 **When to use Option C:**
 
 - You need a specific, known internal IP for firewall rule enforcement
@@ -62,6 +64,8 @@ Apigee proxy
 ---
 
 ## 4. How It Works: PSC (Non-Peering) Model
+
+> **Note:** This section covers the PSC non-peering alternative. This repository assumes VPC Peering provisioning -- see [Provisioning Decision](apigee-provisioning-decision.md).
 
 In the PSC (non-peering) provisioning model, Apigee does not peer to a customer VPC. Instead, Apigee uses **PSC endpoint attachments** for southbound traffic into a customer VPC.
 
@@ -125,7 +129,7 @@ The following numbered steps describe the request/response path. This applies to
 | VPN tunnels | **No** | Traffic bypasses VPN entirely |
 | Serverless NEG | **No** | Not required |
 
-### Additional for PSC (non-peering) model
+### Additional for PSC non-peering alternative
 
 | Component | Required | Notes |
 |---|---|---|

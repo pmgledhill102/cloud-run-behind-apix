@@ -2,6 +2,8 @@
 
 Investigation into whether to include a real Apigee X instance in the Option C PoC.
 
+> **Update:** Pay-as-you-go pricing ($0.50/hr) makes testing feasible without a subscription. See [Provisioning Decision](apigee-provisioning-decision.md) for full cost analysis.
+
 ## Billing
 
 - **Apigee eval org itself is free** — no license charges for 60 days

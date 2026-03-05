@@ -13,6 +13,8 @@ This pattern is best when:
 
 **Key trade-off**: This is the most complex option to set up and the most complex to scale, but it provides the strongest network isolation boundary of all four options.
 
+> **Provisioning assumption:** This document assumes the **VPC Peering** provisioning model. For the PSC non-peering alternative, see [Section 4](#4-how-it-works-psc-non-peering-model).
+
 ---
 
 ## 2. Architecture Diagram
@@ -23,7 +25,7 @@ This pattern is best when:
 
 ## 3. How It Works: VPC Peering Model
 
-In the **VPC Peering** provisioning model (legacy), Apigee peers to a customer-managed "Apigee VPC." The PSC Service Attachment bridges the Apigee VPC and the Workloads VPC without requiring VPN tunnels between them.
+In the **VPC Peering** provisioning model, Apigee peers to a customer-managed "Apigee VPC." The PSC Service Attachment bridges the Apigee VPC and the Workloads VPC without requiring VPN tunnels between them.
 
 ### Producer Side (Workloads VPC)
 
@@ -60,7 +62,9 @@ Apigee proxy
 
 ## 4. How It Works: PSC (Non-Peering) Model
 
-In the **PSC (non-peering)** provisioning model (recommended for new instances), Apigee natively supports **PSC endpoint attachments** for southbound traffic. No intermediate customer VPC is required.
+> This section covers the PSC non-peering alternative. This repository assumes VPC Peering provisioning -- see [Provisioning Decision](apigee-provisioning-decision.md).
+
+In the **PSC (non-peering)** provisioning model, Apigee natively supports **PSC endpoint attachments** for southbound traffic. No intermediate customer VPC is required.
 
 ### Producer Side (Workloads VPC)
 

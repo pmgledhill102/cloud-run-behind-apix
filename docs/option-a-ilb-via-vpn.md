@@ -4,6 +4,8 @@
 
 This option places a regional **Internal Application Load Balancer** (ILB) with a **Serverless NEG** in the Workloads VPC. The Apigee X proxy targets the ILB's internal IP address, and traffic traverses HA VPN tunnels between the Apigee VPC and the Workloads VPC to reach Cloud Run services.
 
+> **Provisioning assumption:** This document assumes the **VPC Peering** provisioning model, which matches the organisation's existing Apigee X deployment. The PSC (non-peering) alternative is covered in Section 4 for reference.
+
 **Choose this option when you need full traffic control:**
 
 - Path-based and host-based routing across multiple Cloud Run services behind a single IP
@@ -24,7 +26,7 @@ This option places a regional **Internal Application Load Balancer** (ILB) with 
 
 ## 3. How It Works: VPC Peering Model
 
-In the VPC Peering provisioning model (legacy), Apigee X peers its managed VPC to a customer-owned **Apigee VPC**. That Apigee VPC connects to the **Workloads VPC** via HA VPN tunnels. The ILB lives in the Workloads VPC.
+In the VPC Peering provisioning model, Apigee X peers its managed VPC to a customer-owned **Apigee VPC**. That Apigee VPC connects to the **Workloads VPC** via HA VPN tunnels. The ILB lives in the Workloads VPC.
 
 ```
 Apigee X (managed)
@@ -54,7 +56,9 @@ Apigee X (managed)
 
 ## 4. How It Works: PSC (Non-Peering) Model
 
-In the PSC provisioning model (recommended for new Apigee X instances), Apigee does **not** peer to any customer VPC. Instead, it uses **PSC endpoint attachments** for southbound traffic.
+> This section covers the PSC non-peering alternative. This repository assumes VPC Peering provisioning -- see [Provisioning Decision](apigee-provisioning-decision.md).
+
+In the PSC provisioning model, Apigee does **not** peer to any customer VPC. Instead, it uses **PSC endpoint attachments** for southbound traffic.
 
 There are two sub-approaches:
 
@@ -393,7 +397,7 @@ Replace `10.1.0.0/20` with the actual Apigee NAT range from your Apigee instance
 
 All prices are approximate, based on us-central1 pricing as of 2025. Actual costs vary by region and usage.
 
-### VPN Path (VPC Peering Model)
+### Infrastructure Costs
 
 | Component | Monthly Cost | Notes |
 |-----------|-------------|-------|
@@ -406,7 +410,7 @@ All prices are approximate, based on us-central1 pricing as of 2025. Actual cost
 | DNS queries | ~$0.40/million | Per million queries |
 | **Total (base)** | **~$91/mo** | **Before data processing charges** |
 
-### PSC Path (Non-Peering Model)
+### Alternative: PSC Non-Peering Path
 
 | Component | Monthly Cost | Notes |
 |-----------|-------------|-------|
