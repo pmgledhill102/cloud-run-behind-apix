@@ -2,6 +2,8 @@
 
 Investigation into whether to include a real Apigee X instance in the Option C PoC.
 
+> **Update:** Pay-as-you-go pricing ($0.50/hr) makes testing feasible without a subscription. See [Provisioning Decision](apigee-provisioning-decision.md) for full cost analysis.
+
 ## Billing
 
 - **Apigee eval org itself is free** — no license charges for 60 days
@@ -46,7 +48,7 @@ Deferred for now. If needed later, add an optional `setup-apigee.sh` script with
 
 ## References
 
-- [Compare eval and paid organizations](https://docs.cloud.google.com/apigee/docs/api-platform/get-started/compare-paid-eval)
+- [Compare eval and paid organizations](https://docs.google.com/apigee/docs/api-platform/get-started/compare-paid-eval)
 - [Does Apigee X eval org charge anything?](https://discuss.google.dev/t/does-apigee-x-eval-org-charges-anything/160937)
-- [organizations.delete API](https://docs.cloud.google.com/apigee/docs/reference/apis/apigee/rest/v1/organizations/delete)
+- [organizations.delete API](https://docs.google.com/apigee/docs/reference/apis/apigee/rest/v1/organizations/delete)
 - [gcloud alpha apigee organizations delete](https://cloud.google.com/sdk/gcloud/reference/alpha/apigee/organizations/delete)

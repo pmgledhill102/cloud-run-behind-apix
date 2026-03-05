@@ -8,9 +8,7 @@ Documentation and architecture exploration for connecting Apigee X to Cloud Run 
 
 The key constraint: Apigee runs in its own VPC connected to the Workloads VPC via HA VPN (not direct VPC peering between Apigee and Workloads).
 
-Two Apigee provisioning models are documented for each option:
-- **VPC Peering model** (legacy): Apigee peers to a customer "Apigee VPC", connected to Workloads VPC via VPN
-- **PSC (non-peering) model** (recommended for new): Apigee uses PSC endpoint attachments for southbound traffic
+The repository assumes the **VPC Peering** provisioning model (Apigee peers to a customer "Apigee VPC", connected to Workloads VPC via VPN). The PSC non-peering alternative is documented for reference. See `docs/apigee-provisioning-decision.md` for rationale.
 
 ## Architecture Options
 
@@ -22,10 +20,10 @@ Two Apigee provisioning models are documented for each option:
 ## Documentation Structure
 
 Each option doc follows the same structure:
-1. Overview
+1. Overview (assumes VPC Peering)
 2. Architecture diagram reference
-3. VPC Peering model details
-4. PSC (non-peering) model details
+3. VPC Peering model details (primary)
+4. PSC non-peering alternative (for reference)
 5. Traffic flow walkthrough
 6. Components required
 7. DNS configuration

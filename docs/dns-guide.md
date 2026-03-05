@@ -2,12 +2,14 @@
 
 Cross-cutting DNS reference for all four Apigee-to-Cloud Run connectivity options.
 
+> This guide assumes the **VPC Peering** provisioning model. All private DNS zones are created in the **Apigee VPC** (the customer-managed VPC that Apigee peers into). See [Provisioning Decision](apigee-provisioning-decision.md).
+
 ## DNS Requirements by Option
 
 | Option | Zone needed | Records | VPC binding |
 |---|---|---|---|
 | **A** (ILB via VPN) | Custom domain zone (e.g., `internal.example.com`) | A → ILB IP | Apigee VPC |
-| **B** (PGA) | `run.app` | A → restricted/private VIP | Apigee VPC (or VPC with PGA) |
+| **B** (PGA) | `run.app` | A → restricted/private VIP | Apigee VPC |
 | **C** (PSC Google APIs) | `run.app` | A → PSC endpoint IP | Apigee VPC |
 | **D** (PSC Service Attachment) | Custom domain zone | A → PSC consumer endpoint IP | Apigee VPC |
 

@@ -2,8 +2,10 @@
 
 Proof-of-concept scripts for connecting Apigee X to Cloud Run via a Private Service Connect endpoint for Google APIs. Traffic flows over Google's backbone, bypassing VPN tunnels entirely.
 
+> These scripts simulate the **Apigee VPC** (VPC Peering provisioning model). The VM acts as a stand-in for Apigee, validating the same network path Apigee would use when peered into this VPC. See [Provisioning Decision](../../docs/apigee-provisioning-decision.md).
+
 ```
-VM (10.0.0.x)
+VM (10.0.0.x) [simulates Apigee in peered VPC]
   → DNS resolves *.run.app to 10.100.0.1 (PSC endpoint)
     → PSC forwarding rule
       → Google backbone
