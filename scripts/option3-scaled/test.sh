@@ -14,7 +14,7 @@ PROJECT_ID="${PROJECT_ID:-sb-paul-g-workshop}"
 
 REGION="europe-north2"
 ZONE="${REGION}-a"
-PSC_IP="10.100.0.1"
+PSC_IP="10.0.0.100"
 SERVICE_COUNT=20
 
 echo "=== Testing PSC Connectivity (${SERVICE_COUNT} services) ==="

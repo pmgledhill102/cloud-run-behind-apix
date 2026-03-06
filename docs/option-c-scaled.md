@@ -6,11 +6,11 @@ Option C scales linearly with zero infrastructure changes. The single PSC endpoi
 
 ## Architecture
 
-See [docs/diagrams/option-c-scaled.drawio](diagrams/option-c-scaled.drawio).
+See [architecture diagram](diagrams/option-c-scaled.drawio).
 
 Traffic flow is identical to single-service Option C:
 1. Apigee proxy sends request to `cr-svc-NN-abc-uc.a.run.app`
-2. DNS resolves `*.run.app` to PSC endpoint IP (10.0.0.100 / 10.100.0.1 in PoC)
+2. DNS resolves `*.run.app` to PSC endpoint IP (`10.0.0.100`)
 3. PSC tunnels traffic through Google's backbone
 4. Cloud Run receives the request
 

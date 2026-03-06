@@ -115,6 +115,10 @@ Concurrent connections is the first limit to watch at very large scale. If a sin
 
 Functionally identical scaling characteristics to PGA. The difference is operational: PSC provides an explicit internal IP for firewall rules and audit logging.
 
+### PoC validation
+
+A 20-service proof of concept confirms Option C scales with zero infrastructure changes. See [Option C Scaled](option-c-scaled.md).
+
 ---
 
 ## Option D: PSC Service Attachment

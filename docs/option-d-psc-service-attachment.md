@@ -414,3 +414,7 @@ If requests fail after the PSC connection is established:
 2. Verify the ILB health checks are passing.
 3. Verify the URL map routes match the request path.
 4. Check Cloud Run service logs for incoming requests.
+
+### PoC Scripts
+
+Runnable scripts for this option: [`scripts/option4/`](../scripts/option4/)

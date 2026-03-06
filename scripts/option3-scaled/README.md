@@ -6,7 +6,7 @@ Proof-of-concept that demonstrates Option C's linear scaling: 20 Cloud Run servi
 
 ```
 VM (10.0.0.x) [simulates Apigee in peered VPC]
-  → DNS resolves *.run.app to 10.100.0.1 (PSC endpoint)
+  → DNS resolves *.run.app to 10.0.0.100 (PSC endpoint)
     → PSC forwarding rule
       → Google backbone
         → cr-svc-01, cr-svc-02, ... cr-svc-20
@@ -22,7 +22,7 @@ The PSC endpoint and DNS zone are identical to the single-service Option C. Only
 |---|---|
 | `setup-iam.sh` | SA `apigee-psc-scaled-poc`, 8 IAM roles, 6 APIs enabled |
 | `setup-infra.sh` | VPC `apigee-vpc`, subnet `compute-apigee` (10.0.0.0/24), VM `vm-test`, 20 Cloud Run services (`cr-svc-01`..`cr-svc-20`), Artifact Registry |
-| `setup-psc.sh` | Global PSC endpoint `pscgoogleapis` (10.100.0.1) targeting `all-apis` bundle, private DNS zone `run-app-psc` with `*.run.app → 10.100.0.1` |
+| `setup-psc.sh` | Global PSC endpoint `pscgoogleapis` (10.0.0.100) targeting `all-apis` bundle, private DNS zone `run-app-psc` with `*.run.app → 10.0.0.100` |
 | `test.sh` | DNS resolution + HTTP connectivity verification for all 20 services from VM via IAP |
 | `teardown.sh` | Reverse-order cleanup of all resources |
 
@@ -51,5 +51,7 @@ gcloud config set auth/impersonate_service_account apigee-psc-scaled-poc@PROJECT
 | **Total** | **~$0.03** | **~$0.61** | Same as single-service Option C |
 
 No VPN tunnels or load balancers — cost is identical regardless of service count. Cloud Run services scale to zero.
+
+> **Note**: Option C and Option C Scaled share networking resource names (`apigee-vpc`, `pscgoogleapis`, `run-app-psc`). Run `./teardown.sh` for one before setting up the other.
 
 Run `./teardown.sh` when done to avoid ongoing costs.

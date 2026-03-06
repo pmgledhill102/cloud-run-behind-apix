@@ -49,6 +49,19 @@ The PSC (non-peering) alternative is documented for reference in each option's d
 - [Provisioning Decision](docs/apigee-provisioning-decision.md) — VPC Peering model choice, pay-as-you-go cost analysis
 - [DNS Guide](docs/dns-guide.md) — Private zones, restricted VIP, PSC auto-DNS, forwarding
 - [Scaling Analysis](docs/scaling-analysis.md) — How each option behaves at 1000+ services
+- [Option C Scaled](docs/option-c-scaled.md) — 20-service PoC validating Option C linear scaling
+
+## PoC Scripts
+
+Runnable proof-of-concept scripts for each option, deployable in a sandbox project:
+
+| Option | Scripts | What it deploys |
+|---|---|---|
+| **A** | [`scripts/option1/`](scripts/option1/) | ILB + Serverless NEG + VPN infrastructure |
+| **B** | [`scripts/option2/`](scripts/option2/) | PGA-enabled subnet + private DNS zone |
+| **C** | [`scripts/option3/`](scripts/option3/) | PSC endpoint for Google APIs + private DNS |
+| **C Scaled** | [`scripts/option3-scaled/`](scripts/option3-scaled/) | Same as C, but with 20 Cloud Run services |
+| **D** | [`scripts/option4/`](scripts/option4/) | ILB + Service Attachment + PSC endpoint |
 
 ## Testing Requirements Summary
 

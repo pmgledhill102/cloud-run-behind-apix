@@ -6,7 +6,7 @@ Proof-of-concept scripts for connecting Apigee X to Cloud Run via a Private Serv
 
 ```
 VM (10.0.0.x) [simulates Apigee in peered VPC]
-  → DNS resolves *.run.app to 10.100.0.1 (PSC endpoint)
+  → DNS resolves *.run.app to 10.0.0.100 (PSC endpoint)
     → PSC forwarding rule
       → Google backbone
         → Cloud Run service
@@ -18,7 +18,7 @@ VM (10.0.0.x) [simulates Apigee in peered VPC]
 |---|---|
 | `setup-iam.sh` | SA `apigee-psc-poc`, 8 IAM roles, 6 APIs enabled |
 | `setup-infra.sh` | VPC `apigee-vpc`, subnet `compute-apigee` (10.0.0.0/24), VM `vm-test`, Cloud Run `cr-hello`, Artifact Registry |
-| `setup-psc.sh` | Global PSC endpoint `pscgoogleapis` (10.100.0.1) targeting `all-apis` bundle, private DNS zone `run-app-psc` with `*.run.app → 10.100.0.1` |
+| `setup-psc.sh` | Global PSC endpoint `pscgoogleapis` (10.0.0.100) targeting `all-apis` bundle, private DNS zone `run-app-psc` with `*.run.app → 10.0.0.100` |
 | `test.sh` | DNS resolution + HTTP connectivity verification from VM via IAP |
 | `teardown.sh` | Reverse-order cleanup of all resources |
 
@@ -47,5 +47,7 @@ gcloud config set auth/impersonate_service_account apigee-psc-poc@PROJECT_ID.iam
 | **Total** | **~$0.03** | **~$0.61** | Safe to leave running for a few days |
 
 No VPN tunnels or load balancers — this is the cheapest option after Option B (PGA).
+
+> **Note**: Option C and Option C Scaled share networking resource names (`apigee-vpc`, `pscgoogleapis`, `run-app-psc`). Run `./teardown.sh` for one before setting up the other.
 
 Run `./teardown.sh` when done to avoid ongoing costs.
