@@ -1,0 +1,174 @@
+<mxfile host="app.diagrams.net" modified="2026-03-05T12:00:00.000Z">
+  <diagram name="Option C Scaled — PSC Endpoint for Google APIs (20 Services)" id="option-c-scaled">
+    <mxGraphModel dx="1422" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="900" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+
+        <!-- Title -->
+        <mxCell id="title" value="Option C Scaled: PSC Endpoint for Google APIs (20 Services)" style="text;html=1;fontSize=18;fontStyle=1;align=center;fontColor=#202124;" vertex="1" parent="1">
+          <mxGeometry x="300" y="10" width="1000" height="35" as="geometry"/>
+        </mxCell>
+        <mxCell id="subtitle" value="Apigee X → PSC Endpoint (internal IP) → Google Internal Network → 20 Cloud Run services (single PSC endpoint, zero infra changes)" style="text;html=1;fontSize=11;align=center;fontColor=#5F6368;" vertex="1" parent="1">
+          <mxGeometry x="300" y="42" width="1000" height="20" as="geometry"/>
+        </mxCell>
+
+        <!-- ==================== APIGEE X ==================== -->
+        <mxCell id="apigee-box" value="Apigee X" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FCE4EC;strokeColor=#E91E63;strokeWidth=2;verticalAlign=top;fontStyle=1;fontSize=16;fontColor=#C2185B;arcSize=4;container=1;collapsible=0;spacingTop=5;" vertex="1" parent="1">
+          <mxGeometry x="40" y="120" width="240" height="200" as="geometry"/>
+        </mxCell>
+        <mxCell id="apigee-proxy" value="API Proxy" style="shape=mxgraph.gcp2.api_monetization;fillColor=#F8BBD0;strokeColor=none;verticalLabelPosition=bottom;verticalAlign=top;align=center;fontSize=10;fontColor=#3C4043;fontStyle=1;" vertex="1" parent="apigee-box">
+          <mxGeometry x="86" y="50" width="68" height="53" as="geometry"/>
+        </mxCell>
+        <mxCell id="apigee-desc" value="Target endpoints:&#xa;cr-svc-01..20-abc-uc.a.run.app" style="text;fontSize=9;fontColor=#80868B;align=center;" vertex="1" parent="apigee-box">
+          <mxGeometry x="30" y="130" width="180" height="30" as="geometry"/>
+        </mxCell>
+
+        <!-- ==================== APIGEE VPC ==================== -->
+        <mxCell id="vpc-apigee" value="Apigee VPC (Customer-Managed)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8F0FE;strokeColor=#4285F4;strokeWidth=2;verticalAlign=top;fontStyle=1;fontSize=14;fontColor=#1A73E8;arcSize=4;container=1;collapsible=0;spacingTop=5;" vertex="1" parent="1">
+          <mxGeometry x="360" y="80" width="420" height="460" as="geometry"/>
+        </mxCell>
+
+        <!-- Peering connection -->
+        <mxCell id="peering-label" value="VPC Peering" style="text;fontSize=9;fontColor=#E91E63;align=center;fontStyle=3;" vertex="1" parent="1">
+          <mxGeometry x="280" y="200" width="80" height="16" as="geometry"/>
+        </mxCell>
+        <mxCell id="peering-line" value="" style="endArrow=classic;startArrow=classic;strokeColor=#E91E63;strokeWidth=2;dashed=1;dashPattern=8 4;html=1;" edge="1" parent="1" source="apigee-box" target="vpc-apigee">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- PSC Endpoint -->
+        <mxCell id="psc-subnet" value="PSC Endpoint Subnet" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#DADCE0;strokeWidth=1;dashed=1;dashPattern=5 5;verticalAlign=top;fontSize=10;fontColor=#5F6368;fontStyle=1;arcSize=6;container=1;collapsible=0;spacingTop=2;" vertex="1" parent="vpc-apigee">
+          <mxGeometry x="20" y="45" width="380" height="130" as="geometry"/>
+        </mxCell>
+        <mxCell id="psc-endpoint" value="PSC Endpoint" style="shape=mxgraph.gcp2.cloud_endpoints;fillColor=#B39DDB;strokeColor=none;verticalLabelPosition=bottom;verticalAlign=top;align=center;fontSize=10;fontColor=#3C4043;fontStyle=1;" vertex="1" parent="psc-subnet">
+          <mxGeometry x="30" y="30" width="68" height="53" as="geometry"/>
+        </mxCell>
+        <mxCell id="psc-ip" value="10.0.0.100&#xa;Forwarding Rule → all-apis" style="text;fontSize=9;fontColor=#5F6368;align=center;" vertex="1" parent="psc-subnet">
+          <mxGeometry x="120" y="35" width="200" height="30" as="geometry"/>
+        </mxCell>
+        <mxCell id="psc-target" value="target-google-apis-bundle: all-apis" style="text;fontSize=8;fontColor=#7B1FA2;align=center;fontStyle=1;fillColor=#F3E5F5;rounded=1;strokeColor=#CE93D8;" vertex="1" parent="psc-subnet">
+          <mxGeometry x="120" y="75" width="220" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="step1" value="&#10102;" style="text;fontSize=16;fontColor=#1A73E8;fontStyle=1;align=center;" vertex="1" parent="psc-subnet">
+          <mxGeometry x="345" y="5" width="30" height="30" as="geometry"/>
+        </mxCell>
+
+        <!-- DNS Zone -->
+        <mxCell id="dns-zone" value="Private DNS Zone: run.app" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#DADCE0;strokeWidth=1;dashed=1;dashPattern=5 5;verticalAlign=top;fontSize=10;fontColor=#5F6368;fontStyle=1;arcSize=6;container=1;collapsible=0;spacingTop=2;" vertex="1" parent="vpc-apigee">
+          <mxGeometry x="20" y="200" width="380" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="dns-record" value="*.run.app → 10.0.0.100 (PSC endpoint IP)&#xa;Covers ALL 20 services with one wildcard record" style="text;fontSize=9;fontColor=#3C4043;align=center;" vertex="1" parent="dns-zone">
+          <mxGeometry x="20" y="25" width="340" height="35" as="geometry"/>
+        </mxCell>
+        <mxCell id="step2" value="&#10103;" style="text;fontSize=16;fontColor=#1A73E8;fontStyle=1;align=center;" vertex="1" parent="dns-zone">
+          <mxGeometry x="345" y="5" width="30" height="30" as="geometry"/>
+        </mxCell>
+
+        <!-- Auto-generated zone note -->
+        <mxCell id="auto-zone" value="Auto-generated zone: p.googleapis.com&#xa;run-ENDPOINT_ID.p.googleapis.com → 10.0.0.100" style="text;fontSize=8;fontColor=#80868B;align=center;fontStyle=2;" vertex="1" parent="vpc-apigee">
+          <mxGeometry x="60" y="300" width="300" height="30" as="geometry"/>
+        </mxCell>
+
+        <!-- VPN (greyed out, not used) -->
+        <mxCell id="vpn-unused" value="HA VPN Tunnels&#xa;(NOT used for PSC traffic)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F5F5F5;strokeColor=#BDBDBD;strokeWidth=1;dashed=1;fontSize=9;fontColor=#9E9E9E;fontStyle=2;arcSize=8;" vertex="1" parent="vpc-apigee">
+          <mxGeometry x="70" y="360" width="280" height="50" as="geometry"/>
+        </mxCell>
+
+        <!-- ==================== GOOGLE INTERNAL NETWORK ==================== -->
+        <mxCell id="google-backbone" value="Google Internal Network" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EDE7F6;strokeColor=#7B1FA2;strokeWidth=2;verticalAlign=top;fontStyle=1;fontSize=14;fontColor=#7B1FA2;arcSize=4;container=1;collapsible=0;spacingTop=5;" vertex="1" parent="1">
+          <mxGeometry x="860" y="80" width="300" height="200" as="geometry"/>
+        </mxCell>
+        <mxCell id="psc-tunnel" value="PSC Tunnel" style="shape=mxgraph.gcp2.cloud_network;fillColor=#CE93D8;strokeColor=none;verticalLabelPosition=bottom;verticalAlign=top;align=center;fontSize=10;fontColor=#3C4043;fontStyle=1;" vertex="1" parent="google-backbone">
+          <mxGeometry x="116" y="50" width="68" height="53" as="geometry"/>
+        </mxCell>
+        <mxCell id="step3" value="&#10104;" style="text;fontSize=16;fontColor=#1A73E8;fontStyle=1;align=center;" vertex="1" parent="google-backbone">
+          <mxGeometry x="10" y="15" width="30" height="30" as="geometry"/>
+        </mxCell>
+        <mxCell id="google-desc" value="Google API Frontend&#xa;Routes to Cloud Run" style="text;fontSize=9;fontColor=#80868B;align=center;" vertex="1" parent="google-backbone">
+          <mxGeometry x="80" y="130" width="140" height="30" as="geometry"/>
+        </mxCell>
+
+        <!-- Arrow from VPC to Google backbone -->
+        <mxCell id="psc-flow" value="" style="endArrow=classic;strokeColor=#7B1FA2;strokeWidth=3;html=1;" edge="1" parent="1" source="vpc-apigee" target="google-backbone">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="psc-flow-label" value="PSC: traffic tunnels&#xa;to Google APIs" style="text;fontSize=9;fontColor=#7B1FA2;align=center;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="785" y="135" width="130" height="30" as="geometry"/>
+        </mxCell>
+
+        <!-- ==================== CLOUD RUN (SCALED — 20 SERVICES) ==================== -->
+        <mxCell id="cr-box" value="Cloud Run (Google-Managed) — 20 Services" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E3F2FD;strokeColor=#1565C0;strokeWidth=2;verticalAlign=top;fontStyle=1;fontSize=14;fontColor=#1565C0;arcSize=4;container=1;collapsible=0;spacingTop=5;" vertex="1" parent="1">
+          <mxGeometry x="860" y="340" width="700" height="280" as="geometry"/>
+        </mxCell>
+        <mxCell id="step4" value="&#10105;" style="text;fontSize=16;fontColor=#1A73E8;fontStyle=1;align=center;" vertex="1" parent="cr-box">
+          <mxGeometry x="10" y="15" width="30" height="30" as="geometry"/>
+        </mxCell>
+
+        <!-- cr-svc-01 -->
+        <mxCell id="cr-svc-01" value="cr-svc-01" style="shape=mxgraph.gcp2.cloud_run;fillColor=#AECBFA;strokeColor=none;verticalLabelPosition=bottom;verticalAlign=top;align=center;fontSize=9;fontColor=#3C4043;fontStyle=1;" vertex="1" parent="cr-box">
+          <mxGeometry x="30" y="60" width="56" height="44" as="geometry"/>
+        </mxCell>
+        <!-- cr-svc-02 -->
+        <mxCell id="cr-svc-02" value="cr-svc-02" style="shape=mxgraph.gcp2.cloud_run;fillColor=#AECBFA;strokeColor=none;verticalLabelPosition=bottom;verticalAlign=top;align=center;fontSize=9;fontColor=#3C4043;fontStyle=1;" vertex="1" parent="cr-box">
+          <mxGeometry x="130" y="60" width="56" height="44" as="geometry"/>
+        </mxCell>
+        <!-- cr-svc-03 -->
+        <mxCell id="cr-svc-03" value="cr-svc-03" style="shape=mxgraph.gcp2.cloud_run;fillColor=#AECBFA;strokeColor=none;verticalLabelPosition=bottom;verticalAlign=top;align=center;fontSize=9;fontColor=#3C4043;fontStyle=1;" vertex="1" parent="cr-box">
+          <mxGeometry x="230" y="60" width="56" height="44" as="geometry"/>
+        </mxCell>
+        <!-- cr-svc-04 -->
+        <mxCell id="cr-svc-04" value="cr-svc-04" style="shape=mxgraph.gcp2.cloud_run;fillColor=#AECBFA;strokeColor=none;verticalLabelPosition=bottom;verticalAlign=top;align=center;fontSize=9;fontColor=#3C4043;fontStyle=1;" vertex="1" parent="cr-box">
+          <mxGeometry x="330" y="60" width="56" height="44" as="geometry"/>
+        </mxCell>
+        <!-- cr-svc-05 -->
+        <mxCell id="cr-svc-05" value="cr-svc-05" style="shape=mxgraph.gcp2.cloud_run;fillColor=#AECBFA;strokeColor=none;verticalLabelPosition=bottom;verticalAlign=top;align=center;fontSize=9;fontColor=#3C4043;fontStyle=1;" vertex="1" parent="cr-box">
+          <mxGeometry x="430" y="60" width="56" height="44" as="geometry"/>
+        </mxCell>
+
+        <!-- Ellipsis — more services -->
+        <mxCell id="cr-more" value="... +15 more services ..." style="text;fontSize=12;fontColor=#1565C0;align=center;fontStyle=3;" vertex="1" parent="cr-box">
+          <mxGeometry x="530" y="65" width="150" height="30" as="geometry"/>
+        </mxCell>
+
+        <!-- Second row showing fan-out pattern -->
+        <mxCell id="cr-svc-06" value="cr-svc-06" style="shape=mxgraph.gcp2.cloud_run;fillColor=#AECBFA;strokeColor=none;verticalLabelPosition=bottom;verticalAlign=top;align=center;fontSize=9;fontColor=#3C4043;fontStyle=1;" vertex="1" parent="cr-box">
+          <mxGeometry x="30" y="150" width="56" height="44" as="geometry"/>
+        </mxCell>
+        <mxCell id="cr-svc-07" value="cr-svc-07" style="shape=mxgraph.gcp2.cloud_run;fillColor=#AECBFA;strokeColor=none;verticalLabelPosition=bottom;verticalAlign=top;align=center;fontSize=9;fontColor=#3C4043;fontStyle=1;" vertex="1" parent="cr-box">
+          <mxGeometry x="130" y="150" width="56" height="44" as="geometry"/>
+        </mxCell>
+        <mxCell id="cr-svc-dots1" value="..." style="text;fontSize=14;fontColor=#1565C0;align=center;fontStyle=1;" vertex="1" parent="cr-box">
+          <mxGeometry x="230" y="160" width="56" height="30" as="geometry"/>
+        </mxCell>
+        <mxCell id="cr-svc-19" value="cr-svc-19" style="shape=mxgraph.gcp2.cloud_run;fillColor=#AECBFA;strokeColor=none;verticalLabelPosition=bottom;verticalAlign=top;align=center;fontSize=9;fontColor=#3C4043;fontStyle=1;" vertex="1" parent="cr-box">
+          <mxGeometry x="330" y="150" width="56" height="44" as="geometry"/>
+        </mxCell>
+        <mxCell id="cr-svc-20" value="cr-svc-20" style="shape=mxgraph.gcp2.cloud_run;fillColor=#AECBFA;strokeColor=none;verticalLabelPosition=bottom;verticalAlign=top;align=center;fontSize=9;fontColor=#3C4043;fontStyle=1;" vertex="1" parent="cr-box">
+          <mxGeometry x="430" y="150" width="56" height="44" as="geometry"/>
+        </mxCell>
+
+        <!-- All ingress internal -->
+        <mxCell id="cr-ingress" value="All services: ingress=internal, scale-to-zero" style="text;fontSize=9;fontColor=#80868B;align=center;" vertex="1" parent="cr-box">
+          <mxGeometry x="440" y="170" width="240" height="20" as="geometry"/>
+        </mxCell>
+
+        <!-- Arrow from Google to Cloud Run -->
+        <mxCell id="google-to-cr" value="" style="endArrow=classic;strokeColor=#1565C0;strokeWidth=3;html=1;" edge="1" parent="1" source="google-backbone" target="cr-box">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- ==================== WORKLOADS VPC (greyed, not involved) ==================== -->
+        <mxCell id="vpc-workloads" value="Workloads VPC (connected via VPN but not used for PSC Google APIs traffic)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F5F5F5;strokeColor=#BDBDBD;strokeWidth=1;dashed=1;verticalAlign=top;fontStyle=2;fontSize=11;fontColor=#9E9E9E;arcSize=4;" vertex="1" parent="1">
+          <mxGeometry x="360" y="600" width="420" height="70" as="geometry"/>
+        </mxCell>
+
+        <!-- ==================== KEY FINDINGS ==================== -->
+        <mxCell id="findings" value="Key Finding: 20 services, single PSC endpoint, zero infrastructure changes  &#10102; PSC endpoint (10.0.0.100) → all-apis bundle  &#10103; DNS wildcard *.run.app → PSC IP (covers ALL services)  &#10104; PSC tunnels to Google API frontend  &#10105; Cloud Run receives request (any of 20 services)&#xa;&#xa;Adding services requires ONLY: gcloud run deploy (no networking changes). PSC endpoint, DNS zone, firewall rules, and VPN config are identical to single-service Option C." style="text;fontSize=10;fontColor=#3C4043;align=left;verticalAlign=top;fillColor=#FFF8E1;rounded=1;strokeColor=#F9A825;spacingLeft=10;spacingRight=10;spacingTop=6;spacingBottom=6;whiteSpace=wrap;" vertex="1" parent="1">
+          <mxGeometry x="40" y="710" width="1120" height="80" as="geometry"/>
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
