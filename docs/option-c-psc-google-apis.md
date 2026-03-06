@@ -379,3 +379,7 @@ Configure an Apigee proxy target endpoint to call the Cloud Run service:
 ```
 
 Invoke the Apigee proxy and verify the end-to-end flow returns a successful response from Cloud Run.
+
+### PoC Scripts
+
+Runnable scripts for this option: [`scripts/option3/`](../scripts/option3/)

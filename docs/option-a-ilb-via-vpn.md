@@ -562,3 +562,7 @@ curl -X POST "https://apigee.googleapis.com/v1/organizations/${ORG}/environments
 ```
 
 Then send a request through the Apigee proxy and inspect the debug session for the target response, latency, and any connection errors.
+
+### PoC Scripts
+
+Runnable scripts for this option: [`scripts/option1/`](../scripts/option1/)

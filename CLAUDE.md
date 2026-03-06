@@ -35,6 +35,16 @@ Each option doc follows the same structure:
 Cross-cutting docs:
 - `docs/dns-guide.md` — DNS reference across all options
 - `docs/scaling-analysis.md` — Scale to 1000s of services analysis
+- `docs/option-c-scaled.md` — 20-service PoC validating Option C linear scaling
+
+## PoC Scripts
+
+Each option has runnable proof-of-concept scripts under `scripts/`:
+- `scripts/option1/` — Option A (ILB + Serverless NEG)
+- `scripts/option2/` — Option B (PGA)
+- `scripts/option3/` — Option C (PSC Google APIs)
+- `scripts/option3-scaled/` — Option C at 20 services
+- `scripts/option4/` — Option D (PSC Service Attachment)
 
 ## Diagrams
 

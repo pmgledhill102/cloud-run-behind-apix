@@ -394,3 +394,7 @@ Configure an Apigee proxy with:
 - Authentication: Google ID token with the Cloud Run service URL as audience
 
 Send a test request through the Apigee proxy and confirm a successful response from Cloud Run.
+
+### PoC Scripts
+
+Runnable scripts for this option: [`scripts/option2/`](../scripts/option2/)
