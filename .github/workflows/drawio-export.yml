@@ -22,6 +22,7 @@ jobs:
           path: docs/diagrams
           format: svg
           transparent: true
+          action-mode: all
 
       - name: Rename exported SVGs to match expected paths
         run: |
@@ -30,7 +31,7 @@ jobs:
             base="$(basename "$drawio_file" .drawio)"
             svg="$(ls docs/diagrams/export/"${base}"-*.svg 2>/dev/null | head -1)"
             if [ -n "$svg" ]; then
-              mv "$svg" "docs/diagrams/${base}.drawio.svg"
+              mv "$svg" "docs/diagrams/${base}.svg"
             fi
           done
           rm -rf docs/diagrams/export
