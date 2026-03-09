@@ -140,14 +140,24 @@ if [[ -n "${EXISTING_PEERING}" ]]; then
     --service=servicenetworking.googleapis.com \
     --ranges="${APIGEE_PEERING_RANGE_NAME},${APIGEE_INSTANCE_RANGE_NAME}" \
     --network="${APIGEE_NETWORK}" \
-    --project="${PROJECT_ID}"
+    --project="${PROJECT_ID}" \
+    --force
   echo "Peering updated with both ranges."
 else
-  gcloud services vpc-peerings connect \
+  # Try connect first; if it fails because peering exists, fall back to update
+  if ! gcloud services vpc-peerings connect \
     --service=servicenetworking.googleapis.com \
     --ranges="${APIGEE_PEERING_RANGE_NAME},${APIGEE_INSTANCE_RANGE_NAME}" \
     --network="${APIGEE_NETWORK}" \
-    --project="${PROJECT_ID}"
+    --project="${PROJECT_ID}" 2>/dev/null; then
+    echo "Connect failed (peering may already exist). Trying update..."
+    gcloud services vpc-peerings update \
+      --service=servicenetworking.googleapis.com \
+      --ranges="${APIGEE_PEERING_RANGE_NAME},${APIGEE_INSTANCE_RANGE_NAME}" \
+      --network="${APIGEE_NETWORK}" \
+      --project="${PROJECT_ID}" \
+      --force
+  fi
   echo "VPC peering to servicenetworking established with both ranges."
 fi
 
