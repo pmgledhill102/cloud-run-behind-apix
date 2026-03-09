@@ -19,7 +19,7 @@ set -euo pipefail
 PROJECT_ID="${PROJECT_ID:-sb-paul-g-workshop}"
 
 REGION="europe-north2"
-PSC_IP="10.0.0.100"
+PSC_IP="10.0.1.100"
 
 echo "=== Setup PSC for Google APIs — project: ${PROJECT_ID} ==="
 echo "Region: ${REGION}"
