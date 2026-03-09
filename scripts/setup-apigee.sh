@@ -29,7 +29,9 @@ ANALYTICS_REGION="europe-west1"  # Apigee analytics not available in all regions
 CONSUMER_DATA_REGION="europe-west1"  # Must be a specific region, not multi-region "eu"
 APIGEE_NETWORK="apigee-vpc"
 APIGEE_PEERING_RANGE_NAME="apigee-peering-range"
-APIGEE_PEERING_CIDR="10.1.0.0/22"  # /22 is the minimum for Apigee runtime
+APIGEE_PEERING_CIDR="10.1.0.0/20"  # Org peering range (4096 IPs)
+APIGEE_INSTANCE_RANGE_NAME="apigee-instance-range"
+APIGEE_INSTANCE_CIDR="10.2.0.0/22"  # Instance range (/22 minimum for runtime)
 APIGEE_ENV="test"
 APIGEE_ENV_GROUP="test-group"
 APIGEE_ENV_GROUP_HOSTNAME="api.internal.example.com"
@@ -81,49 +83,82 @@ else
 fi
 
 # ============================================================
-# Step 3: Allocate IP range for Apigee peering
+# Step 3: Allocate IP ranges for Apigee peering
 # ============================================================
 echo ""
-echo "--- Step 3: Allocate peering IP range ---"
+echo "--- Step 3: Allocate peering IP ranges ---"
+
+# Range 1: org peering
 if gcloud compute addresses describe "${APIGEE_PEERING_RANGE_NAME}" \
     --global --project="${PROJECT_ID}" &>/dev/null; then
   echo "Peering range '${APIGEE_PEERING_RANGE_NAME}' already exists, skipping."
 else
-  # Extract prefix length from CIDR
   PREFIX_LENGTH="${APIGEE_PEERING_CIDR##*/}"
   RANGE_START="${APIGEE_PEERING_CIDR%%/*}"
-
   gcloud compute addresses create "${APIGEE_PEERING_RANGE_NAME}" \
     --global \
     --prefix-length="${PREFIX_LENGTH}" \
     --addresses="${RANGE_START}" \
-    --description="Apigee X peering range" \
+    --description="Apigee X org peering range" \
     --network="${APIGEE_NETWORK}" \
     --purpose=VPC_PEERING \
     --project="${PROJECT_ID}"
   echo "Peering range '${APIGEE_PEERING_RANGE_NAME}' (${APIGEE_PEERING_CIDR}) allocated."
 fi
 
+# Range 2: instance range (separate to avoid exhaustion)
+if gcloud compute addresses describe "${APIGEE_INSTANCE_RANGE_NAME}" \
+    --global --project="${PROJECT_ID}" &>/dev/null; then
+  echo "Instance range '${APIGEE_INSTANCE_RANGE_NAME}' already exists, skipping."
+else
+  INST_PREFIX="${APIGEE_INSTANCE_CIDR##*/}"
+  INST_START="${APIGEE_INSTANCE_CIDR%%/*}"
+  gcloud compute addresses create "${APIGEE_INSTANCE_RANGE_NAME}" \
+    --global \
+    --prefix-length="${INST_PREFIX}" \
+    --addresses="${INST_START}" \
+    --description="Apigee X instance IP range" \
+    --network="${APIGEE_NETWORK}" \
+    --purpose=VPC_PEERING \
+    --project="${PROJECT_ID}"
+  echo "Instance range '${APIGEE_INSTANCE_RANGE_NAME}' (${APIGEE_INSTANCE_CIDR}) allocated."
+fi
+
 # ============================================================
-# Step 4: Create VPC peering to servicenetworking
+# Step 4: Create/update VPC peering to servicenetworking
 # ============================================================
 echo ""
 echo "--- Step 4: VPC peering to Google Service Networking ---"
 
-# Check if peering already exists
 EXISTING_PEERING="$(gcloud compute networks peerings list \
   --network="${APIGEE_NETWORK}" --project="${PROJECT_ID}" \
   --format='value(name)' --filter='network~servicenetworking' 2>/dev/null || true)"
 
 if [[ -n "${EXISTING_PEERING}" ]]; then
-  echo "VPC peering already exists (${EXISTING_PEERING}), skipping."
-else
-  gcloud services vpc-peerings connect \
+  echo "VPC peering already exists. Updating to include both ranges..."
+  gcloud services vpc-peerings update \
     --service=servicenetworking.googleapis.com \
-    --ranges="${APIGEE_PEERING_RANGE_NAME}" \
+    --ranges="${APIGEE_PEERING_RANGE_NAME},${APIGEE_INSTANCE_RANGE_NAME}" \
     --network="${APIGEE_NETWORK}" \
-    --project="${PROJECT_ID}"
-  echo "VPC peering to servicenetworking established."
+    --project="${PROJECT_ID}" \
+    --force
+  echo "Peering updated with both ranges."
+else
+  # Try connect first; if it fails because peering exists, fall back to update
+  if ! gcloud services vpc-peerings connect \
+    --service=servicenetworking.googleapis.com \
+    --ranges="${APIGEE_PEERING_RANGE_NAME},${APIGEE_INSTANCE_RANGE_NAME}" \
+    --network="${APIGEE_NETWORK}" \
+    --project="${PROJECT_ID}" 2>/dev/null; then
+    echo "Connect failed (peering may already exist). Trying update..."
+    gcloud services vpc-peerings update \
+      --service=servicenetworking.googleapis.com \
+      --ranges="${APIGEE_PEERING_RANGE_NAME},${APIGEE_INSTANCE_RANGE_NAME}" \
+      --network="${APIGEE_NETWORK}" \
+      --project="${PROJECT_ID}" \
+      --force
+  fi
+  echo "VPC peering to servicenetworking established with both ranges."
 fi
 
 # ============================================================
@@ -226,15 +261,20 @@ echo "--- Step 6: Create Apigee runtime instance ---"
 TOKEN="$(gcloud auth print-access-token)"
 INSTANCE_NAME="instance-${REGION}"
 
-INSTANCE_HTTP="$(curl -s -o /dev/null -w '%{http_code}' \
+# Check if instance already exists (any state — CREATING or ACTIVE)
+INSTANCE_JSON="$(curl -s \
   -H "Authorization: Bearer ${TOKEN}" \
   "${APIGEE_API}/organizations/${PROJECT_ID}/instances/${INSTANCE_NAME}")"
+INSTANCE_EXISTS="$(echo "${INSTANCE_JSON}" | python3 -c "import sys,json; d=json.load(sys.stdin); print('yes' if 'name' in d else 'no')" 2>/dev/null || echo "no")"
+INSTANCE_STATE="$(echo "${INSTANCE_JSON}" | python3 -c "import sys,json; print(json.load(sys.stdin).get('state','UNKNOWN'))" 2>/dev/null || echo "UNKNOWN")"
 
-if [[ "${INSTANCE_HTTP}" == "200" ]]; then
-  echo "Apigee instance '${INSTANCE_NAME}' already exists, skipping."
+if [[ "${INSTANCE_EXISTS}" == "yes" && "${INSTANCE_STATE}" == "ACTIVE" ]]; then
+  echo "Apigee instance '${INSTANCE_NAME}' already exists and is ACTIVE, skipping."
+elif [[ "${INSTANCE_EXISTS}" == "yes" ]]; then
+  echo "Apigee instance '${INSTANCE_NAME}' exists (state: ${INSTANCE_STATE}). Waiting..."
 else
   echo "Creating Apigee instance '${INSTANCE_NAME}' in ${REGION}..."
-  echo "(This may take 20-30 minutes)"
+  echo "(This may take 30-60 minutes)"
 
   INST_RESPONSE="$(curl -s -X POST \
     -H "Authorization: Bearer ${TOKEN}" \
@@ -243,7 +283,7 @@ else
     -d "{
       \"name\": \"${INSTANCE_NAME}\",
       \"location\": \"${REGION}\",
-      \"ipRange\": \"${APIGEE_PEERING_CIDR}\"
+      \"ipRange\": \"${APIGEE_INSTANCE_CIDR}\"
     }")"
 
   if echo "${INST_RESPONSE}" | grep -q '"error"'; then
@@ -252,10 +292,13 @@ else
     exit 1
   fi
 
-  echo "Instance creation started. Waiting for completion..."
+  echo "Instance creation started."
+fi
 
-  # Poll for instance readiness
-  TIMEOUT=2400  # 40 minutes max
+# Wait for ACTIVE (unless already active)
+if [[ "${INSTANCE_STATE}" != "ACTIVE" ]]; then
+  echo "Waiting for instance to become ACTIVE..."
+  TIMEOUT=3600  # 60 minutes max
   INTERVAL=30
   ELAPSED=0
   while true; do
