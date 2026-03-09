@@ -27,6 +27,7 @@ PROJECT_ID="${PROJECT_ID:-sb-paul-g-apigee}"
 REGION="europe-north2"
 APIGEE_NETWORK="apigee-vpc"
 APIGEE_PEERING_RANGE_NAME="apigee-peering-range"
+APIGEE_INSTANCE_RANGE_NAME="apigee-instance-range"
 APIGEE_ENV="test"
 APIGEE_ENV_GROUP="test-group"
 INSTANCE_NAME="instance-${REGION}"
@@ -234,8 +235,12 @@ echo "Done."
 # Step 10: Release peering IP range
 # ============================================================
 echo ""
-echo "--- Step 10: Release peering IP range ---"
+echo "--- Step 10: Release peering IP ranges ---"
 gcloud compute addresses delete "${APIGEE_PEERING_RANGE_NAME}" \
+  --global \
+  --project="${PROJECT_ID}" \
+  --quiet 2>/dev/null || true
+gcloud compute addresses delete "${APIGEE_INSTANCE_RANGE_NAME}" \
   --global \
   --project="${PROJECT_ID}" \
   --quiet 2>/dev/null || true
