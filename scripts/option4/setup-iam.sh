@@ -66,6 +66,17 @@ for role in "${ROLES[@]}"; do
 done
 echo "IAM roles bound."
 
+# --- Grant caller permission to impersonate the SA ---
+echo ""
+echo "--- Granting caller serviceAccountTokenCreator ---"
+CALLER_ACCOUNT="$(gcloud config get-value account 2>/dev/null)"
+gcloud iam service-accounts add-iam-policy-binding "${SA_EMAIL}" \
+  --member="user:${CALLER_ACCOUNT}" \
+  --role="roles/iam.serviceAccountTokenCreator" \
+  --project="${PROJECT_ID}" \
+  --quiet >/dev/null
+echo "Caller '${CALLER_ACCOUNT}' can now impersonate '${SA_EMAIL}'."
+
 # --- Grant Cloud Run Service Agent compute.networkUser ---
 echo ""
 echo "--- Granting Cloud Run Service Agent roles/compute.networkUser ---"
