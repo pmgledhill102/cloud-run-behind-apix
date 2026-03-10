@@ -11,9 +11,15 @@
 set -euo pipefail
 
 # --- Configuration ---
-PROJECT_ID="${PROJECT_ID:-sb-paul-g-workshop}"
+PROJECT_ID="${PROJECT_ID:-sb-paul-g-apigee}"
 
 REGION="europe-north2"
+
+# Apigee (optional — detected automatically)
+APIGEE_API="${APIGEE_API:-https://eu-apigee.googleapis.com/v1}"
+APIGEE_ENV="${APIGEE_ENV:-test}"
+PROXY_NAME="cr-hello-passthrough"
+APIGEE_TARGET_URL="https://api.internal.example.com/"
 
 echo "=== Setup PSC Service Attachment — project: ${PROJECT_ID} ==="
 echo "Region: ${REGION}"
@@ -242,6 +248,7 @@ if resource_exists gcloud dns managed-zones describe "api-internal-zone" --proje
 else
   gcloud dns managed-zones create "api-internal-zone" \
     --dns-name="api.internal.example.com." \
+    --description="Private zone for Apigee to Cloud Run via PSC" \
     --visibility=private \
     --networks=apigee-vpc \
     --project="${PROJECT_ID}"
@@ -292,7 +299,155 @@ gcloud dns record-sets list \
   --project="${PROJECT_ID}" \
   --format="table(name,type,ttl,rrdatas)" 2>/dev/null || echo "(not ready yet)"
 
+# ============================================================
+# Step 13: Update Apigee proxy target (if Apigee is provisioned)
+# ============================================================
 echo ""
-echo "=== Next steps ==="
-echo ""
-echo "Run ./test.sh to verify PSC connectivity from the VM."
+echo "--- Step 13: Configure Apigee proxy (if provisioned) ---"
+
+TOKEN="$(gcloud auth print-access-token)"
+APIGEE_HTTP="$(curl -s -o /dev/null -w '%{http_code}' \
+  -H "Authorization: Bearer ${TOKEN}" \
+  "${APIGEE_API}/organizations/${PROJECT_ID}")"
+
+if [[ "${APIGEE_HTTP}" != "200" ]]; then
+  echo "Apigee not provisioned (HTTP ${APIGEE_HTTP}), skipping proxy update."
+  echo ""
+  echo "=== Next steps ==="
+  echo ""
+  echo "Run ./test.sh to verify PSC connectivity from the VM."
+else
+  # Check if proxy target is already correct
+  DEPLOYED_REV="$(curl -s \
+    -H "Authorization: Bearer ${TOKEN}" \
+    "${APIGEE_API}/organizations/${PROJECT_ID}/environments/${APIGEE_ENV}/apis/${PROXY_NAME}/deployments" \
+    | python3 -c "
+import sys,json
+data = json.load(sys.stdin)
+deploys = data.get('deployments', [])
+if deploys:
+    print(deploys[0].get('revision',''))
+" 2>/dev/null || true)"
+
+  NEEDS_UPDATE=true
+  if [[ -n "${DEPLOYED_REV}" ]]; then
+    CURRENT_TARGET_XML="$(curl -s \
+      -H "Authorization: Bearer ${TOKEN}" \
+      -H "Accept: application/xml" \
+      "${APIGEE_API}/organizations/${PROJECT_ID}/apis/${PROXY_NAME}/revisions/${DEPLOYED_REV}/targets/default" 2>/dev/null || true)"
+    if echo "${CURRENT_TARGET_XML}" | grep -q "api.internal.example.com"; then
+      echo "Proxy target already set to ${APIGEE_TARGET_URL}, skipping."
+      NEEDS_UPDATE=false
+    fi
+  fi
+
+  if [[ "${NEEDS_UPDATE}" == "true" ]]; then
+    echo "Updating proxy '${PROXY_NAME}' target to ${APIGEE_TARGET_URL}..."
+
+    # Build proxy bundle with correct target URL
+    BUNDLE_DIR="$(mktemp -d)"
+    mkdir -p "${BUNDLE_DIR}/apiproxy/proxies"
+    mkdir -p "${BUNDLE_DIR}/apiproxy/targets"
+    mkdir -p "${BUNDLE_DIR}/apiproxy/policies"
+
+    cat > "${BUNDLE_DIR}/apiproxy/proxies/default.xml" << 'XMLEOF'
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<ProxyEndpoint name="default">
+  <PreFlow name="PreFlow">
+    <Request/>
+    <Response/>
+  </PreFlow>
+  <Flows/>
+  <PostFlow name="PostFlow">
+    <Request/>
+    <Response/>
+  </PostFlow>
+  <HTTPProxyConnection>
+    <BasePath>/hello</BasePath>
+  </HTTPProxyConnection>
+  <RouteRule name="default">
+    <TargetEndpoint>default</TargetEndpoint>
+  </RouteRule>
+</ProxyEndpoint>
+XMLEOF
+
+    cat > "${BUNDLE_DIR}/apiproxy/targets/default.xml" << XMLEOF
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<TargetEndpoint name="default">
+  <PreFlow name="PreFlow">
+    <Request/>
+    <Response/>
+  </PreFlow>
+  <Flows/>
+  <PostFlow name="PostFlow">
+    <Request/>
+    <Response/>
+  </PostFlow>
+  <HTTPTargetConnection>
+    <URL>${APIGEE_TARGET_URL}</URL>
+  </HTTPTargetConnection>
+</TargetEndpoint>
+XMLEOF
+
+    cat > "${BUNDLE_DIR}/apiproxy/${PROXY_NAME}.xml" << XMLEOF
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<APIProxy name="${PROXY_NAME}">
+  <Description>Pass-through proxy to Cloud Run cr-hello service via PSC</Description>
+  <BasePaths>/hello</BasePaths>
+</APIProxy>
+XMLEOF
+
+    BUNDLE_ZIP="$(mktemp).zip"
+    (cd "${BUNDLE_DIR}" && zip -r "${BUNDLE_ZIP}" apiproxy/) >/dev/null
+
+    # Import new revision
+    IMPORT_RESPONSE="$(curl -s -X POST \
+      -H "Authorization: Bearer ${TOKEN}" \
+      -H "Content-Type: application/octet-stream" \
+      "${APIGEE_API}/organizations/${PROJECT_ID}/apis?name=${PROXY_NAME}&action=import" \
+      --data-binary "@${BUNDLE_ZIP}")"
+
+    rm -rf "${BUNDLE_DIR}" "${BUNDLE_ZIP}"
+
+    if echo "${IMPORT_RESPONSE}" | grep -q '"error"'; then
+      echo "ERROR importing proxy revision:"
+      echo "${IMPORT_RESPONSE}" | python3 -m json.tool 2>/dev/null || echo "${IMPORT_RESPONSE}"
+    else
+      NEW_REV="$(echo "${IMPORT_RESPONSE}" | python3 -c "import sys,json; print(json.load(sys.stdin).get('revision',''))" 2>/dev/null || true)"
+      echo "Imported revision ${NEW_REV}."
+
+      # Deploy new revision (override undeploys the old one)
+      DEPLOY_RESPONSE="$(curl -s -X POST \
+        -H "Authorization: Bearer ${TOKEN}" \
+        "${APIGEE_API}/organizations/${PROJECT_ID}/environments/${APIGEE_ENV}/apis/${PROXY_NAME}/revisions/${NEW_REV}/deployments?override=true")"
+
+      if echo "${DEPLOY_RESPONSE}" | grep -q '"error"'; then
+        echo "ERROR deploying revision ${NEW_REV}:"
+        echo "${DEPLOY_RESPONSE}" | python3 -m json.tool 2>/dev/null || echo "${DEPLOY_RESPONSE}"
+      else
+        echo "Revision ${NEW_REV} deployed to '${APIGEE_ENV}'."
+      fi
+    fi
+  fi
+
+  # Get instance IP for summary
+  INSTANCE_IP="$(curl -s \
+    -H "Authorization: Bearer ${TOKEN}" \
+    "${APIGEE_API}/organizations/${PROJECT_ID}/instances/instance-${REGION}" \
+    | python3 -c "import sys,json; print(json.load(sys.stdin).get('host','unknown'))" 2>/dev/null || echo 'unknown')"
+
+  echo ""
+  echo "=== Apigee proxy configured ==="
+  echo ""
+  echo "  Proxy:  ${PROXY_NAME} → /hello"
+  echo "  Target: ${APIGEE_TARGET_URL}"
+  echo "  Instance IP: ${INSTANCE_IP}"
+  echo ""
+  echo "  Traffic flow:"
+  echo "    Client → Apigee (${INSTANCE_IP}) → DNS → PSC (10.0.0.50)"
+  echo "    → Service Attachment → ILB → Cloud Run"
+  echo ""
+  echo "=== Next steps ==="
+  echo ""
+  echo "Run ./test.sh to verify both direct PSC and Apigee end-to-end connectivity."
+fi

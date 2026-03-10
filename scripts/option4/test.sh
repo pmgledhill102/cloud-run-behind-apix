@@ -12,10 +12,14 @@
 #
 set -euo pipefail
 
-PROJECT_ID="${PROJECT_ID:-sb-paul-g-workshop}"
+PROJECT_ID="${PROJECT_ID:-sb-paul-g-apigee}"
 
 REGION="europe-north2"
 ZONE="${REGION}-a"
+
+# Apigee (optional — detected automatically)
+APIGEE_API="${APIGEE_API:-https://eu-apigee.googleapis.com/v1}"
+INSTANCE_NAME="instance-${REGION}"
 
 echo "=== Testing PSC Service Attachment Connectivity ==="
 echo "Project: ${PROJECT_ID}"
@@ -120,10 +124,57 @@ ssh_cmd "curl -skv --max-time 10 https://api.internal.example.com/ 2>&1 | grep -
 echo ""
 
 # ============================================================
+# Test 6: End-to-end through Apigee (if provisioned)
+# ============================================================
+echo "=========================================="
+echo "  Test 6: Apigee End-to-End (if provisioned)"
+echo "=========================================="
+echo ""
+
+TOKEN="$(gcloud auth print-access-token)"
+APIGEE_HTTP="$(curl -s -o /dev/null -w '%{http_code}' \
+  -H "Authorization: Bearer ${TOKEN}" \
+  "${APIGEE_API}/organizations/${PROJECT_ID}")"
+
+if [[ "${APIGEE_HTTP}" != "200" ]]; then
+  echo "Apigee not provisioned, skipping."
+  echo ""
+else
+  INSTANCE_IP="$(curl -s \
+    -H "Authorization: Bearer ${TOKEN}" \
+    "${APIGEE_API}/organizations/${PROJECT_ID}/instances/${INSTANCE_NAME}" \
+    | python3 -c "import sys,json; print(json.load(sys.stdin).get('host',''))" 2>/dev/null || true)"
+
+  if [[ -z "${INSTANCE_IP}" ]]; then
+    echo "Apigee instance not ACTIVE, skipping."
+    echo ""
+  else
+    echo "Apigee instance IP: ${INSTANCE_IP}"
+    echo ""
+    echo "VM → Apigee (${INSTANCE_IP}) → DNS → PSC (10.0.0.50) → Service Attachment → ILB → Cloud Run"
+    echo ""
+
+    echo "--- curl https://api.internal.example.com/hello via Apigee ---"
+    ssh_cmd "curl -sk --max-time 15 --resolve api.internal.example.com:443:${INSTANCE_IP} https://api.internal.example.com/hello" || echo "  FAILED"
+
+    echo ""
+
+    echo "--- Connection details ---"
+    ssh_cmd "curl -skv --max-time 15 --resolve api.internal.example.com:443:${INSTANCE_IP} https://api.internal.example.com/hello 2>&1 | grep -E '(Trying|Connected|< HTTP)'" || echo "  FAILED"
+
+    echo ""
+  fi
+fi
+
+# ============================================================
 # Summary
 # ============================================================
 echo "=== Test complete ==="
 echo ""
-echo "If Test 2 shows ACCEPTED, the PSC connection is established."
-echo "If Test 3 shows 10.0.0.50, DNS is correctly resolving to the PSC endpoint."
-echo "If Test 4 returns 'OK', the full path (VM -> PSC -> ILB -> Cloud Run) works."
+echo "Direct PSC path (Tests 1-5):"
+echo "  Test 2 ACCEPTED  → PSC connection established"
+echo "  Test 3 10.0.0.50 → DNS resolving to PSC endpoint"
+echo "  Test 4 'OK'      → VM → PSC → ILB → Cloud Run works"
+echo ""
+echo "Apigee path (Test 6, if provisioned):"
+echo "  'OK' → VM → Apigee → PSC → ILB → Cloud Run works"
