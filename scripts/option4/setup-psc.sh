@@ -19,7 +19,8 @@ REGION="europe-north2"
 APIGEE_API="${APIGEE_API:-https://eu-apigee.googleapis.com/v1}"
 APIGEE_ENV="${APIGEE_ENV:-test}"
 PROXY_NAME="cr-hello-passthrough"
-APIGEE_TARGET_URL="https://api.internal.example.com/"
+PSC_CONSUMER_IP="10.0.0.50"
+APIGEE_TARGET_URL="https://${PSC_CONSUMER_IP}/"
 
 echo "=== Setup PSC Service Attachment — project: ${PROJECT_ID} ==="
 echo "Region: ${REGION}"
@@ -335,7 +336,7 @@ if deploys:
       -H "Authorization: Bearer ${TOKEN}" \
       -H "Accept: application/xml" \
       "${APIGEE_API}/organizations/${PROJECT_ID}/apis/${PROXY_NAME}/revisions/${DEPLOYED_REV}/targets/default" 2>/dev/null || true)"
-    if echo "${CURRENT_TARGET_XML}" | grep -q "api.internal.example.com"; then
+    if echo "${CURRENT_TARGET_XML}" | grep -q "${PSC_CONSUMER_IP}"; then
       echo "Proxy target already set to ${APIGEE_TARGET_URL}, skipping."
       NEEDS_UPDATE=false
     fi
@@ -385,6 +386,10 @@ XMLEOF
   </PostFlow>
   <HTTPTargetConnection>
     <URL>${APIGEE_TARGET_URL}</URL>
+    <SSLInfo>
+      <Enabled>true</Enabled>
+      <IgnoreValidationErrors>true</IgnoreValidationErrors>
+    </SSLInfo>
   </HTTPTargetConnection>
 </TargetEndpoint>
 XMLEOF
@@ -444,8 +449,11 @@ XMLEOF
   echo "  Instance IP: ${INSTANCE_IP}"
   echo ""
   echo "  Traffic flow:"
-  echo "    Client → Apigee (${INSTANCE_IP}) → DNS → PSC (10.0.0.50)"
+  echo "    Client → Apigee (${INSTANCE_IP}) → PSC (${PSC_CONSUMER_IP})"
   echo "    → Service Attachment → ILB → Cloud Run"
+  echo ""
+  echo "  Note: Target uses PSC IP directly (Apigee runtime cannot"
+  echo "  resolve Cloud DNS private zones via VPC peering)."
   echo ""
   echo "=== Next steps ==="
   echo ""

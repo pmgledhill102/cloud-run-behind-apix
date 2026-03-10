@@ -151,16 +151,19 @@ else
   else
     echo "Apigee instance IP: ${INSTANCE_IP}"
     echo ""
-    echo "VM → Apigee (${INSTANCE_IP}) → DNS → PSC (10.0.0.50) → Service Attachment → ILB → Cloud Run"
+    echo "VM → Apigee (${INSTANCE_IP}) → PSC (10.0.0.50) → Service Attachment → ILB → Cloud Run"
+    echo ""
+    echo "Note: Proxy targets PSC IP directly (Apigee runtime cannot"
+    echo "resolve Cloud DNS private zones via VPC peering)."
     echo ""
 
-    echo "--- curl https://api.internal.example.com/hello via Apigee ---"
-    ssh_cmd "curl -sk --max-time 15 --resolve api.internal.example.com:443:${INSTANCE_IP} https://api.internal.example.com/hello" || echo "  FAILED"
+    echo "--- curl https://${INSTANCE_IP}/hello (via Apigee env group) ---"
+    ssh_cmd "curl -sk --max-time 15 -H 'Host: api.internal.example.com' https://${INSTANCE_IP}/hello" || echo "  FAILED"
 
     echo ""
 
     echo "--- Connection details ---"
-    ssh_cmd "curl -skv --max-time 15 --resolve api.internal.example.com:443:${INSTANCE_IP} https://api.internal.example.com/hello 2>&1 | grep -E '(Trying|Connected|< HTTP)'" || echo "  FAILED"
+    ssh_cmd "curl -skv --max-time 15 -H 'Host: api.internal.example.com' https://${INSTANCE_IP}/hello 2>&1 | grep -E '(Trying|Connected|< HTTP)'" || echo "  FAILED"
 
     echo ""
   fi
