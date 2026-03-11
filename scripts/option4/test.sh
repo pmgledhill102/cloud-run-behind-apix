@@ -20,6 +20,7 @@ ZONE="${REGION}-a"
 # Apigee (optional — detected automatically)
 APIGEE_API="${APIGEE_API:-https://eu-apigee.googleapis.com/v1}"
 INSTANCE_NAME="instance-${REGION}"
+ENDPOINT_ATTACHMENT_ID="ea-cr-hello"
 
 echo "=== Testing PSC Service Attachment Connectivity ==="
 echo "Project: ${PROJECT_ID}"
@@ -145,19 +146,28 @@ else
     "${APIGEE_API}/organizations/${PROJECT_ID}/instances/${INSTANCE_NAME}" \
     | python3 -c "import sys,json; print(json.load(sys.stdin).get('host',''))" 2>/dev/null || true)"
 
+  EA_HOST="$(curl -s \
+    -H "Authorization: Bearer ${TOKEN}" \
+    "${APIGEE_API}/organizations/${PROJECT_ID}/endpointAttachments/${ENDPOINT_ATTACHMENT_ID}" \
+    | python3 -c "import sys,json; print(json.load(sys.stdin).get('host',''))" 2>/dev/null || true)"
+
   if [[ -z "${INSTANCE_IP}" ]]; then
     echo "Apigee instance not ACTIVE, skipping."
     echo ""
+  elif [[ -z "${EA_HOST}" ]]; then
+    echo "Endpoint attachment '${ENDPOINT_ATTACHMENT_ID}' not ready, skipping."
+    echo "Run setup-psc.sh first to create the endpoint attachment."
+    echo ""
   else
-    echo "Apigee instance IP: ${INSTANCE_IP}"
+    echo "Apigee instance IP:         ${INSTANCE_IP}"
+    echo "Endpoint attachment host:    ${EA_HOST}"
     echo ""
-    echo "VM → Apigee (${INSTANCE_IP}) → PSC (10.0.0.50) → Service Attachment → ILB → Cloud Run"
-    echo ""
-    echo "Note: Proxy targets PSC IP directly (Apigee runtime cannot"
-    echo "resolve Cloud DNS private zones via VPC peering)."
+    echo "VM → Apigee (${INSTANCE_IP})"
+    echo "  → Endpoint Attachment (${EA_HOST}) → Service Attachment"
+    echo "  → ILB → Cloud Run"
     echo ""
 
-    echo "--- curl https://${INSTANCE_IP}/hello (via Apigee env group) ---"
+    echo "--- curl https://${INSTANCE_IP}/hello (via Apigee → southbound PSC) ---"
     ssh_cmd "curl -sk --max-time 15 -H 'Host: api.internal.example.com' https://${INSTANCE_IP}/hello" || echo "  FAILED"
 
     echo ""
@@ -180,4 +190,4 @@ echo "  Test 3 10.0.0.50 → DNS resolving to PSC endpoint"
 echo "  Test 4 'OK'      → VM → PSC → ILB → Cloud Run works"
 echo ""
 echo "Apigee path (Test 6, if provisioned):"
-echo "  'OK' → VM → Apigee → PSC → ILB → Cloud Run works"
+echo "  'OK' → VM → Apigee → Endpoint Attachment → Service Attachment → ILB → Cloud Run"

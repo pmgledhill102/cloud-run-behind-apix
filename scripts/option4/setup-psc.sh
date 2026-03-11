@@ -19,8 +19,7 @@ REGION="europe-north2"
 APIGEE_API="${APIGEE_API:-https://eu-apigee.googleapis.com/v1}"
 APIGEE_ENV="${APIGEE_ENV:-test}"
 PROXY_NAME="cr-hello-passthrough"
-PSC_CONSUMER_IP="10.0.0.50"
-APIGEE_TARGET_URL="https://${PSC_CONSUMER_IP}/"
+ENDPOINT_ATTACHMENT_ID="ea-cr-hello"
 
 echo "=== Setup PSC Service Attachment — project: ${PROJECT_ID} ==="
 echo "Region: ${REGION}"
@@ -301,10 +300,10 @@ gcloud dns record-sets list \
   --format="table(name,type,ttl,rrdatas)" 2>/dev/null || echo "(not ready yet)"
 
 # ============================================================
-# Step 13: Update Apigee proxy target (if Apigee is provisioned)
+# Step 13: Create Apigee Endpoint Attachment (if Apigee is provisioned)
 # ============================================================
 echo ""
-echo "--- Step 13: Configure Apigee proxy (if provisioned) ---"
+echo "--- Step 13: Apigee Endpoint Attachment (if provisioned) ---"
 
 TOKEN="$(gcloud auth print-access-token)"
 APIGEE_HTTP="$(curl -s -o /dev/null -w '%{http_code}' \
@@ -312,17 +311,97 @@ APIGEE_HTTP="$(curl -s -o /dev/null -w '%{http_code}' \
   "${APIGEE_API}/organizations/${PROJECT_ID}")"
 
 if [[ "${APIGEE_HTTP}" != "200" ]]; then
-  echo "Apigee not provisioned (HTTP ${APIGEE_HTTP}), skipping proxy update."
+  echo "Apigee not provisioned (HTTP ${APIGEE_HTTP}), skipping."
   echo ""
   echo "=== Next steps ==="
   echo ""
   echo "Run ./test.sh to verify PSC connectivity from the VM."
 else
-  # Check if proxy target is already correct
-  DEPLOYED_REV="$(curl -s \
+  # Get the Service Attachment resource path
+  SA_RESOURCE="projects/${PROJECT_ID}/regions/${REGION}/serviceAttachments/sa-workloads"
+
+  # Check if endpoint attachment already exists
+  EA_JSON="$(curl -s \
     -H "Authorization: Bearer ${TOKEN}" \
-    "${APIGEE_API}/organizations/${PROJECT_ID}/environments/${APIGEE_ENV}/apis/${PROXY_NAME}/deployments" \
-    | python3 -c "
+    "${APIGEE_API}/organizations/${PROJECT_ID}/endpointAttachments/${ENDPOINT_ATTACHMENT_ID}")"
+  EA_STATE="$(echo "${EA_JSON}" | python3 -c "import sys,json; print(json.load(sys.stdin).get('state',''))" 2>/dev/null || true)"
+  EA_HOST="$(echo "${EA_JSON}" | python3 -c "import sys,json; print(json.load(sys.stdin).get('host',''))" 2>/dev/null || true)"
+
+  if [[ "${EA_STATE}" == "ACTIVE" && -n "${EA_HOST}" ]]; then
+    echo "Endpoint attachment '${ENDPOINT_ATTACHMENT_ID}' already ACTIVE (host: ${EA_HOST}), skipping."
+  else
+    if [[ -n "${EA_STATE}" && "${EA_STATE}" != "ACTIVE" ]]; then
+      echo "Endpoint attachment exists (state: ${EA_STATE}). Waiting..."
+    else
+      echo "Creating Apigee endpoint attachment '${ENDPOINT_ATTACHMENT_ID}'..."
+      echo "  Service Attachment: ${SA_RESOURCE}"
+
+      EA_RESPONSE="$(curl -s -X POST \
+        -H "Authorization: Bearer ${TOKEN}" \
+        -H "Content-Type: application/json" \
+        "${APIGEE_API}/organizations/${PROJECT_ID}/endpointAttachments?endpointAttachmentId=${ENDPOINT_ATTACHMENT_ID}" \
+        -d "{
+          \"location\": \"${REGION}\",
+          \"serviceAttachment\": \"${SA_RESOURCE}\"
+        }")"
+
+      if echo "${EA_RESPONSE}" | grep -q '"error"'; then
+        echo "ERROR creating endpoint attachment:"
+        echo "${EA_RESPONSE}" | python3 -m json.tool 2>/dev/null || echo "${EA_RESPONSE}"
+        echo ""
+        echo "=== Next steps ==="
+        echo ""
+        echo "Run ./test.sh to verify PSC connectivity from the VM (Apigee path skipped)."
+        exit 0
+      fi
+
+      echo "Endpoint attachment creation started (LRO)."
+    fi
+
+    # Poll for ACTIVE
+    echo "Waiting for endpoint attachment to become ACTIVE..."
+    TIMEOUT=600
+    INTERVAL=15
+    ELAPSED=0
+    while true; do
+      if (( ELAPSED > 0 && ELAPSED % 300 == 0 )); then
+        TOKEN="$(gcloud auth print-access-token)"
+      fi
+
+      EA_JSON="$(curl -s \
+        -H "Authorization: Bearer ${TOKEN}" \
+        "${APIGEE_API}/organizations/${PROJECT_ID}/endpointAttachments/${ENDPOINT_ATTACHMENT_ID}")"
+      EA_STATE="$(echo "${EA_JSON}" | python3 -c "import sys,json; print(json.load(sys.stdin).get('state',''))" 2>/dev/null || true)"
+      EA_HOST="$(echo "${EA_JSON}" | python3 -c "import sys,json; print(json.load(sys.stdin).get('host',''))" 2>/dev/null || true)"
+
+      if [[ "${EA_STATE}" == "ACTIVE" && -n "${EA_HOST}" ]]; then
+        echo "Endpoint attachment ACTIVE (host: ${EA_HOST})."
+        break
+      fi
+      if (( ELAPSED >= TIMEOUT )); then
+        echo "WARNING: Timed out waiting for endpoint attachment. Check manually."
+        break
+      fi
+      echo "  State: ${EA_STATE} (${ELAPSED}s elapsed)..."
+      sleep "${INTERVAL}"
+      ELAPSED=$((ELAPSED + INTERVAL))
+    done
+  fi
+
+  # --- Step 14: Update Apigee proxy target ---
+  echo ""
+  echo "--- Step 14: Update Apigee proxy target ---"
+
+  if [[ -z "${EA_HOST}" ]]; then
+    echo "No endpoint attachment host available, skipping proxy update."
+  else
+    APIGEE_TARGET_URL="https://${EA_HOST}/"
+
+    # Check if proxy target is already correct
+    DEPLOYED_REV="$(curl -s \
+      -H "Authorization: Bearer ${TOKEN}" \
+      "${APIGEE_API}/organizations/${PROJECT_ID}/environments/${APIGEE_ENV}/apis/${PROXY_NAME}/deployments" \
+      | python3 -c "
 import sys,json
 data = json.load(sys.stdin)
 deploys = data.get('deployments', [])
@@ -330,28 +409,31 @@ if deploys:
     print(deploys[0].get('revision',''))
 " 2>/dev/null || true)"
 
-  NEEDS_UPDATE=true
-  if [[ -n "${DEPLOYED_REV}" ]]; then
-    CURRENT_TARGET_XML="$(curl -s \
-      -H "Authorization: Bearer ${TOKEN}" \
-      -H "Accept: application/xml" \
-      "${APIGEE_API}/organizations/${PROJECT_ID}/apis/${PROXY_NAME}/revisions/${DEPLOYED_REV}/targets/default" 2>/dev/null || true)"
-    if echo "${CURRENT_TARGET_XML}" | grep -q "${PSC_CONSUMER_IP}"; then
-      echo "Proxy target already set to ${APIGEE_TARGET_URL}, skipping."
-      NEEDS_UPDATE=false
+    NEEDS_UPDATE=true
+    if [[ -n "${DEPLOYED_REV}" ]]; then
+      # Download the deployed revision bundle to check target URL
+      CURRENT_TARGET="$(curl -s \
+        -H "Authorization: Bearer ${TOKEN}" \
+        "${APIGEE_API}/organizations/${PROJECT_ID}/apis/${PROXY_NAME}/revisions/${DEPLOYED_REV}?format=bundle" \
+        -o /tmp/apigee-rev-check.zip 2>/dev/null && \
+        unzip -p /tmp/apigee-rev-check.zip apiproxy/targets/default.xml 2>/dev/null || true)"
+      rm -f /tmp/apigee-rev-check.zip
+      if echo "${CURRENT_TARGET}" | grep -q "${EA_HOST}"; then
+        echo "Proxy target already set to ${APIGEE_TARGET_URL}, skipping."
+        NEEDS_UPDATE=false
+      fi
     fi
-  fi
 
-  if [[ "${NEEDS_UPDATE}" == "true" ]]; then
-    echo "Updating proxy '${PROXY_NAME}' target to ${APIGEE_TARGET_URL}..."
+    if [[ "${NEEDS_UPDATE}" == "true" ]]; then
+      echo "Updating proxy '${PROXY_NAME}' target to ${APIGEE_TARGET_URL}..."
 
-    # Build proxy bundle with correct target URL
-    BUNDLE_DIR="$(mktemp -d)"
-    mkdir -p "${BUNDLE_DIR}/apiproxy/proxies"
-    mkdir -p "${BUNDLE_DIR}/apiproxy/targets"
-    mkdir -p "${BUNDLE_DIR}/apiproxy/policies"
+      # Build proxy bundle targeting the endpoint attachment host
+      BUNDLE_DIR="$(mktemp -d)"
+      mkdir -p "${BUNDLE_DIR}/apiproxy/proxies"
+      mkdir -p "${BUNDLE_DIR}/apiproxy/targets"
+      mkdir -p "${BUNDLE_DIR}/apiproxy/policies"
 
-    cat > "${BUNDLE_DIR}/apiproxy/proxies/default.xml" << 'XMLEOF'
+      cat > "${BUNDLE_DIR}/apiproxy/proxies/default.xml" << 'XMLEOF'
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <ProxyEndpoint name="default">
   <PreFlow name="PreFlow">
@@ -372,7 +454,7 @@ if deploys:
 </ProxyEndpoint>
 XMLEOF
 
-    cat > "${BUNDLE_DIR}/apiproxy/targets/default.xml" << XMLEOF
+      cat > "${BUNDLE_DIR}/apiproxy/targets/default.xml" << XMLEOF
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <TargetEndpoint name="default">
   <PreFlow name="PreFlow">
@@ -394,66 +476,64 @@ XMLEOF
 </TargetEndpoint>
 XMLEOF
 
-    cat > "${BUNDLE_DIR}/apiproxy/${PROXY_NAME}.xml" << XMLEOF
+      cat > "${BUNDLE_DIR}/apiproxy/${PROXY_NAME}.xml" << XMLEOF
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <APIProxy name="${PROXY_NAME}">
-  <Description>Pass-through proxy to Cloud Run cr-hello service via PSC</Description>
+  <Description>Pass-through proxy to Cloud Run cr-hello via Endpoint Attachment</Description>
   <BasePaths>/hello</BasePaths>
 </APIProxy>
 XMLEOF
 
-    BUNDLE_ZIP="$(mktemp).zip"
-    (cd "${BUNDLE_DIR}" && zip -r "${BUNDLE_ZIP}" apiproxy/) >/dev/null
+      BUNDLE_ZIP="$(mktemp).zip"
+      (cd "${BUNDLE_DIR}" && zip -r "${BUNDLE_ZIP}" apiproxy/) >/dev/null
 
-    # Import new revision
-    IMPORT_RESPONSE="$(curl -s -X POST \
-      -H "Authorization: Bearer ${TOKEN}" \
-      -H "Content-Type: application/octet-stream" \
-      "${APIGEE_API}/organizations/${PROJECT_ID}/apis?name=${PROXY_NAME}&action=import" \
-      --data-binary "@${BUNDLE_ZIP}")"
-
-    rm -rf "${BUNDLE_DIR}" "${BUNDLE_ZIP}"
-
-    if echo "${IMPORT_RESPONSE}" | grep -q '"error"'; then
-      echo "ERROR importing proxy revision:"
-      echo "${IMPORT_RESPONSE}" | python3 -m json.tool 2>/dev/null || echo "${IMPORT_RESPONSE}"
-    else
-      NEW_REV="$(echo "${IMPORT_RESPONSE}" | python3 -c "import sys,json; print(json.load(sys.stdin).get('revision',''))" 2>/dev/null || true)"
-      echo "Imported revision ${NEW_REV}."
-
-      # Deploy new revision (override undeploys the old one)
-      DEPLOY_RESPONSE="$(curl -s -X POST \
+      IMPORT_RESPONSE="$(curl -s -X POST \
         -H "Authorization: Bearer ${TOKEN}" \
-        "${APIGEE_API}/organizations/${PROJECT_ID}/environments/${APIGEE_ENV}/apis/${PROXY_NAME}/revisions/${NEW_REV}/deployments?override=true")"
+        -H "Content-Type: application/octet-stream" \
+        "${APIGEE_API}/organizations/${PROJECT_ID}/apis?name=${PROXY_NAME}&action=import" \
+        --data-binary "@${BUNDLE_ZIP}")"
 
-      if echo "${DEPLOY_RESPONSE}" | grep -q '"error"'; then
-        echo "ERROR deploying revision ${NEW_REV}:"
-        echo "${DEPLOY_RESPONSE}" | python3 -m json.tool 2>/dev/null || echo "${DEPLOY_RESPONSE}"
+      rm -rf "${BUNDLE_DIR}" "${BUNDLE_ZIP}"
+
+      if echo "${IMPORT_RESPONSE}" | grep -q '"error"'; then
+        echo "ERROR importing proxy revision:"
+        echo "${IMPORT_RESPONSE}" | python3 -m json.tool 2>/dev/null || echo "${IMPORT_RESPONSE}"
       else
-        echo "Revision ${NEW_REV} deployed to '${APIGEE_ENV}'."
+        NEW_REV="$(echo "${IMPORT_RESPONSE}" | python3 -c "import sys,json; print(json.load(sys.stdin).get('revision',''))" 2>/dev/null || true)"
+        echo "Imported revision ${NEW_REV}."
+
+        DEPLOY_RESPONSE="$(curl -s -X POST \
+          -H "Authorization: Bearer ${TOKEN}" \
+          "${APIGEE_API}/organizations/${PROJECT_ID}/environments/${APIGEE_ENV}/apis/${PROXY_NAME}/revisions/${NEW_REV}/deployments?override=true")"
+
+        if echo "${DEPLOY_RESPONSE}" | grep -q '"error"'; then
+          echo "ERROR deploying revision ${NEW_REV}:"
+          echo "${DEPLOY_RESPONSE}" | python3 -m json.tool 2>/dev/null || echo "${DEPLOY_RESPONSE}"
+        else
+          echo "Revision ${NEW_REV} deployed to '${APIGEE_ENV}'."
+        fi
       fi
     fi
   fi
 
-  # Get instance IP for summary
+  # Summary
   INSTANCE_IP="$(curl -s \
     -H "Authorization: Bearer ${TOKEN}" \
     "${APIGEE_API}/organizations/${PROJECT_ID}/instances/instance-${REGION}" \
     | python3 -c "import sys,json; print(json.load(sys.stdin).get('host','unknown'))" 2>/dev/null || echo 'unknown')"
 
   echo ""
-  echo "=== Apigee proxy configured ==="
+  echo "=== Apigee configured ==="
   echo ""
-  echo "  Proxy:  ${PROXY_NAME} → /hello"
-  echo "  Target: ${APIGEE_TARGET_URL}"
-  echo "  Instance IP: ${INSTANCE_IP}"
+  echo "  Proxy:               ${PROXY_NAME} → /hello"
+  echo "  Endpoint Attachment:  ${ENDPOINT_ATTACHMENT_ID} (host: ${EA_HOST:-pending})"
+  echo "  Target:              https://${EA_HOST:-pending}/"
+  echo "  Instance IP:         ${INSTANCE_IP}"
   echo ""
-  echo "  Traffic flow:"
-  echo "    Client → Apigee (${INSTANCE_IP}) → PSC (${PSC_CONSUMER_IP})"
-  echo "    → Service Attachment → ILB → Cloud Run"
-  echo ""
-  echo "  Note: Target uses PSC IP directly (Apigee runtime cannot"
-  echo "  resolve Cloud DNS private zones via VPC peering)."
+  echo "  Traffic flow (southbound PSC):"
+  echo "    Client → Apigee (${INSTANCE_IP})"
+  echo "    → Endpoint Attachment (${EA_HOST:-pending}) → Service Attachment"
+  echo "    → ILB → Cloud Run"
   echo ""
   echo "=== Next steps ==="
   echo ""
