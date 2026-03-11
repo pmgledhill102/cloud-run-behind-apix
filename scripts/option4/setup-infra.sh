@@ -13,7 +13,7 @@
 set -euo pipefail
 
 # --- Configuration ---
-PROJECT_ID="${PROJECT_ID:-sb-paul-g-workshop}"
+PROJECT_ID="${PROJECT_ID:-sb-paul-g-apigee}"
 
 REGION="europe-north2"
 ZONE="${REGION}-a"

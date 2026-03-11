@@ -7,7 +7,7 @@
 #
 set -euo pipefail
 
-PROJECT_ID="${PROJECT_ID:-sb-paul-g-workshop}"
+PROJECT_ID="${PROJECT_ID:-sb-paul-g-apigee}"
 
 SA_NAME="apigee-psc-sa-poc"
 SA_EMAIL="${SA_NAME}@${PROJECT_ID}.iam.gserviceaccount.com"
