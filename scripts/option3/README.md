@@ -16,22 +16,32 @@ VM (10.0.0.x) [simulates Apigee in peered VPC]
 
 | Script | Resources |
 |---|---|
-| `setup-iam.sh` | SA `apigee-psc-poc`, 8 IAM roles, 6 APIs enabled |
-| `setup-infra.sh` | VPC `apigee-vpc`, subnet `compute-apigee` (10.0.0.0/24), VM `vm-test`, Cloud Run `cr-hello`, Artifact Registry |
-| `setup-psc.sh` | Global PSC endpoint `pscgoogleapis` (10.0.0.100) targeting `all-apis` bundle, private DNS zone `run-app-psc` with `*.run.app → 10.0.0.100` |
-| `test.sh` | DNS resolution + HTTP connectivity verification from VM via IAP |
-| `teardown.sh` | Reverse-order cleanup of all resources |
+| `setup.sh` | Extra Cloud Run services (if SERVICE_COUNT>1), global PSC endpoint `pscgoogleapis` (10.0.1.100), private DNS zone `run-app-psc` with `*.run.app → 10.0.1.100` |
+| `test.sh` | DNS resolution + HTTP connectivity verification (single or scaled mode) |
+| `teardown.sh` | Reverse-order cleanup of option-specific resources |
 
-Run in order:
+## Prerequisites
+
+Run shared setup first (once across all options):
 
 ```bash
-./setup-iam.sh
-gcloud config set auth/impersonate_service_account apigee-psc-poc@PROJECT_ID.iam.gserviceaccount.com
-./setup-infra.sh
-./setup-psc.sh
-./test.sh
+./scripts/shared/setup-iam.sh
+./scripts/shared/setup-base.sh        # ~5 min
+./scripts/shared/setup-slow.sh        # ~60-90 min (Apigee — optional, can run in parallel)
+```
+
+## Run instructions
+
+```bash
+./scripts/option3/setup.sh            # ~1 min
+./scripts/option3/test.sh
 # when done:
-./teardown.sh
+./scripts/option3/teardown.sh
+
+# Scaled variant (20 services):
+SERVICE_COUNT=20 ./scripts/option3/setup.sh
+SERVICE_COUNT=20 ./scripts/option3/test.sh
+SERVICE_COUNT=20 ./scripts/option3/teardown.sh
 ```
 
 ## Cost while running
@@ -48,6 +58,4 @@ gcloud config set auth/impersonate_service_account apigee-psc-poc@PROJECT_ID.iam
 
 No VPN tunnels or load balancers — this is the cheapest option after Option B (PGA).
 
-> **Note**: Option C and Option C Scaled share networking resource names (`apigee-vpc`, `pscgoogleapis`, `run-app-psc`). Run `./teardown.sh` for one before setting up the other.
-
-Run `./teardown.sh` when done to avoid ongoing costs.
+Run `./scripts/option3/teardown.sh` when done, then `./scripts/shared/teardown-base.sh` to avoid ongoing costs.

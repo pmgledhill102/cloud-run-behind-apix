@@ -1,38 +1,17 @@
 #!/usr/bin/env bash
 #
-# teardown-apigee.sh — Delete Apigee X org and supporting infrastructure
+# teardown-slow.sh — Delete Apigee X org and peering infrastructure
 #
-# Tears down in reverse order:
-#   1. Undeploy API proxy
-#   2. Delete API proxy
-#   3. Detach environment from group
-#   4. Delete environment group
-#   5. Detach environment from instance
-#   6. Delete environment
-#   7. Delete Apigee instance
-#   8. Delete Apigee organisation
-#   9. Remove VPC peering
-#   10. Release peering IP range
-#   11. Delete Apigee VPC
-#
-# Run option-specific teardown.sh scripts FIRST to remove subnets,
-# firewall rules, VMs, Cloud Run services, etc.
+# Run option-specific teardown scripts FIRST, then this script,
+# then teardown-base.sh.
 #
 # Usage:
-#   PROJECT_ID=sb-paul-g-apigee ./teardown-apigee.sh
+#   ./scripts/shared/teardown-slow.sh
 #
 set -euo pipefail
 
-PROJECT_ID="${PROJECT_ID:-sb-paul-g-apigee}"
-REGION="europe-north2"
-APIGEE_NETWORK="apigee-vpc"
-APIGEE_PEERING_RANGE_NAME="apigee-peering-range"
-APIGEE_INSTANCE_RANGE_NAME="apigee-instance-range"
-APIGEE_ENV="test"
-APIGEE_ENV_GROUP="test-group"
-INSTANCE_NAME="instance-${REGION}"
-PROXY_NAME="cr-hello-passthrough"
-APIGEE_API="https://eu-apigee.googleapis.com/v1"  # EU endpoint for data residency
+source "$(dirname "${BASH_SOURCE[0]}")/env.sh"
+source "${SHARED_DIR}/lib/helpers.sh"
 
 echo "=== Apigee X Teardown for project: ${PROJECT_ID} ==="
 echo ""
@@ -44,35 +23,6 @@ if [[ "${CONFIRM}" != "y" && "${CONFIRM}" != "Y" ]]; then
   echo "Aborted."
   exit 0
 fi
-
-# --- Helper ---
-# Calls the Apigee REST API. Ignores 404s silently.
-apigee_api() {
-  local method="$1"
-  local path="$2"
-  local token
-  token="$(gcloud auth print-access-token)"
-  local response
-  response="$(curl -s -w "\n%{http_code}" -X "${method}" \
-    -H "Authorization: Bearer ${token}" \
-    "${APIGEE_API}/${path}")"
-  local http_code
-  http_code="$(echo "${response}" | tail -1)"
-  local body
-  body="$(echo "${response}" | sed '$d')"
-
-  if [[ "${http_code}" == "404" ]]; then
-    echo "  (not found, skipping)"
-    return 0
-  elif [[ "${http_code}" =~ ^2 ]]; then
-    echo "${body}"
-    return 0
-  else
-    echo "  WARNING: HTTP ${http_code}"
-    echo "${body}" | python3 -m json.tool 2>/dev/null || echo "${body}"
-    return 0  # Don't fail teardown on errors
-  fi
-}
 
 # ============================================================
 # Step 1: Undeploy API proxy
@@ -102,7 +52,6 @@ ATTACHMENTS_JSON="$(curl -s \
   -H "Authorization: Bearer ${TOKEN}" \
   "${APIGEE_API}/organizations/${PROJECT_ID}/envgroups/${APIGEE_ENV_GROUP}/attachments" 2>/dev/null || echo '{}')"
 
-# Extract attachment name for our environment
 ATTACHMENT_NAME="$(echo "${ATTACHMENTS_JSON}" | python3 -c "
 import sys,json
 data = json.load(sys.stdin)
@@ -148,7 +97,6 @@ if [[ -n "${INST_ATTACHMENT_NAME}" ]]; then
   echo "Detaching environment from instance (may take a few minutes)..."
   apigee_api DELETE "${INST_ATTACHMENT_NAME}" >/dev/null
 
-  # Wait for detachment
   TIMEOUT=300
   INTERVAL=15
   ELAPSED=0
@@ -182,7 +130,6 @@ echo "--- Step 7: Delete Apigee instance ---"
 echo "Deleting instance '${INSTANCE_NAME}' (this may take 20-30 minutes)..."
 apigee_api DELETE "organizations/${PROJECT_ID}/instances/${INSTANCE_NAME}" >/dev/null
 
-# Wait for instance deletion
 TIMEOUT=2400
 INTERVAL=30
 ELAPSED=0
@@ -232,7 +179,7 @@ fi
 echo "Done."
 
 # ============================================================
-# Step 10: Release peering IP range
+# Step 10: Release peering IP ranges
 # ============================================================
 echo ""
 echo "--- Step 10: Release peering IP ranges ---"
@@ -247,25 +194,13 @@ gcloud compute addresses delete "${APIGEE_INSTANCE_RANGE_NAME}" \
 echo "Done."
 
 # ============================================================
-# Step 11: Delete Apigee VPC
-# ============================================================
-echo ""
-echo "--- Step 11: Delete Apigee VPC ---"
-echo "Note: This will fail if subnets/resources still exist."
-echo "Run option-specific teardown scripts first."
-gcloud compute networks delete "${APIGEE_NETWORK}" \
-  --project="${PROJECT_ID}" \
-  --quiet 2>/dev/null || true
-echo "Done."
-
-# ============================================================
 # Summary
 # ============================================================
 echo ""
-echo "=== Teardown complete ==="
+echo "=== Apigee teardown complete ==="
 echo ""
 echo "The Apigee org has been soft-deleted (billing stops now)."
 echo "Permanent deletion occurs in ~24 hours."
 echo ""
-echo "If the VPC deletion failed, ensure you ran the option-specific"
-echo "teardown scripts first to remove subnets, firewall rules, etc."
+echo "Next: run ./scripts/shared/teardown-base.sh to remove"
+echo "VPC, VM, Cloud Run, etc."

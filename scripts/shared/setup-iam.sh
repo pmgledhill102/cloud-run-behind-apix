@@ -2,15 +2,16 @@
 #
 # setup-iam.sh — Create service account and bind IAM roles
 #
-# Run this with your own privileged account (Owner or IAM Admin).
-# After this completes, use the created service account to run setup-infra.sh.
+# Single service account (apigee-poc) with superset of all roles needed
+# by any option. Run this once with a privileged account (Owner or IAM Admin).
+#
+# Usage:
+#   ./scripts/shared/setup-iam.sh
+#   PROJECT_ID=my-project ./scripts/shared/setup-iam.sh
 #
 set -euo pipefail
 
-PROJECT_ID="${PROJECT_ID:-sb-paul-g-workshop}"
-
-SA_NAME="apigee-psc-scaled-poc"
-SA_EMAIL="${SA_NAME}@${PROJECT_ID}.iam.gserviceaccount.com"
+source "$(dirname "${BASH_SOURCE[0]}")/env.sh"
 
 echo "=== Setup IAM for project: ${PROJECT_ID} ==="
 echo "Service account: ${SA_EMAIL}"
@@ -19,7 +20,10 @@ echo ""
 # --- Enable APIs ---
 echo "--- Enabling APIs ---"
 gcloud services enable \
+  apigee.googleapis.com \
   compute.googleapis.com \
+  servicenetworking.googleapis.com \
+  cloudkms.googleapis.com \
   run.googleapis.com \
   dns.googleapis.com \
   iap.googleapis.com \
@@ -35,13 +39,13 @@ if gcloud iam service-accounts describe "${SA_EMAIL}" --project="${PROJECT_ID}" 
   echo "Service account already exists, skipping."
 else
   gcloud iam service-accounts create "${SA_NAME}" \
-    --display-name="Apigee PSC Scaled PoC" \
-    --description="Service account for Apigee-to-Cloud-Run PSC scaled PoC (20 services)" \
+    --display-name="Apigee PoC" \
+    --description="Service account for Apigee-to-Cloud-Run PoC (all options)" \
     --project="${PROJECT_ID}"
   echo "Service account created."
 fi
 
-# --- Bind IAM roles ---
+# --- Bind IAM roles (superset of all options) ---
 echo ""
 echo "--- Binding IAM roles ---"
 ROLES=(
@@ -89,13 +93,35 @@ gcloud projects add-iam-policy-binding "${PROJECT_ID}" \
   --quiet >/dev/null
 echo "Cloud Run Service Agent granted compute.networkUser."
 
+# --- Grant Apigee runtime SA Cloud Run invoker ---
+echo ""
+echo "--- Granting Apigee runtime SA roles/run.invoker ---"
+APIGEE_RUNTIME_SA="service-${PROJECT_NUMBER}@gcp-sa-apigee-mp.iam.gserviceaccount.com"
+gcloud projects add-iam-policy-binding "${PROJECT_ID}" \
+  --member="serviceAccount:${APIGEE_RUNTIME_SA}" \
+  --role="roles/run.invoker" \
+  --condition=None \
+  --quiet >/dev/null
+echo "Apigee runtime SA granted run.invoker."
+
+# --- Grant default compute SA Cloud Run invoker (for test VM) ---
+echo ""
+echo "--- Granting default compute SA roles/run.invoker ---"
+COMPUTE_SA="${PROJECT_NUMBER}-compute@developer.gserviceaccount.com"
+gcloud projects add-iam-policy-binding "${PROJECT_ID}" \
+  --member="serviceAccount:${COMPUTE_SA}" \
+  --role="roles/run.invoker" \
+  --condition=None \
+  --quiet >/dev/null
+echo "Default compute SA granted run.invoker (for test VM auth)."
+
 # --- Summary ---
 echo ""
 echo "=== Done ==="
 echo ""
 echo "Service account: ${SA_EMAIL}"
 echo ""
-echo "To impersonate this SA for setup-infra.sh:"
+echo "To impersonate this SA for setup scripts:"
 echo "  gcloud config set auth/impersonate_service_account ${SA_EMAIL}"
 echo ""
 echo "To stop impersonating:"

@@ -1,39 +1,32 @@
 #!/usr/bin/env bash
 #
-# test.sh — Verify PSC Service Attachment connectivity to Cloud Run
+# option4/test.sh — Verify PSC Service Attachment connectivity to Cloud Run
 #
 # Test 1: Service Attachment connected endpoints status
 # Test 2: PSC endpoint connection status
 # Test 3: DNS resolution from VM
 # Test 4: HTTP connectivity through PSC
 # Test 5: Verbose curl showing connection details
-#
-# Prerequisites: setup-infra.sh and setup-psc.sh completed.
+# Test 6: End-to-end through Apigee (if provisioned)
 #
 set -euo pipefail
 
-PROJECT_ID="${PROJECT_ID:-sb-paul-g-apigee}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/../shared/env.sh"
+source "${SHARED_DIR}/lib/helpers.sh"
 
-REGION="europe-north2"
-ZONE="${REGION}-a"
-
-# Apigee (optional — detected automatically)
-APIGEE_API="${APIGEE_API:-https://eu-apigee.googleapis.com/v1}"
-INSTANCE_NAME="instance-${REGION}"
 ENDPOINT_ATTACHMENT_ID="ea-cr-hello"
 
 echo "=== Testing PSC Service Attachment Connectivity ==="
 echo "Project: ${PROJECT_ID}"
 echo ""
 
-# Helper — run a command on vm-test via IAP SSH (filters NumPy warning, keeps real errors)
-ssh_cmd() {
-  gcloud compute ssh "vm-test" \
-    --zone="${ZONE}" \
-    --tunnel-through-iap \
-    --project="${PROJECT_ID}" \
-    --command="$1" 2> >(grep -v 'NumPy' >&2)
-}
+# Cloud Run URL (used as audience for ID token)
+SERVICE_URL="$(gcloud run services describe "cr-hello" \
+  --region="${REGION}" --project="${PROJECT_ID}" \
+  --format='value(status.url)' 2>/dev/null || true)"
+echo "Cloud Run URL (auth audience): ${SERVICE_URL}"
+echo ""
 
 # ============================================================
 # Test 1: Service Attachment connected endpoints status
@@ -41,8 +34,6 @@ ssh_cmd() {
 echo "=========================================="
 echo "  Test 1: Service Attachment Status"
 echo "=========================================="
-echo ""
-echo "Verifying Service Attachment has ACCEPTED connected endpoints..."
 echo ""
 
 echo "--- Connected endpoints ---"
@@ -58,8 +49,6 @@ echo ""
 echo "=========================================="
 echo "  Test 2: PSC Endpoint Connection Status"
 echo "=========================================="
-echo ""
-echo "Verifying PSC endpoint pscConnectionStatus = ACCEPTED..."
 echo ""
 
 PSC_STATUS="$(gcloud compute forwarding-rules describe "psc-endpoint-apigee" \
@@ -90,7 +79,7 @@ ssh_cmd "getent hosts api.internal.example.com" || echo "  FAILED"
 
 echo ""
 echo "--- dig +short api.internal.example.com ---"
-ssh_cmd "dig +short api.internal.example.com" || echo "  FAILED (dig not available — VM startup script may still be running)"
+ssh_cmd "dig +short api.internal.example.com" || echo "  FAILED"
 
 echo ""
 
@@ -104,8 +93,8 @@ echo ""
 echo "VM -> PSC endpoint (10.0.0.50) -> Service Attachment -> ILB -> Cloud Run"
 echo ""
 
-echo "--- curl https://api.internal.example.com/ ---"
-ssh_cmd "curl -sk --max-time 10 https://api.internal.example.com/" || echo "  FAILED"
+echo "--- curl https://api.internal.example.com/ (with ID token) ---"
+ssh_curl_auth "${SERVICE_URL}" "-sk --max-time 10 https://api.internal.example.com/" || echo "  FAILED"
 
 echo ""
 
@@ -116,11 +105,9 @@ echo "=========================================="
 echo "  Test 5: Connection Details"
 echo "=========================================="
 echo ""
-echo "Confirming curl connects to PSC endpoint IP..."
-echo ""
 
-echo "--- curl -v (connection details) ---"
-ssh_cmd "curl -skv --max-time 10 https://api.internal.example.com/ 2>&1 | grep -E '(Trying|Connected|< HTTP)'" || echo "  FAILED"
+echo "--- curl -v (connection details, with ID token) ---"
+ssh_curl_auth "${SERVICE_URL}" "-skv --max-time 10 https://api.internal.example.com/ 2>&1 | grep -E '(Trying|Connected|< HTTP)'" || echo "  FAILED"
 
 echo ""
 
@@ -156,7 +143,6 @@ else
     echo ""
   elif [[ -z "${EA_HOST}" ]]; then
     echo "Endpoint attachment '${ENDPOINT_ATTACHMENT_ID}' not ready, skipping."
-    echo "Run setup-psc.sh first to create the endpoint attachment."
     echo ""
   else
     echo "Apigee instance IP:         ${INSTANCE_IP}"

@@ -16,22 +16,27 @@ VM (10.0.0.x) [simulates Apigee in peered VPC]
 
 | Script | Resources |
 |---|---|
-| `setup-iam.sh` | SA `apigee-pga-poc`, 8 IAM roles, 6 APIs enabled |
-| `setup-infra.sh` | VPC `apigee-vpc`, subnet `compute-apigee` (10.0.0.0/24), VM `vm-test`, Cloud Run `cr-hello`, Artifact Registry |
-| `setup-dns.sh` | Private DNS zone `run-app-pga` with `*.run.app → 199.36.153.4-7` (restricted VIP) and apex `run.app → 199.36.153.4-7` |
+| `setup.sh` | Private DNS zone `run-app-pga` with `*.run.app → 199.36.153.4-7` (restricted VIP) and apex record |
 | `test.sh` | DNS resolution + HTTP connectivity verification from VM via IAP |
-| `teardown.sh` | Reverse-order cleanup of all resources |
+| `teardown.sh` | Reverse-order cleanup of option-specific resources |
+
+## Prerequisites
+
+Run shared setup first (once across all options):
+
+```bash
+./scripts/shared/setup-iam.sh
+./scripts/shared/setup-base.sh        # ~5 min
+./scripts/shared/setup-slow.sh        # ~60-90 min (Apigee — optional, can run in parallel)
+```
 
 ## Run instructions
 
 ```bash
-./setup-iam.sh
-gcloud config set auth/impersonate_service_account apigee-pga-poc@PROJECT_ID.iam.gserviceaccount.com
-./setup-infra.sh
-./setup-dns.sh
-./test.sh
+./scripts/option2/setup.sh            # ~30 sec
+./scripts/option2/test.sh
 # when done:
-./teardown.sh
+./scripts/option2/teardown.sh
 ```
 
 ## Cost while running
@@ -46,4 +51,4 @@ gcloud config set auth/impersonate_service_account apigee-pga-poc@PROJECT_ID.iam
 
 No PSC forwarding rule, no VPN tunnels, no load balancers. This is the cheapest option.
 
-Run `./teardown.sh` when done to avoid ongoing costs.
+Run `./scripts/option2/teardown.sh` when done, then `./scripts/shared/teardown-base.sh` to avoid ongoing costs.

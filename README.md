@@ -57,10 +57,10 @@ Runnable proof-of-concept scripts for each option, deployable in a sandbox proje
 
 | Option | Scripts | What it deploys |
 |---|---|---|
+| **Shared** | [`scripts/shared/`](scripts/shared/) | IAM, base infra (VPC, VM, Cloud Run), Apigee provisioning |
 | **A** | [`scripts/option1/`](scripts/option1/) | ILB + Serverless NEG + VPN infrastructure |
 | **B** | [`scripts/option2/`](scripts/option2/) | PGA-enabled subnet + private DNS zone |
-| **C** | [`scripts/option3/`](scripts/option3/) | PSC endpoint for Google APIs + private DNS |
-| **C Scaled** | [`scripts/option3-scaled/`](scripts/option3-scaled/) | Same as C, but with 20 Cloud Run services |
+| **C** | [`scripts/option3/`](scripts/option3/) | PSC endpoint for Google APIs + private DNS (`SERVICE_COUNT=20` for scaled) |
 | **D** | [`scripts/option4/`](scripts/option4/) | ILB + Service Attachment + PSC endpoint |
 
 ## Testing Requirements Summary

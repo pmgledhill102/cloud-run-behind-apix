@@ -16,22 +16,27 @@ VM (10.0.0.x) [simulates Apigee in peered VPC]
 
 | Script | Resources |
 |---|---|
-| `setup-iam.sh` | SA `apigee-psc-sa-poc`, 9 IAM roles, 6 APIs enabled |
-| `setup-infra.sh` | VPCs `apigee-vpc` + `workloads-vpc`, subnets `compute-apigee` (10.0.0.0/24) + `compute-workloads` (10.100.0.0/24) + `proxy-only-workloads` (10.100.64.0/24) + `psc-nat-workloads` (10.100.2.0/24), 5 firewall rules, VM `vm-test`, Cloud Run `cr-hello`, Artifact Registry |
-| `setup-psc.sh` | ILB stack (NEG, backend service, URL map, SSL cert, target proxy, forwarding rule), Service Attachment `sa-workloads`, PSC endpoint `psc-endpoint-apigee` (10.0.0.50), DNS zone `api-internal-zone` with `api.internal.example.com -> 10.0.0.50` |
-| `test.sh` | Service Attachment status, PSC connection status, DNS resolution + HTTP connectivity verification from VM via IAP |
-| `teardown.sh` | Reverse-order cleanup of all resources |
+| `setup.sh` | workloads-vpc, PSC NAT subnet, ILB stack, Service Attachment `sa-workloads`, PSC endpoint (10.0.0.50), DNS zone `api-internal-zone`, Apigee Endpoint Attachment |
+| `test.sh` | Service Attachment status, PSC connection status, DNS resolution, HTTP connectivity, Apigee end-to-end |
+| `teardown.sh` | Reverse-order cleanup of option-specific resources |
 
-Run in order:
+## Prerequisites
+
+Run shared setup first (once across all options):
 
 ```bash
-./setup-iam.sh
-gcloud config set auth/impersonate_service_account apigee-psc-sa-poc@PROJECT_ID.iam.gserviceaccount.com
-./setup-infra.sh
-./setup-psc.sh
-./test.sh
+./scripts/shared/setup-iam.sh
+./scripts/shared/setup-base.sh        # ~5 min
+./scripts/shared/setup-slow.sh        # ~60-90 min (Apigee — optional, can run in parallel)
+```
+
+## Run instructions
+
+```bash
+./scripts/option4/setup.sh            # ~2 min
+./scripts/option4/test.sh
 # when done:
-./teardown.sh
+./scripts/option4/teardown.sh
 ```
 
 ## Cost while running
@@ -49,4 +54,4 @@ gcloud config set auth/impersonate_service_account apigee-psc-sa-poc@PROJECT_ID.
 
 No VPN tunnels, but ILB + PSC make this more expensive than Options B and C.
 
-Run `./teardown.sh` when done to avoid ongoing costs.
+Run `./scripts/option4/teardown.sh` when done, then `./scripts/shared/teardown-base.sh` to avoid ongoing costs.
