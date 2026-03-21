@@ -13,26 +13,30 @@ VM (10.0.0.x) [simulates Apigee in peered VPC]
 ```
 
 ## Scripts
+
 | Script | Resources |
 |---|---|
-| `setup-iam.sh` | SA `apigee-ilb-poc`, 9 IAM roles, 6 APIs enabled |
-| `setup-infra.sh` | VPCs (`apigee-vpc`, `workloads-vpc`), subnets, firewall rules, Cloud Run `cr-hello`, NAT, VM `vm-test` |
-| `setup-vpn.sh` | HA VPN gateways, 4 tunnels (IKEv2), Cloud Routers with BGP (ASN 64512/64513) |
-| `setup-ilb.sh` | Reserved IP `10.100.0.10`, Serverless NEG, backend service, URL map, self-signed cert, target HTTPS proxy, forwarding rule, DNS zone `api-internal-zone` |
+| `setup.sh` | workloads-vpc, VPN firewall, HA VPN (gateways, 4 tunnels, BGP), ILB stack (NEG, backend, cert, proxy, fwd rule), DNS zone `api-internal-zone`, Apigee proxy target update |
 | `test.sh` | BGP route verification, DNS resolution, HTTPS connectivity through VPN to ILB to Cloud Run |
-| `teardown.sh` | Reverse-order cleanup of all resources |
+| `teardown.sh` | Reverse-order cleanup of option-specific resources |
 
-Run in order:
+## Prerequisites
+
+Run shared setup first (once across all options):
 
 ```bash
-./setup-iam.sh
-gcloud config set auth/impersonate_service_account apigee-ilb-poc@PROJECT_ID.iam.gserviceaccount.com
-./setup-infra.sh
-./setup-vpn.sh
-./setup-ilb.sh
-./test.sh
+./scripts/shared/setup-iam.sh
+./scripts/shared/setup-base.sh        # ~5 min
+./scripts/shared/setup-slow.sh        # ~60-90 min (Apigee — optional, can run in parallel)
+```
+
+## Run instructions
+
+```bash
+./scripts/option1/setup.sh            # ~2 min
+./scripts/option1/test.sh
 # when done:
-./teardown.sh
+./scripts/option1/teardown.sh
 ```
 
 ## Cost while running
@@ -48,4 +52,4 @@ gcloud config set auth/impersonate_service_account apigee-ilb-poc@PROJECT_ID.iam
 | Artifact Registry | ~$0.00 | ~$0.00 | Pennies |
 | **Total** | **~$0.13** | **~$3.01** | Most expensive option (VPN tunnels) |
 
-Run `./teardown.sh` when done to avoid ongoing costs.
+Run `./scripts/option1/teardown.sh` when done, then `./scripts/shared/teardown-base.sh` to avoid ongoing costs.

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# test.sh — Verify VPN + ILB connectivity to Cloud Run
+# option1/test.sh — Verify VPN + ILB connectivity to Cloud Run
 #
 # Test 1: BGP routes — verify 10.100.0.0/24 learned by router-apigee
 # Test 2: VPN tunnel status — all tunnels ESTABLISHED
@@ -8,27 +8,22 @@
 # Test 4: HTTP connectivity — curl through VPN to ILB to Cloud Run
 # Test 5: Verbose connection details
 #
-# Prerequisites: setup-infra.sh, setup-vpn.sh, and setup-ilb.sh completed.
-#
 set -euo pipefail
 
-PROJECT_ID="${PROJECT_ID:-sb-paul-g-workshop}"
-
-REGION="europe-north2"
-ZONE="${REGION}-a"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/../shared/env.sh"
+source "${SHARED_DIR}/lib/helpers.sh"
 
 echo "=== Testing VPN + ILB Connectivity ==="
 echo "Project: ${PROJECT_ID}"
 echo ""
 
-# Helper — run a command on vm-test via IAP SSH (filters NumPy warning, keeps real errors)
-ssh_cmd() {
-  gcloud compute ssh "vm-test" \
-    --zone="${ZONE}" \
-    --tunnel-through-iap \
-    --project="${PROJECT_ID}" \
-    --command="$1" 2> >(grep -v 'NumPy' >&2)
-}
+# Cloud Run URL (used as audience for ID token)
+SERVICE_URL="$(gcloud run services describe "cr-hello" \
+  --region="${REGION}" --project="${PROJECT_ID}" \
+  --format='value(status.url)' 2>/dev/null || true)"
+echo "Cloud Run URL (auth audience): ${SERVICE_URL}"
+echo ""
 
 # ============================================================
 # Test 1: BGP routes
@@ -93,8 +88,8 @@ echo ""
 echo "VM → VPN tunnel → ILB (10.100.0.10:443) → Serverless NEG → Cloud Run"
 echo ""
 
-echo "--- curl -sk https://api.internal.example.com/ ---"
-ssh_cmd "curl -sk --max-time 15 https://api.internal.example.com/" || echo "  FAILED: curl https://api.internal.example.com/"
+echo "--- curl -sk https://api.internal.example.com/ (with ID token) ---"
+ssh_curl_auth "${SERVICE_URL}" "-sk --max-time 15 https://api.internal.example.com/" || echo "  FAILED: curl https://api.internal.example.com/"
 
 echo ""
 
@@ -105,11 +100,9 @@ echo "=========================================="
 echo "  Test 5: Connection Details"
 echo "=========================================="
 echo ""
-echo "Confirming connection routes through ILB IP..."
-echo ""
 
-echo "--- curl -skv (connection details) ---"
-ssh_cmd "curl -skv --max-time 15 https://api.internal.example.com/ 2>&1 | grep -E '(Trying|Connected|< HTTP)'" || echo "  FAILED"
+echo "--- curl -skv (connection details, with ID token) ---"
+ssh_curl_auth "${SERVICE_URL}" "-skv --max-time 15 https://api.internal.example.com/ 2>&1 | grep -E '(Trying|Connected|< HTTP)'" || echo "  FAILED"
 
 echo ""
 

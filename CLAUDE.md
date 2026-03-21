@@ -39,12 +39,53 @@ Cross-cutting docs:
 
 ## PoC Scripts
 
-Each option has runnable proof-of-concept scripts under `scripts/`:
-- `scripts/option1/` — Option A (ILB + Serverless NEG)
-- `scripts/option2/` — Option B (PGA)
-- `scripts/option3/` — Option C (PSC Google APIs)
-- `scripts/option3-scaled/` — Option C at 20 services
-- `scripts/option4/` — Option D (PSC Service Attachment)
+Scripts are structured in three tiers for fast iteration:
+
+### Shared infrastructure (`scripts/shared/`)
+- `env.sh` — All config vars (PROJECT_ID, REGION, etc.)
+- `lib/helpers.sh` — `resource_exists()`, `ssh_cmd()`, `delete_subnet_with_retry()`
+- `lib/workloads-vpc.sh` — Create/delete workloads-vpc (used by options 1 & 4)
+- `lib/ilb-stack.sh` — Create/delete ILB stack (used by options 1 & 4)
+- `lib/apigee-proxy.sh` — `update_apigee_proxy_target()` (skips if no Apigee)
+- `container/` — Single copy of Dockerfile + main.go
+- `setup-iam.sh` — One SA (`apigee-poc`) with superset of all roles
+- `setup-base.sh` — apigee-vpc, subnet, firewall, NAT, VM, AR, image, Cloud Run (~5 min)
+- `setup-slow.sh` — Apigee org + instance + env + proxy (~60-90 min)
+- `teardown-base.sh`, `teardown-slow.sh`, `teardown-iam.sh` — Reverse order
+
+### Option-specific scripts (`scripts/option{1,2,3,4}/`)
+- `setup.sh` — Option-specific resources only (~1-2 min each)
+- `teardown.sh` — Reverse of setup.sh
+- `test.sh` — Verification tests
+
+### Workflow
+```bash
+# Once at start:
+./scripts/shared/setup-iam.sh
+./scripts/shared/setup-base.sh      # ~5 min
+./scripts/shared/setup-slow.sh      # ~60-90 min (can run in parallel)
+
+# Per option — fast and repeatable:
+./scripts/option3/setup.sh           # ~1 min
+./scripts/option3/test.sh
+./scripts/option3/teardown.sh
+
+# Scaled variant (option 3 only):
+SERVICE_COUNT=20 ./scripts/option3/setup.sh
+
+# Full teardown:
+./scripts/shared/teardown-slow.sh
+./scripts/shared/teardown-base.sh
+./scripts/shared/teardown-iam.sh
+```
+
+### Options
+- `scripts/option1/` — Option A: ILB via VPN (workloads-vpc + VPN + ILB + DNS)
+- `scripts/option2/` — Option B: PGA (DNS zone only — simplest)
+- `scripts/option3/` — Option C: PSC Google APIs (PSC endpoint + DNS; `SERVICE_COUNT=20` for scaled)
+- `scripts/option4/` — Option D: PSC Service Attachment (workloads-vpc + ILB + SA + PSC + Apigee EA)
+
+**Note:** Options 1 & 4 both use workloads-vpc — don't run both simultaneously.
 
 ## Diagrams
 

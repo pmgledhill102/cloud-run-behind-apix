@@ -1,41 +1,24 @@
 #!/usr/bin/env bash
 #
-# setup-apigee.sh — Provision Apigee X (pay-as-you-go) with VPC Peering
+# setup-slow.sh — Provision Apigee X (pay-as-you-go) with VPC Peering (~60-90 min)
 #
 # Creates:
-#   1. Apigee VPC + peering subnet (for Apigee runtime)
-#   2. Apigee X organisation (pay-as-you-go, VPC peering model)
-#   3. Apigee runtime instance
-#   4. Apigee environment + environment group
-#   5. Simple pass-through API proxy
+#   1. Apigee VPC (idempotent — same VPC as setup-base.sh)
+#   2. Peering IP ranges + VPC peering to servicenetworking
+#   3. Apigee X organisation (pay-as-you-go, VPC peering model)
+#   4. Apigee runtime instance
+#   5. Apigee environment + environment group
+#   6. Simple pass-through API proxy
 #
-# This is the foundation that all option PoC scripts build on.
-# Run this ONCE per project before running any option's setup scripts.
-#
-# Prerequisites:
-#   - gcloud CLI authenticated with Owner or Apigee Admin on the project
-#   - Billing account linked to the project
-#   - Docker (for building the test container in option scripts)
+# Can run in parallel with setup-base.sh — both create apigee-vpc idempotently.
 #
 # Usage:
-#   PROJECT_ID=sb-paul-g-apigee ./setup-apigee.sh
+#   ./scripts/shared/setup-slow.sh
 #
 set -euo pipefail
 
-# --- Configuration ---
-PROJECT_ID="${PROJECT_ID:-sb-paul-g-apigee}"
-REGION="europe-north2"
-ANALYTICS_REGION="europe-west1"  # Apigee analytics not available in all regions
-CONSUMER_DATA_REGION="europe-west1"  # Must be a specific region, not multi-region "eu"
-APIGEE_NETWORK="apigee-vpc"
-APIGEE_PEERING_RANGE_NAME="apigee-peering-range"
-APIGEE_PEERING_CIDR="10.1.0.0/20"  # Org peering range (4096 IPs)
-APIGEE_INSTANCE_RANGE_NAME="apigee-instance-range"
-APIGEE_INSTANCE_CIDR="10.2.0.0/22"  # Instance range (/22 minimum for runtime)
-APIGEE_ENV="test"
-APIGEE_ENV_GROUP="test-group"
-APIGEE_ENV_GROUP_HOSTNAME="api.internal.example.com"
-APIGEE_API="https://eu-apigee.googleapis.com/v1"  # EU endpoint for data residency
+source "$(dirname "${BASH_SOURCE[0]}")/env.sh"
+source "${SHARED_DIR}/lib/helpers.sh"
 
 echo "=== Apigee X Provisioning (VPC Peering, Pay-As-You-Go) ==="
 echo "Project:          ${PROJECT_ID}"
@@ -44,12 +27,6 @@ echo "Analytics region: ${ANALYTICS_REGION}"
 echo "Network:          ${APIGEE_NETWORK}"
 echo "Peering CIDR:     ${APIGEE_PEERING_CIDR}"
 echo ""
-
-# --- Helper ---
-resource_exists() {
-  "$@" &>/dev/null
-  return $?
-}
 
 # ============================================================
 # Step 1: Enable APIs
@@ -88,7 +65,6 @@ fi
 echo ""
 echo "--- Step 3: Allocate peering IP ranges ---"
 
-# Range 1: org peering
 if gcloud compute addresses describe "${APIGEE_PEERING_RANGE_NAME}" \
     --global --project="${PROJECT_ID}" &>/dev/null; then
   echo "Peering range '${APIGEE_PEERING_RANGE_NAME}' already exists, skipping."
@@ -106,7 +82,6 @@ else
   echo "Peering range '${APIGEE_PEERING_RANGE_NAME}' (${APIGEE_PEERING_CIDR}) allocated."
 fi
 
-# Range 2: instance range (separate to avoid exhaustion)
 if gcloud compute addresses describe "${APIGEE_INSTANCE_RANGE_NAME}" \
     --global --project="${PROJECT_ID}" &>/dev/null; then
   echo "Instance range '${APIGEE_INSTANCE_RANGE_NAME}' already exists, skipping."
@@ -144,7 +119,6 @@ if [[ -n "${EXISTING_PEERING}" ]]; then
     --force
   echo "Peering updated with both ranges."
 else
-  # Try connect first; if it fails because peering exists, fall back to update
   if ! gcloud services vpc-peerings connect \
     --service=servicenetworking.googleapis.com \
     --ranges="${APIGEE_PEERING_RANGE_NAME},${APIGEE_INSTANCE_RANGE_NAME}" \
@@ -167,12 +141,8 @@ fi
 echo ""
 echo "--- Step 5: Provision Apigee organisation ---"
 
-# Note: gcloud alpha apigee organizations provision only supports eval/trial orgs.
-# For pay-as-you-go (PAYG), we use the Apigee REST API directly.
-
 TOKEN="$(gcloud auth print-access-token)"
 
-# Check if org already exists
 ORG_STATE="$(curl -s -o /dev/null -w '%{http_code}' \
   -H "Authorization: Bearer ${TOKEN}" \
   "${APIGEE_API}/organizations/${PROJECT_ID}")"
@@ -187,7 +157,6 @@ else
   echo "  Network:       ${APIGEE_NETWORK}"
   echo ""
 
-  # Create the org via REST API (supports billingType: PAYG)
   ORG_RESPONSE="$(curl -s -X POST \
     -H "Authorization: Bearer ${TOKEN}" \
     -H "Content-Type: application/json" \
@@ -202,14 +171,12 @@ else
       \"apiConsumerDataLocation\": \"${CONSUMER_DATA_REGION}\"
     }")"
 
-  # Check for errors in response
   if echo "${ORG_RESPONSE}" | grep -q '"error"'; then
     echo "ERROR creating Apigee org:"
     echo "${ORG_RESPONSE}" | python3 -m json.tool 2>/dev/null || echo "${ORG_RESPONSE}"
     exit 1
   fi
 
-  # Extract operation name for polling
   OP_NAME="$(echo "${ORG_RESPONSE}" | python3 -c "import sys,json; print(json.load(sys.stdin).get('name',''))" 2>/dev/null || true)"
   echo "Organisation creation started."
   if [[ -n "${OP_NAME}" ]]; then
@@ -221,12 +188,10 @@ else
   echo "(This is the longest step — typically 30-50 minutes)"
   echo ""
 
-  # Poll for org readiness
-  TIMEOUT=3600  # 60 minutes max
+  TIMEOUT=3600
   INTERVAL=30
   ELAPSED=0
   while true; do
-    # Refresh token periodically (tokens expire after 60 min)
     if (( ELAPSED > 0 && ELAPSED % 1800 == 0 )); then
       TOKEN="$(gcloud auth print-access-token)"
     fi
@@ -243,7 +208,6 @@ else
     if (( ELAPSED >= TIMEOUT )); then
       echo "ERROR: Timed out after ${TIMEOUT}s waiting for Apigee org to become ACTIVE."
       echo "Current state: ${STATE}"
-      echo "Check: curl -H \"Authorization: Bearer \$(gcloud auth print-access-token)\" ${APIGEE_API}/organizations/${PROJECT_ID}"
       exit 1
     fi
     echo "  State: ${STATE} (${ELAPSED}s elapsed, checking every ${INTERVAL}s)..."
@@ -259,9 +223,7 @@ echo ""
 echo "--- Step 6: Create Apigee runtime instance ---"
 
 TOKEN="$(gcloud auth print-access-token)"
-INSTANCE_NAME="instance-${REGION}"
 
-# Check if instance already exists (any state — CREATING or ACTIVE)
 INSTANCE_JSON="$(curl -s \
   -H "Authorization: Bearer ${TOKEN}" \
   "${APIGEE_API}/organizations/${PROJECT_ID}/instances/${INSTANCE_NAME}")"
@@ -295,10 +257,9 @@ else
   echo "Instance creation started."
 fi
 
-# Wait for ACTIVE (unless already active)
 if [[ "${INSTANCE_STATE}" != "ACTIVE" ]]; then
   echo "Waiting for instance to become ACTIVE..."
-  TIMEOUT=3600  # 60 minutes max
+  TIMEOUT=3600
   INTERVAL=30
   ELAPSED=0
   while true; do
@@ -357,7 +318,6 @@ else
     exit 1
   fi
 
-  # Wait for environment creation (usually quick, but LRO)
   echo "Waiting for environment creation..."
   sleep 10
   echo "Environment '${APIGEE_ENV}' created."
@@ -390,7 +350,6 @@ else
     exit 1
   fi
 
-  # Wait for attachment (can take a few minutes)
   echo "Waiting for environment attachment..."
   TIMEOUT=300
   INTERVAL=15
@@ -447,7 +406,6 @@ else
   echo "Environment group '${APIGEE_ENV_GROUP}' created with hostname '${APIGEE_ENV_GROUP_HOSTNAME}'."
 fi
 
-# Attach environment to group
 ENVGROUP_ATTACHMENTS="$(curl -s \
   -H "Authorization: Bearer ${TOKEN}" \
   "${APIGEE_API}/organizations/${PROJECT_ID}/envgroups/${APIGEE_ENV_GROUP}/attachments")"
@@ -481,9 +439,7 @@ echo ""
 echo "--- Step 10: Deploy pass-through API proxy ---"
 
 TOKEN="$(gcloud auth print-access-token)"
-PROXY_NAME="cr-hello-passthrough"
 
-# Check if proxy already exists
 PROXY_HTTP="$(curl -s -o /dev/null -w '%{http_code}' \
   -H "Authorization: Bearer ${TOKEN}" \
   "${APIGEE_API}/organizations/${PROJECT_ID}/apis/${PROXY_NAME}")"
@@ -493,13 +449,11 @@ if [[ "${PROXY_HTTP}" == "200" ]]; then
 else
   echo "Creating API proxy bundle..."
 
-  # Create temporary proxy bundle zip
   BUNDLE_DIR="$(mktemp -d)"
   mkdir -p "${BUNDLE_DIR}/apiproxy/proxies"
   mkdir -p "${BUNDLE_DIR}/apiproxy/targets"
   mkdir -p "${BUNDLE_DIR}/apiproxy/policies"
 
-  # Proxy endpoint
   cat > "${BUNDLE_DIR}/apiproxy/proxies/default.xml" << 'XMLEOF'
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <ProxyEndpoint name="default">
@@ -521,7 +475,6 @@ else
 </ProxyEndpoint>
 XMLEOF
 
-  # Target endpoint — URL will be updated per-option
   cat > "${BUNDLE_DIR}/apiproxy/targets/default.xml" << 'XMLEOF'
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <TargetEndpoint name="default">
@@ -540,7 +493,6 @@ XMLEOF
 </TargetEndpoint>
 XMLEOF
 
-  # Proxy descriptor
   cat > "${BUNDLE_DIR}/apiproxy/${PROXY_NAME}.xml" << XMLEOF
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <APIProxy name="${PROXY_NAME}">
@@ -549,11 +501,9 @@ XMLEOF
 </APIProxy>
 XMLEOF
 
-  # Create the bundle zip
   BUNDLE_ZIP="$(mktemp).zip"
   (cd "${BUNDLE_DIR}" && zip -r "${BUNDLE_ZIP}" apiproxy/)
 
-  # Import the proxy via REST API (gcloud has no 'apis create')
   IMPORT_RESPONSE="$(curl -s -X POST \
     -H "Authorization: Bearer ${TOKEN}" \
     -H "Content-Type: application/octet-stream" \
@@ -571,7 +521,6 @@ XMLEOF
   echo "API proxy '${PROXY_NAME}' imported (revision 1)."
 fi
 
-# Deploy revision 1 if not already deployed
 DEPLOY_CHECK="$(curl -s \
   -H "Authorization: Bearer ${TOKEN}" \
   "${APIGEE_API}/organizations/${PROJECT_ID}/environments/${APIGEE_ENV}/deployments")"
@@ -601,7 +550,7 @@ echo "=== Apigee X Provisioning Complete ==="
 echo "============================================================"
 echo ""
 echo "Organisation: ${PROJECT_ID}"
-echo "Instance:     ${INSTANCE_NAME:-instance-${REGION}} (${REGION})"
+echo "Instance:     ${INSTANCE_NAME} (${REGION})"
 echo "Environment:  ${APIGEE_ENV}"
 echo "Env group:    ${APIGEE_ENV_GROUP} (${APIGEE_ENV_GROUP_HOSTNAME})"
 echo "API proxy:    ${PROXY_NAME} → /hello"
@@ -610,7 +559,6 @@ echo "VPC:          ${APIGEE_NETWORK}"
 echo "Peering CIDR: ${APIGEE_PEERING_CIDR} (Apigee runtime IPs)"
 echo ""
 
-# Show the internal IP of the Apigee instance
 TOKEN="$(gcloud auth print-access-token)"
 INSTANCE_HOST="$(curl -s \
   -H "Authorization: Bearer ${TOKEN}" \
@@ -619,14 +567,7 @@ INSTANCE_HOST="$(curl -s \
 echo "Instance internal IP: ${INSTANCE_HOST}"
 echo ""
 echo "The proxy has a placeholder target URL. Each option's setup"
-echo "scripts will configure the correct Cloud Run target URL and"
-echo "DNS/networking to reach it."
+echo "scripts will configure the correct Cloud Run target URL."
 echo ""
-echo "Billing: pay-as-you-go (\$0.50/hr). Run teardown-apigee.sh"
+echo "Billing: pay-as-you-go (\$0.50/hr). Run teardown-slow.sh"
 echo "when done to stop charges."
-echo ""
-echo "Next steps:"
-echo "  1. cd scripts/option{1,2,3,4}/"
-echo "  2. Run setup-iam.sh, setup-infra.sh, etc."
-echo "  3. The option scripts will create subnets, DNS, PSC/VPN"
-echo "     in the existing apigee-vpc."

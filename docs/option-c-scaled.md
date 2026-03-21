@@ -37,16 +37,17 @@ This is the key advantage of Option C over Options A and D, which require per-se
 
 ## PoC validation
 
-The `scripts/option3-scaled/` directory deploys 20 Cloud Run services (`cr-svc-01` through `cr-svc-20`) and verifies each is reachable through the single PSC endpoint.
+The `scripts/option3/` directory supports a scaled variant via `SERVICE_COUNT` — it deploys 20 Cloud Run services (`cr-svc-01` through `cr-svc-20`) and verifies each is reachable through the single PSC endpoint.
 
 ```bash
-cd scripts/option3-scaled
-./setup-iam.sh
-gcloud config set auth/impersonate_service_account apigee-psc-scaled-poc@PROJECT_ID.iam.gserviceaccount.com
-./setup-infra.sh    # deploys 20 Cloud Run services
-./setup-psc.sh      # same single PSC endpoint + DNS
-./test.sh           # tests all 20 services
-./teardown.sh       # cleanup
+# Shared setup (once):
+./scripts/shared/setup-iam.sh
+./scripts/shared/setup-base.sh
+
+# Scaled option 3:
+SERVICE_COUNT=20 ./scripts/option3/setup.sh    # deploys 20 Cloud Run services + PSC + DNS
+SERVICE_COUNT=20 ./scripts/option3/test.sh     # tests all 20 services
+SERVICE_COUNT=20 ./scripts/option3/teardown.sh # cleanup
 ```
 
 ## Cost

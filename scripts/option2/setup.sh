@@ -1,30 +1,26 @@
 #!/usr/bin/env bash
 #
-# setup-dns.sh — Create private DNS zone for PGA restricted VIP (idempotent)
+# option2/setup.sh — Option B: Private Google Access (PGA) (~30 sec)
 #
-# Routes *.run.app to Google's restricted VIP range (199.36.153.4/30)
-# instead of public IPs. Combined with Private Google Access on the subnet,
-# this enables Cloud Run access without PSC or VPN.
+# Creates: private DNS zone routing *.run.app to restricted VIP (199.36.153.4/30)
 #
-# Run this AFTER setup-infra.sh has completed.
+# This is the simplest option — just DNS. Combined with Private Google Access
+# on the subnet (enabled by setup-base.sh), traffic routes to Cloud Run
+# without VPN or PSC.
+#
+# Prerequisites: shared/setup-base.sh completed.
 #
 set -euo pipefail
 
-# --- Configuration ---
-PROJECT_ID="${PROJECT_ID:-sb-paul-g-workshop}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/../shared/env.sh"
+source "${SHARED_DIR}/lib/helpers.sh"
+source "${SHARED_DIR}/lib/apigee-proxy.sh"
 
-REGION="europe-north2"
-
-echo "=== Setup DNS for PGA — project: ${PROJECT_ID} ==="
+echo "=== Option 2: PGA — project: ${PROJECT_ID} ==="
 echo "Region: ${REGION}"
 echo "Restricted VIP: 199.36.153.4, 199.36.153.5, 199.36.153.6, 199.36.153.7"
 echo ""
-
-# --- Helper ---
-resource_exists() {
-  "$@" &>/dev/null
-  return $?
-}
 
 # ============================================================
 # Step 1: Create private DNS zone for run.app
@@ -36,7 +32,7 @@ else
   gcloud dns managed-zones create "run-app-pga" \
     --dns-name="run.app." \
     --visibility=private \
-    --networks=apigee-vpc \
+    --networks="${APIGEE_NETWORK}" \
     --description="Route run.app to restricted VIP for Private Google Access" \
     --project="${PROJECT_ID}"
   echo "DNS zone 'run-app-pga' created."
@@ -55,7 +51,7 @@ else
     --zone="run-app-pga" \
     --type=A \
     --ttl=300 \
-    --rrdatas="199.36.153.4 199.36.153.5 199.36.153.6 199.36.153.7" \
+    --rrdatas="199.36.153.4,199.36.153.5,199.36.153.6,199.36.153.7" \
     --project="${PROJECT_ID}"
   echo "DNS record '*.run.app → 199.36.153.4-7' created."
 fi
@@ -73,31 +69,28 @@ else
     --zone="run-app-pga" \
     --type=A \
     --ttl=300 \
-    --rrdatas="199.36.153.4 199.36.153.5 199.36.153.6 199.36.153.7" \
+    --rrdatas="199.36.153.4,199.36.153.5,199.36.153.6,199.36.153.7" \
     --project="${PROJECT_ID}"
   echo "DNS record 'run.app → 199.36.153.4-7' created."
 fi
 
 # ============================================================
-# Verification
+# Step 4: Update Apigee proxy target (optional)
 # ============================================================
 echo ""
-echo "=== DNS setup complete ==="
+SERVICE_URL="$(gcloud run services describe "cr-hello" \
+  --region="${REGION}" --project="${PROJECT_ID}" \
+  --format='value(status.url)' 2>/dev/null || true)"
+if [[ -n "${SERVICE_URL}" ]]; then
+  update_apigee_proxy_target "${SERVICE_URL}/" --audience="${SERVICE_URL}"
+fi
 
+# ============================================================
+# Summary
+# ============================================================
 echo ""
-echo "--- DNS zone ---"
-gcloud dns managed-zones describe "run-app-pga" \
-  --project="${PROJECT_ID}" \
-  --format="table(name,dnsName,visibility)" 2>/dev/null || echo "(not ready yet)"
-
+echo "=== Option 2 setup complete ==="
 echo ""
-echo "--- DNS records ---"
-gcloud dns record-sets list \
-  --zone="run-app-pga" \
-  --project="${PROJECT_ID}" \
-  --format="table(name,type,ttl,rrdatas)" 2>/dev/null || echo "(not ready yet)"
-
+echo "Traffic flow: VM → restricted VIP (199.36.153.x) → Cloud Run"
 echo ""
-echo "=== Next steps ==="
-echo ""
-echo "Run ./test.sh to verify DNS resolution and connectivity through PGA."
+echo "Run ./scripts/option2/test.sh to verify."
