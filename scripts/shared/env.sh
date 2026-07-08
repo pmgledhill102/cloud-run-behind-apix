@@ -22,6 +22,15 @@ IMAGE_NAME="http-server"
 IMAGE_TAG="latest"
 IMAGE_URL="${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO_NAME}/${IMAGE_NAME}:${IMAGE_TAG}"
 
+# --- Cloud Build ---
+# The image is built remotely with `gcloud builds submit` (no local Docker
+# required). BUILD_REGION must be an allowed location if the project enforces
+# constraints/gcp.resourceLocations — the default US Cloud Build pool/bucket is
+# rejected in EU-only orgs. CLOUDBUILD_BUCKET is a regional staging bucket in
+# BUILD_REGION (the default US multi-region bucket is likewise disallowed).
+BUILD_REGION="${BUILD_REGION:-europe-west1}"
+CLOUDBUILD_BUCKET="${CLOUDBUILD_BUCKET:-${PROJECT_ID}-cloudbuild}"
+
 # --- Networking ---
 APIGEE_NETWORK="apigee-vpc"
 

@@ -123,6 +123,22 @@ gcloud projects add-iam-policy-binding "${PROJECT_ID}" \
   --quiet >/dev/null
 echo "Default compute SA granted run.invoker (for test VM auth)."
 
+# --- Grant default compute SA Cloud Build roles ---
+# setup-base.sh builds the image with `gcloud builds submit`, which runs as the
+# default compute SA. In hardened projects (automatic default-SA grants disabled)
+# that SA has no roles, so the build cannot read its source, write logs, or push
+# the image. Grant the minimum needed.
+echo ""
+echo "--- Granting default compute SA Cloud Build roles ---"
+for CB_ROLE in roles/storage.objectViewer roles/logging.logWriter roles/artifactregistry.writer; do
+  gcloud projects add-iam-policy-binding "${PROJECT_ID}" \
+    --member="serviceAccount:${COMPUTE_SA}" \
+    --role="${CB_ROLE}" \
+    --condition=None \
+    --quiet >/dev/null
+  echo "Default compute SA granted ${CB_ROLE}."
+done
+
 # --- Summary ---
 echo ""
 echo "=== Done ==="
