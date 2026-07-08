@@ -217,6 +217,24 @@ else
 fi
 
 # ============================================================
+# Step 5b: Grant Apigee runtime SA Cloud Run invoker
+# ============================================================
+# The Apigee runtime service agent (gcp-sa-apigee-mp) is created when the org is
+# provisioned, so it exists by this point. setup-iam.sh grants this too, but on a
+# greenfield project that grant is skipped (the SA does not exist yet at IAM time),
+# so we (re-)apply it here. Idempotent.
+echo ""
+echo "--- Step 5b: Grant Apigee runtime SA roles/run.invoker ---"
+PROJECT_NUMBER="$(gcloud projects describe "${PROJECT_ID}" --format='value(projectNumber)')"
+APIGEE_RUNTIME_SA="service-${PROJECT_NUMBER}@gcp-sa-apigee-mp.iam.gserviceaccount.com"
+gcloud projects add-iam-policy-binding "${PROJECT_ID}" \
+  --member="serviceAccount:${APIGEE_RUNTIME_SA}" \
+  --role="roles/run.invoker" \
+  --condition=None \
+  --quiet >/dev/null
+echo "Apigee runtime SA '${APIGEE_RUNTIME_SA}' granted run.invoker."
+
+# ============================================================
 # Step 6: Create Apigee runtime instance
 # ============================================================
 echo ""

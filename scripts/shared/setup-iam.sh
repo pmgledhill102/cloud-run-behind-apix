@@ -94,15 +94,23 @@ gcloud projects add-iam-policy-binding "${PROJECT_ID}" \
 echo "Cloud Run Service Agent granted compute.networkUser."
 
 # --- Grant Apigee runtime SA Cloud Run invoker ---
+# NOTE: The Apigee runtime service agent (gcp-sa-apigee-mp) only exists once the
+# Apigee org has been provisioned (setup-slow.sh). On a greenfield project this
+# grant will fail because the SA does not exist yet, so it is non-fatal here —
+# setup-slow.sh re-applies it after the org becomes ACTIVE.
 echo ""
 echo "--- Granting Apigee runtime SA roles/run.invoker ---"
 APIGEE_RUNTIME_SA="service-${PROJECT_NUMBER}@gcp-sa-apigee-mp.iam.gserviceaccount.com"
-gcloud projects add-iam-policy-binding "${PROJECT_ID}" \
+if gcloud projects add-iam-policy-binding "${PROJECT_ID}" \
   --member="serviceAccount:${APIGEE_RUNTIME_SA}" \
   --role="roles/run.invoker" \
   --condition=None \
-  --quiet >/dev/null
-echo "Apigee runtime SA granted run.invoker."
+  --quiet >/dev/null 2>&1; then
+  echo "Apigee runtime SA granted run.invoker."
+else
+  echo "SKIPPED: Apigee runtime SA '${APIGEE_RUNTIME_SA}' does not exist yet."
+  echo "         setup-slow.sh will grant this once the Apigee org is provisioned."
+fi
 
 # --- Grant default compute SA Cloud Run invoker (for test VM) ---
 echo ""
