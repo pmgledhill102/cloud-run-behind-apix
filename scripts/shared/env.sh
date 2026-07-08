@@ -10,7 +10,11 @@
 # --- Project ---
 PROJECT_ID="${PROJECT_ID:-sb-paul-g-apigee}"
 REGION="europe-north2"
-ZONE="${REGION}-a"
+# Overridable: small VM types can stock out in a single zone (e.g. e2-micro in
+# europe-north2-a) — switch zone or size without editing this file:
+#   ZONE=europe-north2-b ./scripts/shared/setup-base.sh
+ZONE="${ZONE:-${REGION}-a}"
+VM_MACHINE_TYPE="${VM_MACHINE_TYPE:-e2-micro}"
 
 # --- Service account ---
 SA_NAME="apigee-poc"

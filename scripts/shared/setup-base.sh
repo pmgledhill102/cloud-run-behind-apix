@@ -196,7 +196,7 @@ if resource_exists gcloud compute instances describe "vm-test" \
 else
   gcloud compute instances create "vm-test" \
     --zone="${ZONE}" \
-    --machine-type=e2-micro \
+    --machine-type="${VM_MACHINE_TYPE}" \
     --network-interface=network="${APIGEE_NETWORK}",subnet=compute-apigee,no-address \
     --metadata=startup-script='#!/bin/bash
 apt-get update -qq && apt-get install -yqq dnsutils >/dev/null 2>&1' \
