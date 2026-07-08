@@ -175,10 +175,19 @@ XMLEOF
     NEW_REV="$(echo "${IMPORT_RESPONSE}" | python3 -c "import sys,json; print(json.load(sys.stdin).get('revision',''))" 2>/dev/null || true)"
     echo "Imported revision ${NEW_REV}."
 
+    # A proxy with an <Authentication> block (GoogleIDToken) must be deployed
+    # with a service account identity — Apigee mints the ID tokens as that SA,
+    # and rejects the deployment with MISSING_SERVICE_ACCOUNT otherwise. Use the
+    # PoC SA, which setup-iam.sh grants roles/run.invoker.
+    local DEPLOY_PARAMS="override=true"
+    if [[ -n "${audience}" ]]; then
+      DEPLOY_PARAMS="${DEPLOY_PARAMS}&serviceAccount=${SA_EMAIL}"
+    fi
+
     local DEPLOY_RESPONSE
     DEPLOY_RESPONSE="$(curl -s -X POST \
       -H "Authorization: Bearer ${TOKEN}" \
-      "${APIGEE_API}/organizations/${PROJECT_ID}/environments/${APIGEE_ENV}/apis/${PROXY_NAME}/revisions/${NEW_REV}/deployments?override=true")"
+      "${APIGEE_API}/organizations/${PROJECT_ID}/environments/${APIGEE_ENV}/apis/${PROXY_NAME}/revisions/${NEW_REV}/deployments?${DEPLOY_PARAMS}")"
 
     if echo "${DEPLOY_RESPONSE}" | grep -q '"error"'; then
       echo "ERROR deploying revision ${NEW_REV}:"

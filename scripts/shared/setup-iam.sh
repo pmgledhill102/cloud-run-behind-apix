@@ -81,6 +81,19 @@ gcloud iam service-accounts add-iam-policy-binding "${SA_EMAIL}" \
   --quiet >/dev/null
 echo "Caller '${CALLER_ACCOUNT}' can now impersonate '${SA_EMAIL}'."
 
+# --- Grant caller permission to deploy proxies as the SA ---
+# Deploying an Apigee proxy with a GoogleIDToken <Authentication> block requires
+# the deployer to have iam.serviceAccounts.actAs on the SA passed to the
+# deployment (roles/iam.serviceAccountUser); tokenCreator alone is not enough.
+echo ""
+echo "--- Granting caller serviceAccountUser ---"
+gcloud iam service-accounts add-iam-policy-binding "${SA_EMAIL}" \
+  --member="user:${CALLER_ACCOUNT}" \
+  --role="roles/iam.serviceAccountUser" \
+  --project="${PROJECT_ID}" \
+  --quiet >/dev/null
+echo "Caller '${CALLER_ACCOUNT}' can now deploy Apigee proxies as '${SA_EMAIL}'."
+
 # --- Grant Cloud Run Service Agent compute.networkUser ---
 echo ""
 echo "--- Granting Cloud Run Service Agent roles/compute.networkUser ---"
