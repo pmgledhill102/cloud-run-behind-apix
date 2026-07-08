@@ -148,7 +148,11 @@ ORG_STATE="$(curl -s -o /dev/null -w '%{http_code}' \
   "${APIGEE_API}/organizations/${PROJECT_ID}")"
 
 if [[ "${ORG_STATE}" == "200" ]]; then
-  echo "Apigee org '${PROJECT_ID}' already exists, skipping."
+  # Org resource exists — but "exists" does not mean "ACTIVE". On a re-run while a
+  # previous creation is still in flight, the resource returns 200 with state
+  # CREATING; skipping straight to the instance step then fails with a lock error.
+  # Fall through to the shared wait-for-ACTIVE loop below.
+  echo "Apigee org '${PROJECT_ID}' already exists — verifying it is ACTIVE..."
 else
   echo "Creating Apigee organisation..."
   echo "  Billing type:  PAYG (pay-as-you-go)"
@@ -187,34 +191,37 @@ else
   echo "Waiting for org to become ACTIVE..."
   echo "(This is the longest step — typically 30-50 minutes)"
   echo ""
-
-  TIMEOUT=3600
-  INTERVAL=30
-  ELAPSED=0
-  while true; do
-    if (( ELAPSED > 0 && ELAPSED % 1800 == 0 )); then
-      TOKEN="$(gcloud auth print-access-token)"
-    fi
-
-    STATE="$(curl -s \
-      -H "Authorization: Bearer ${TOKEN}" \
-      "${APIGEE_API}/organizations/${PROJECT_ID}" \
-      | python3 -c "import sys,json; print(json.load(sys.stdin).get('state','NOT_READY'))" 2>/dev/null || echo "NOT_READY")"
-
-    if [[ "${STATE}" == "ACTIVE" ]]; then
-      echo "Apigee org is ACTIVE."
-      break
-    fi
-    if (( ELAPSED >= TIMEOUT )); then
-      echo "ERROR: Timed out after ${TIMEOUT}s waiting for Apigee org to become ACTIVE."
-      echo "Current state: ${STATE}"
-      exit 1
-    fi
-    echo "  State: ${STATE} (${ELAPSED}s elapsed, checking every ${INTERVAL}s)..."
-    sleep "${INTERVAL}"
-    ELAPSED=$((ELAPSED + INTERVAL))
-  done
 fi
+
+# Wait for org ACTIVE — runs whether we just created it or it already existed
+# (possibly still CREATING from an earlier interrupted run). Breaks immediately
+# if already ACTIVE.
+TIMEOUT=3600
+INTERVAL=30
+ELAPSED=0
+while true; do
+  if (( ELAPSED > 0 && ELAPSED % 1800 == 0 )); then
+    TOKEN="$(gcloud auth print-access-token)"
+  fi
+
+  STATE="$(curl -s \
+    -H "Authorization: Bearer ${TOKEN}" \
+    "${APIGEE_API}/organizations/${PROJECT_ID}" \
+    | python3 -c "import sys,json; print(json.load(sys.stdin).get('state','NOT_READY'))" 2>/dev/null || echo "NOT_READY")"
+
+  if [[ "${STATE}" == "ACTIVE" ]]; then
+    echo "Apigee org is ACTIVE."
+    break
+  fi
+  if (( ELAPSED >= TIMEOUT )); then
+    echo "ERROR: Timed out after ${TIMEOUT}s waiting for Apigee org to become ACTIVE."
+    echo "Current state: ${STATE}"
+    exit 1
+  fi
+  echo "  State: ${STATE} (${ELAPSED}s elapsed, checking every ${INTERVAL}s)..."
+  sleep "${INTERVAL}"
+  ELAPSED=$((ELAPSED + INTERVAL))
+done
 
 # ============================================================
 # Step 6: Create Apigee runtime instance
