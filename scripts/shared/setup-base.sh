@@ -41,14 +41,28 @@ fi
 # ============================================================
 echo ""
 echo "--- Step 2: Build and push container image ---"
-gcloud auth configure-docker "${REGION}-docker.pkg.dev" --quiet 2>/dev/null || true
 
 if gcloud artifacts docker images describe "${IMAGE_URL}" --project="${PROJECT_ID}" &>/dev/null; then
   echo "Image '${IMAGE_URL}' already exists, skipping build."
 else
-  echo "Building image..."
-  docker build --platform linux/amd64 -t "${IMAGE_URL}" "${SHARED_DIR}/container"
-  docker push "${IMAGE_URL}"
+  echo "Building image via Cloud Build (region: ${BUILD_REGION})..."
+  # Build remotely — no local Docker/Podman required, and the build runs on
+  # native amd64 (matching Cloud Run). A regional staging bucket in an allowed
+  # location is used because the default US Cloud Build bucket is rejected by
+  # constraints/gcp.resourceLocations in EU-only orgs.
+  if ! gcloud storage buckets describe "gs://${CLOUDBUILD_BUCKET}" \
+      --project="${PROJECT_ID}" &>/dev/null; then
+    gcloud storage buckets create "gs://${CLOUDBUILD_BUCKET}" \
+      --location="${BUILD_REGION}" \
+      --project="${PROJECT_ID}"
+    echo "Cloud Build staging bucket 'gs://${CLOUDBUILD_BUCKET}' created."
+  fi
+  gcloud builds submit \
+    --region="${BUILD_REGION}" \
+    --gcs-source-staging-dir="gs://${CLOUDBUILD_BUCKET}/source" \
+    --tag "${IMAGE_URL}" \
+    "${SHARED_DIR}/container" \
+    --project="${PROJECT_ID}"
   echo "Image pushed to ${IMAGE_URL}"
 fi
 
@@ -182,7 +196,7 @@ if resource_exists gcloud compute instances describe "vm-test" \
 else
   gcloud compute instances create "vm-test" \
     --zone="${ZONE}" \
-    --machine-type=e2-micro \
+    --machine-type="${VM_MACHINE_TYPE}" \
     --network-interface=network="${APIGEE_NETWORK}",subnet=compute-apigee,no-address \
     --metadata=startup-script='#!/bin/bash
 apt-get update -qq && apt-get install -yqq dnsutils >/dev/null 2>&1' \

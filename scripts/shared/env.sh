@@ -10,7 +10,11 @@
 # --- Project ---
 PROJECT_ID="${PROJECT_ID:-sb-paul-g-apigee}"
 REGION="europe-north2"
-ZONE="${REGION}-a"
+# Overridable: small VM types can stock out in a single zone (e.g. e2-micro in
+# europe-north2-a) — switch zone or size without editing this file:
+#   ZONE=europe-north2-b ./scripts/shared/setup-base.sh
+ZONE="${ZONE:-${REGION}-a}"
+VM_MACHINE_TYPE="${VM_MACHINE_TYPE:-e2-micro}"
 
 # --- Service account ---
 SA_NAME="apigee-poc"
@@ -21,6 +25,15 @@ REPO_NAME="apigee-poc"
 IMAGE_NAME="http-server"
 IMAGE_TAG="latest"
 IMAGE_URL="${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO_NAME}/${IMAGE_NAME}:${IMAGE_TAG}"
+
+# --- Cloud Build ---
+# The image is built remotely with `gcloud builds submit` (no local Docker
+# required). BUILD_REGION must be an allowed location if the project enforces
+# constraints/gcp.resourceLocations — the default US Cloud Build pool/bucket is
+# rejected in EU-only orgs. CLOUDBUILD_BUCKET is a regional staging bucket in
+# BUILD_REGION (the default US multi-region bucket is likewise disallowed).
+BUILD_REGION="${BUILD_REGION:-europe-west1}"
+CLOUDBUILD_BUCKET="${CLOUDBUILD_BUCKET:-${PROJECT_ID}-cloudbuild}"
 
 # --- Networking ---
 APIGEE_NETWORK="apigee-vpc"

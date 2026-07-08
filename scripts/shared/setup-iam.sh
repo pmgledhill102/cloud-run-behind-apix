@@ -81,6 +81,19 @@ gcloud iam service-accounts add-iam-policy-binding "${SA_EMAIL}" \
   --quiet >/dev/null
 echo "Caller '${CALLER_ACCOUNT}' can now impersonate '${SA_EMAIL}'."
 
+# --- Grant caller permission to deploy proxies as the SA ---
+# Deploying an Apigee proxy with a GoogleIDToken <Authentication> block requires
+# the deployer to have iam.serviceAccounts.actAs on the SA passed to the
+# deployment (roles/iam.serviceAccountUser); tokenCreator alone is not enough.
+echo ""
+echo "--- Granting caller serviceAccountUser ---"
+gcloud iam service-accounts add-iam-policy-binding "${SA_EMAIL}" \
+  --member="user:${CALLER_ACCOUNT}" \
+  --role="roles/iam.serviceAccountUser" \
+  --project="${PROJECT_ID}" \
+  --quiet >/dev/null
+echo "Caller '${CALLER_ACCOUNT}' can now deploy Apigee proxies as '${SA_EMAIL}'."
+
 # --- Grant Cloud Run Service Agent compute.networkUser ---
 echo ""
 echo "--- Granting Cloud Run Service Agent roles/compute.networkUser ---"
@@ -94,15 +107,23 @@ gcloud projects add-iam-policy-binding "${PROJECT_ID}" \
 echo "Cloud Run Service Agent granted compute.networkUser."
 
 # --- Grant Apigee runtime SA Cloud Run invoker ---
+# NOTE: The Apigee runtime service agent (gcp-sa-apigee-mp) only exists once the
+# Apigee org has been provisioned (setup-slow.sh). On a greenfield project this
+# grant will fail because the SA does not exist yet, so it is non-fatal here —
+# setup-slow.sh re-applies it after the org becomes ACTIVE.
 echo ""
 echo "--- Granting Apigee runtime SA roles/run.invoker ---"
 APIGEE_RUNTIME_SA="service-${PROJECT_NUMBER}@gcp-sa-apigee-mp.iam.gserviceaccount.com"
-gcloud projects add-iam-policy-binding "${PROJECT_ID}" \
+if gcloud projects add-iam-policy-binding "${PROJECT_ID}" \
   --member="serviceAccount:${APIGEE_RUNTIME_SA}" \
   --role="roles/run.invoker" \
   --condition=None \
-  --quiet >/dev/null
-echo "Apigee runtime SA granted run.invoker."
+  --quiet >/dev/null 2>&1; then
+  echo "Apigee runtime SA granted run.invoker."
+else
+  echo "SKIPPED: Apigee runtime SA '${APIGEE_RUNTIME_SA}' does not exist yet."
+  echo "         setup-slow.sh will grant this once the Apigee org is provisioned."
+fi
 
 # --- Grant default compute SA Cloud Run invoker (for test VM) ---
 echo ""
@@ -114,6 +135,22 @@ gcloud projects add-iam-policy-binding "${PROJECT_ID}" \
   --condition=None \
   --quiet >/dev/null
 echo "Default compute SA granted run.invoker (for test VM auth)."
+
+# --- Grant default compute SA Cloud Build roles ---
+# setup-base.sh builds the image with `gcloud builds submit`, which runs as the
+# default compute SA. In hardened projects (automatic default-SA grants disabled)
+# that SA has no roles, so the build cannot read its source, write logs, or push
+# the image. Grant the minimum needed.
+echo ""
+echo "--- Granting default compute SA Cloud Build roles ---"
+for CB_ROLE in roles/storage.objectViewer roles/logging.logWriter roles/artifactregistry.writer; do
+  gcloud projects add-iam-policy-binding "${PROJECT_ID}" \
+    --member="serviceAccount:${COMPUTE_SA}" \
+    --role="${CB_ROLE}" \
+    --condition=None \
+    --quiet >/dev/null
+  echo "Default compute SA granted ${CB_ROLE}."
+done
 
 # --- Summary ---
 echo ""

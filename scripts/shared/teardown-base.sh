@@ -132,6 +132,19 @@ else
   echo "Repository '${REPO_NAME}' does not exist, skipping."
 fi
 
+# ============================================================
+# Step 8: Delete Cloud Build staging bucket
+# ============================================================
+echo ""
+echo "--- Step 8: Delete Cloud Build staging bucket ---"
+if gcloud storage buckets describe "gs://${CLOUDBUILD_BUCKET}" \
+    --project="${PROJECT_ID}" &>/dev/null; then
+  gcloud storage rm --recursive "gs://${CLOUDBUILD_BUCKET}" --project="${PROJECT_ID}" --quiet
+  echo "Cloud Build staging bucket 'gs://${CLOUDBUILD_BUCKET}' deleted."
+else
+  echo "Cloud Build staging bucket 'gs://${CLOUDBUILD_BUCKET}' does not exist, skipping."
+fi
+
 echo ""
 if [[ ${#FAILED_RESOURCES[@]} -gt 0 ]]; then
   echo "=== Teardown complete (with warnings) ==="

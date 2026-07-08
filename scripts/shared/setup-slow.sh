@@ -148,7 +148,11 @@ ORG_STATE="$(curl -s -o /dev/null -w '%{http_code}' \
   "${APIGEE_API}/organizations/${PROJECT_ID}")"
 
 if [[ "${ORG_STATE}" == "200" ]]; then
-  echo "Apigee org '${PROJECT_ID}' already exists, skipping."
+  # Org resource exists — but "exists" does not mean "ACTIVE". On a re-run while a
+  # previous creation is still in flight, the resource returns 200 with state
+  # CREATING; skipping straight to the instance step then fails with a lock error.
+  # Fall through to the shared wait-for-ACTIVE loop below.
+  echo "Apigee org '${PROJECT_ID}' already exists — verifying it is ACTIVE..."
 else
   echo "Creating Apigee organisation..."
   echo "  Billing type:  PAYG (pay-as-you-go)"
@@ -187,34 +191,37 @@ else
   echo "Waiting for org to become ACTIVE..."
   echo "(This is the longest step — typically 30-50 minutes)"
   echo ""
-
-  TIMEOUT=3600
-  INTERVAL=30
-  ELAPSED=0
-  while true; do
-    if (( ELAPSED > 0 && ELAPSED % 1800 == 0 )); then
-      TOKEN="$(gcloud auth print-access-token)"
-    fi
-
-    STATE="$(curl -s \
-      -H "Authorization: Bearer ${TOKEN}" \
-      "${APIGEE_API}/organizations/${PROJECT_ID}" \
-      | python3 -c "import sys,json; print(json.load(sys.stdin).get('state','NOT_READY'))" 2>/dev/null || echo "NOT_READY")"
-
-    if [[ "${STATE}" == "ACTIVE" ]]; then
-      echo "Apigee org is ACTIVE."
-      break
-    fi
-    if (( ELAPSED >= TIMEOUT )); then
-      echo "ERROR: Timed out after ${TIMEOUT}s waiting for Apigee org to become ACTIVE."
-      echo "Current state: ${STATE}"
-      exit 1
-    fi
-    echo "  State: ${STATE} (${ELAPSED}s elapsed, checking every ${INTERVAL}s)..."
-    sleep "${INTERVAL}"
-    ELAPSED=$((ELAPSED + INTERVAL))
-  done
 fi
+
+# Wait for org ACTIVE — runs whether we just created it or it already existed
+# (possibly still CREATING from an earlier interrupted run). Breaks immediately
+# if already ACTIVE.
+TIMEOUT=3600
+INTERVAL=30
+ELAPSED=0
+while true; do
+  if (( ELAPSED > 0 && ELAPSED % 1800 == 0 )); then
+    TOKEN="$(gcloud auth print-access-token)"
+  fi
+
+  STATE="$(curl -s \
+    -H "Authorization: Bearer ${TOKEN}" \
+    "${APIGEE_API}/organizations/${PROJECT_ID}" \
+    | python3 -c "import sys,json; print(json.load(sys.stdin).get('state','NOT_READY'))" 2>/dev/null || echo "NOT_READY")"
+
+  if [[ "${STATE}" == "ACTIVE" ]]; then
+    echo "Apigee org is ACTIVE."
+    break
+  fi
+  if (( ELAPSED >= TIMEOUT )); then
+    echo "ERROR: Timed out after ${TIMEOUT}s waiting for Apigee org to become ACTIVE."
+    echo "Current state: ${STATE}"
+    exit 1
+  fi
+  echo "  State: ${STATE} (${ELAPSED}s elapsed, checking every ${INTERVAL}s)..."
+  sleep "${INTERVAL}"
+  ELAPSED=$((ELAPSED + INTERVAL))
+done
 
 # ============================================================
 # Step 6: Create Apigee runtime instance
@@ -285,6 +292,41 @@ if [[ "${INSTANCE_STATE}" != "ACTIVE" ]]; then
     sleep "${INTERVAL}"
     ELAPSED=$((ELAPSED + INTERVAL))
   done
+fi
+
+# ============================================================
+# Step 6b: Grant Apigee runtime SA Cloud Run invoker
+# ============================================================
+# The Apigee runtime service agent (gcp-sa-apigee-mp) is created during *instance*
+# provisioning (not org provisioning), so it only exists after Step 6. setup-iam.sh
+# attempts this grant too, but on a greenfield project it is skipped there because
+# the agent does not exist yet — so we (re-)apply it here. Best-effort with a short
+# retry for IAM propagation, and non-fatal so it never blocks provisioning.
+echo ""
+echo "--- Step 6b: Grant Apigee runtime SA roles/run.invoker ---"
+PROJECT_NUMBER="$(gcloud projects describe "${PROJECT_ID}" --format='value(projectNumber)')"
+APIGEE_RUNTIME_SA="service-${PROJECT_NUMBER}@gcp-sa-apigee-mp.iam.gserviceaccount.com"
+GRANT_OK=""
+for attempt in 1 2 3 4 5 6; do
+  if gcloud projects add-iam-policy-binding "${PROJECT_ID}" \
+    --member="serviceAccount:${APIGEE_RUNTIME_SA}" \
+    --role="roles/run.invoker" \
+    --condition=None \
+    --quiet >/dev/null 2>&1; then
+    GRANT_OK="yes"
+    break
+  fi
+  echo "  Agent not available yet (attempt ${attempt}/6), retrying in 10s..."
+  sleep 10
+done
+if [[ -n "${GRANT_OK}" ]]; then
+  echo "Apigee runtime SA '${APIGEE_RUNTIME_SA}' granted run.invoker."
+else
+  echo "WARNING: could not grant run.invoker to '${APIGEE_RUNTIME_SA}' (agent may"
+  echo "         still be propagating). Re-run this script or apply manually later:"
+  echo "         gcloud projects add-iam-policy-binding ${PROJECT_ID} \\"
+  echo "           --member=serviceAccount:${APIGEE_RUNTIME_SA} \\"
+  echo "           --role=roles/run.invoker --condition=None"
 fi
 
 # ============================================================
