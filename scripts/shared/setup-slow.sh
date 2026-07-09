@@ -329,6 +329,25 @@ else
   echo "           --role=roles/run.invoker --condition=None"
 fi
 
+# The Apigee service agent must be able to mint GoogleIDToken southbound
+# credentials as the PoC SA (proxies are deployed with it). Without this,
+# authenticated targets fail with GoogleTokenGenerationFailure. Mirrors the
+# non-fatal grant in setup-iam.sh, which is skipped on greenfield projects.
+APIGEE_AGENT_SA="service-${PROJECT_NUMBER}@gcp-sa-apigee.iam.gserviceaccount.com"
+if gcloud iam service-accounts add-iam-policy-binding "${SA_EMAIL}" \
+  --member="serviceAccount:${APIGEE_AGENT_SA}" \
+  --role="roles/iam.serviceAccountTokenCreator" \
+  --project="${PROJECT_ID}" \
+  --quiet >/dev/null 2>&1; then
+  echo "Apigee service agent granted tokenCreator on '${SA_EMAIL}'."
+else
+  echo "WARNING: could not grant tokenCreator on '${SA_EMAIL}' to '${APIGEE_AGENT_SA}'."
+  echo "         Apply manually:"
+  echo "         gcloud iam service-accounts add-iam-policy-binding ${SA_EMAIL} \\"
+  echo "           --member=serviceAccount:${APIGEE_AGENT_SA} \\"
+  echo "           --role=roles/iam.serviceAccountTokenCreator --project=${PROJECT_ID}"
+fi
+
 # ============================================================
 # Step 7: Create Apigee environment
 # ============================================================
