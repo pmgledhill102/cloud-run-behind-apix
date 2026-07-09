@@ -23,7 +23,7 @@ VM ─────────────────│──► restricted VI
 
 | Script | Resources |
 |---|---|
-| `setup.sh` | ACM API, scoped access policy `apigee-poc-policy`, VPC-SC on the Apigee peering, enforced perimeter `apigee-poc-perimeter` (restricts `run.googleapis.com`, `storage.googleapis.com`; ingress rule admits the caller identity) |
+| `setup.sh` | ACM API, scoped access policy `apigee-poc-policy`, VPC-SC on the Apigee peering, enforced perimeter `apigee_poc_perimeter` (restricts `run.googleapis.com`, `storage.googleapis.com`; ingress rule admits the caller identity; underscores because perimeter names disallow hyphens) |
 | `test.sh` | Perimeter status + positive/negative enforcement tests + Apigee E2E |
 | `teardown.sh` | Perimeter, policy (only if ours and empty), peering VPC-SC off |
 

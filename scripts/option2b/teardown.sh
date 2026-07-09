@@ -14,7 +14,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/../shared/env.sh"
 source "${SHARED_DIR}/lib/helpers.sh"
 
-PERIMETER_NAME="apigee-poc-perimeter"
+PERIMETER_NAME="apigee_poc_perimeter"
 POLICY_TITLE="apigee-poc-policy"
 
 echo "=== Teardown Option 2b (VPC-SC perimeter) — project: ${PROJECT_ID} ==="

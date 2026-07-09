@@ -37,7 +37,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/../shared/env.sh"
 source "${SHARED_DIR}/lib/helpers.sh"
 
-PERIMETER_NAME="apigee-poc-perimeter"
+# Perimeter short names allow only [A-Za-z0-9_] — no hyphens
+PERIMETER_NAME="apigee_poc_perimeter"
 POLICY_TITLE="apigee-poc-policy"
 RESTRICTED_SERVICES="run.googleapis.com,storage.googleapis.com"
 
