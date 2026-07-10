@@ -208,71 +208,27 @@ else
 fi
 
 # ============================================================
-# Step 4d: Apigee DNS peering zone for run.app
+# Step 4d: Peered DNS domain — run.app resolves via this VPC
 # ============================================================
 echo ""
-echo "--- Step 4d: Apigee DNS peering zone (run.app) ---"
-# The dns.peer grant alone does nothing: the tenant only consults this VPC's
-# private zones once an Apigee DNS peering zone exists, created explicitly via
-# the organizations.dnsZones API (it is NOT created automatically at org or
-# instance provisioning). The runtime picks it up dynamically once ACTIVE —
-# no instance recreation needed.
-TOKEN="$(gcloud auth print-access-token)"
-DNS_ZONE_ID="run-app"
-
-ZONE_STATE="$(curl -s \
-  -H "Authorization: Bearer ${TOKEN}" \
-  "${APIGEE_API}/organizations/${PROJECT_ID}/dnsZones/${DNS_ZONE_ID}" \
-  | python3 -c "import sys,json; print(json.load(sys.stdin).get('state',''))" 2>/dev/null || true)"
-
-if [[ "${ZONE_STATE}" == "ACTIVE" ]]; then
-  echo "Apigee DNS peering zone '${DNS_ZONE_ID}' already ACTIVE, skipping."
+echo "--- Step 4d: Peered DNS domain (run.app) ---"
+# The organizations.dnsZones API is only supported for PSC (non-peering) orgs
+# — a VPC-peered org returns FAILED_PRECONDITION. For peered orgs the
+# equivalent is a servicenetworking peered DNS domain: tenant-project queries
+# for the suffix are forwarded to this VPC's resolution order, which includes
+# the private run-app-pga zone (restricted VIP). Without this, the tenant
+# resolves run.app to public IPs it can no longer route to (VPC-SC enablement
+# removed its default internet route) → TARGET_CONNECT_TIMEOUT.
+if gcloud services peered-dns-domains list \
+    --network="${APIGEE_NETWORK}" --project="${PROJECT_ID}" \
+    --format='value(name)' 2>/dev/null | grep -qx "run-app"; then
+  echo "Peered DNS domain 'run-app' already exists, skipping."
 else
-  if [[ -z "${ZONE_STATE}" ]]; then
-    echo "Creating Apigee DNS peering zone '${DNS_ZONE_ID}' → ${APIGEE_NETWORK}..."
-    CREATE_RESPONSE="$(curl -s -X POST \
-      -H "Authorization: Bearer ${TOKEN}" \
-      -H "Content-Type: application/json" \
-      "${APIGEE_API}/organizations/${PROJECT_ID}/dnsZones?dnsZoneId=${DNS_ZONE_ID}" \
-      -d "{
-        \"domain\": \"run.app\",
-        \"description\": \"Peer run.app into ${APIGEE_NETWORK} so the tenant resolves the run-app-pga zone (restricted VIP)\",
-        \"peeringConfig\": {
-          \"targetProjectId\": \"${PROJECT_ID}\",
-          \"targetNetworkId\": \"${APIGEE_NETWORK}\"
-        }
-      }")"
-    if echo "${CREATE_RESPONSE}" | grep -q '"error"'; then
-      echo "ERROR creating Apigee DNS peering zone:"
-      echo "${CREATE_RESPONSE}" | python3 -m json.tool 2>/dev/null || echo "${CREATE_RESPONSE}"
-      exit 1
-    fi
-    echo "DNS peering zone creation started."
-  else
-    echo "DNS peering zone exists (state: ${ZONE_STATE}), waiting for ACTIVE..."
-  fi
-
-  TIMEOUT=300
-  INTERVAL=15
-  ELAPSED=0
-  while true; do
-    ZONE_STATE="$(curl -s \
-      -H "Authorization: Bearer ${TOKEN}" \
-      "${APIGEE_API}/organizations/${PROJECT_ID}/dnsZones/${DNS_ZONE_ID}" \
-      | python3 -c "import sys,json; print(json.load(sys.stdin).get('state',''))" 2>/dev/null || true)"
-    if [[ "${ZONE_STATE}" == "ACTIVE" ]]; then
-      echo "Apigee DNS peering zone '${DNS_ZONE_ID}' is ACTIVE."
-      break
-    fi
-    if (( ELAPSED >= TIMEOUT )); then
-      echo "WARNING: DNS peering zone not ACTIVE after ${TIMEOUT}s (state: ${ZONE_STATE:-unknown})."
-      echo "         Check: curl ${APIGEE_API}/organizations/${PROJECT_ID}/dnsZones/${DNS_ZONE_ID}"
-      break
-    fi
-    echo "  State: ${ZONE_STATE:-pending} (${ELAPSED}s elapsed)..."
-    sleep "${INTERVAL}"
-    ELAPSED=$((ELAPSED + INTERVAL))
-  done
+  gcloud services peered-dns-domains create "run-app" \
+    --network="${APIGEE_NETWORK}" \
+    --dns-suffix="run.app." \
+    --project="${PROJECT_ID}"
+  echo "Peered DNS domain 'run-app' (run.app.) created."
 fi
 
 # ============================================================

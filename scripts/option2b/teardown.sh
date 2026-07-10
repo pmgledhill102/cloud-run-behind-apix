@@ -93,8 +93,17 @@ fi
 # ============================================================
 echo ""
 echo "--- Step 4: Remove Apigee DNS peering zone + route + export + dns.peer ---"
-echo "Deleting Apigee DNS peering zone 'run-app' (if present)..."
-apigee_api DELETE "organizations/${PROJECT_ID}/dnsZones/run-app"
+if gcloud services peered-dns-domains list \
+    --network="${APIGEE_NETWORK}" --project="${PROJECT_ID}" \
+    --format='value(name)' 2>/dev/null | grep -qx "run-app"; then
+  gcloud services peered-dns-domains delete "run-app" \
+    --network="${APIGEE_NETWORK}" \
+    --project="${PROJECT_ID}" --quiet \
+    && echo "Peered DNS domain 'run-app' deleted." \
+    || echo "WARNING: could not delete peered DNS domain 'run-app'. Non-fatal."
+else
+  echo "Peered DNS domain 'run-app' does not exist, skipping."
+fi
 if resource_exists gcloud compute routes describe "restricted-vip" --project="${PROJECT_ID}"; then
   gcloud compute routes delete "restricted-vip" --project="${PROJECT_ID}" --quiet
   echo "Route 'restricted-vip' deleted."
