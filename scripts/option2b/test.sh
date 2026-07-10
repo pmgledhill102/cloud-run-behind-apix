@@ -26,15 +26,26 @@ echo "=== Testing VPC-SC Perimeter Enforcement ==="
 echo "Project: ${PROJECT_ID}"
 echo ""
 
-# Get Cloud Run service URL
+# Get Cloud Run service URL. Don't suppress stderr: with the perimeter up,
+# failures here can be auth expiry OR a VPC-SC denial of the laptop itself
+# ("Request is prohibited by organization's policy") — very different fixes.
+DESCRIBE_ERR="$(mktemp)"
 SERVICE_URL="$(gcloud run services describe "cr-hello" \
   --region="${REGION}" --project="${PROJECT_ID}" \
-  --format='value(status.url)' 2>/dev/null || true)"
+  --format='value(status.url)' 2>"${DESCRIBE_ERR}" || true)"
 
 if [[ -z "${SERVICE_URL}" ]]; then
-  echo "ERROR: Could not get Cloud Run service URL. Is setup-base.sh complete?"
+  echo "ERROR: Could not get Cloud Run service URL. gcloud said:"
+  sed 's/^/  /' "${DESCRIBE_ERR}"
+  rm -f "${DESCRIBE_ERR}"
+  echo ""
+  echo "  - 'Reauthentication failed'             → run: gcloud auth login"
+  echo "  - 'prohibited by organization's policy' → the perimeter is blocking"
+  echo "    this caller; check the ingress rule (option2b/setup.sh Step 5)"
+  echo "  - 'NOT_FOUND'                           → run shared/setup-base.sh"
   exit 1
 fi
+rm -f "${DESCRIBE_ERR}"
 echo "Cloud Run URL: ${SERVICE_URL}"
 echo ""
 
