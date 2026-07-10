@@ -86,16 +86,37 @@ deploy_fixture_proxy() {
   local name="$1" basepath="$2" target_url="$3"
   echo "--- Fixture: proxy '${name}' (${basepath} → ${target_url}) ---"
 
-  local proxy_http
-  proxy_http="$(curl -s -o /dev/null -w '%{http_code}' \
+  # Drift-aware skip: "a proxy with this name exists" is not enough — compare
+  # the DEPLOYED revision's actual target URL (same approach as
+  # shared/lib/apigee-proxy.sh). Name-only checks silently keep serving a
+  # stale target after the URL changes.
+  local deployed_rev
+  deployed_rev="$(curl -s \
     -H "Authorization: Bearer ${TOKEN}" \
-    "${APIGEE_API}/organizations/${PROJECT_ID}/apis/${name}")"
+    "${APIGEE_API}/organizations/${PROJECT_ID}/environments/${APIGEE_ENV}/apis/${name}/deployments" \
+    | python3 -c "
+import sys,json
+d = json.load(sys.stdin).get('deployments', [])
+print(d[0].get('revision','') if d else '')
+" 2>/dev/null || true)"
 
-  if [[ "${proxy_http}" == "200" ]]; then
-    echo "Proxy exists, skipping import."
-  else
-    local bundle_dir
-    bundle_dir="$(mktemp -d)"
+  if [[ -n "${deployed_rev}" ]]; then
+    local current_target
+    current_target="$(curl -s \
+      -H "Authorization: Bearer ${TOKEN}" \
+      "${APIGEE_API}/organizations/${PROJECT_ID}/apis/${name}/revisions/${deployed_rev}?format=bundle" \
+      -o "/tmp/fixture-rev-check-$$.zip" 2>/dev/null && \
+      unzip -p "/tmp/fixture-rev-check-$$.zip" apiproxy/targets/default.xml 2>/dev/null || true)"
+    rm -f "/tmp/fixture-rev-check-$$.zip"
+    if echo "${current_target}" | grep -qF "<URL>${target_url}</URL>"; then
+      echo "Deployed revision ${deployed_rev} already targets ${target_url}, skipping."
+      return 0
+    fi
+    echo "Deployed revision ${deployed_rev} targets a different URL — updating."
+  fi
+
+  local bundle_dir
+  bundle_dir="$(mktemp -d)"
     mkdir -p "${bundle_dir}/apiproxy/proxies" "${bundle_dir}/apiproxy/targets"
 
     cat > "${bundle_dir}/apiproxy/proxies/default.xml" << XMLEOF
@@ -135,7 +156,7 @@ XMLEOF
 </APIProxy>
 XMLEOF
 
-    local bundle_zip import_response
+    local bundle_zip import_response new_rev
     bundle_zip="$(mktemp).zip"
     (cd "${bundle_dir}" && zip -r "${bundle_zip}" apiproxy/) >/dev/null
     import_response="$(curl -s -X POST \
@@ -149,33 +170,28 @@ XMLEOF
       echo "${import_response}" | python3 -m json.tool 2>/dev/null || echo "${import_response}"
       exit 1
     fi
-    echo "Proxy imported (revision 1)."
-  fi
-
-  local deploy_check
-  deploy_check="$(curl -s \
-    -H "Authorization: Bearer ${TOKEN}" \
-    "${APIGEE_API}/organizations/${PROJECT_ID}/environments/${APIGEE_ENV}/deployments")"
-  if echo "${deploy_check}" | grep -q "\"${name}\""; then
-    echo "Proxy already deployed."
-    return 0
-  fi
+    new_rev="$(echo "${import_response}" | python3 -c "import sys,json; print(json.load(sys.stdin).get('revision',''))" 2>/dev/null || true)"
+    if [[ -z "${new_rev}" ]]; then
+      echo "ERROR: could not determine imported revision for '${name}'."
+      exit 1
+    fi
+    echo "Proxy imported (revision ${new_rev})."
 
   local deploy_response
   deploy_response="$(curl -s -X POST \
     -H "Authorization: Bearer ${TOKEN}" \
-    "${APIGEE_API}/organizations/${PROJECT_ID}/environments/${APIGEE_ENV}/apis/${name}/revisions/1/deployments?override=true")"
+    "${APIGEE_API}/organizations/${PROJECT_ID}/environments/${APIGEE_ENV}/apis/${name}/revisions/${new_rev}/deployments?override=true")"
   if echo "${deploy_response}" | grep -q '"error"'; then
     echo "ERROR deploying fixture proxy '${name}':"
     echo "${deploy_response}" | python3 -m json.tool 2>/dev/null || echo "${deploy_response}"
     exit 1
   fi
-  echo "Deployment started; waiting for READY..."
+  echo "Deployment of revision ${new_rev} started; waiting for READY..."
   local elapsed=0 state
   while true; do
     state="$(curl -s \
       -H "Authorization: Bearer ${TOKEN}" \
-      "${APIGEE_API}/organizations/${PROJECT_ID}/environments/${APIGEE_ENV}/apis/${name}/revisions/1/deployments" \
+      "${APIGEE_API}/organizations/${PROJECT_ID}/environments/${APIGEE_ENV}/apis/${name}/revisions/${new_rev}/deployments" \
       | python3 -c "import sys,json; print(json.load(sys.stdin).get('state',''))" 2>/dev/null || true)"
     [[ "${state}" == "READY" ]] && { echo "Deployment READY."; break; }
     if (( elapsed >= 180 )); then
