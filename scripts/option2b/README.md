@@ -25,6 +25,7 @@ VM ─────────────────│──► restricted VI
 |---|---|
 | `setup.sh` | ACM API, scoped access policy `apigee-poc-policy`, VPC-SC on the Apigee peering, `dns.peer` grant for the Apigee service agent, restricted-VIP static route + custom route export, peered DNS domain `run-app` (tenant resolves `run.app` via this VPC), enforced perimeter `apigee_poc_perimeter` (restricts `run.googleapis.com`, `storage.googleapis.com`; ingress rule admits the caller identity; underscores because perimeter names disallow hyphens) |
 | `test.sh` | Perimeter status + positive/negative enforcement tests + Apigee E2E |
+| `measure-propagation.sh` | Probes the negative test every `INTERVAL` (60s) until the expected state arrives and reports elapsed time — `measure-propagation.sh blocked` after `setup.sh`, `measure-propagation.sh open` after `teardown.sh`. Pass the target: if the flip lands before the first probe (deletion has been near-instant), auto-detect would anchor on the wrong state |
 | `teardown.sh` | Perimeter, policy (only if ours and empty), peered DNS domain, route + export, `dns.peer`, peering VPC-SC off |
 
 ## Why the Apigee tenant needs DNS + routing plumbing
