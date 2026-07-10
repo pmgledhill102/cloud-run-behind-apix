@@ -78,8 +78,11 @@ fi
 gcloud access-context-manager perimeters describe "${PERIMETER_NAME}" \
   --policy="${POLICY_ID}" \
   --billing-project="${PROJECT_ID}" \
-  --format='yaml(status.resources,status.restrictedServices)' \
+  --format='yaml(status.resources,status.restrictedServices,status.ingressPolicies,status.egressPolicies)' \
   || { echo "ERROR: perimeter '${PERIMETER_NAME}' not found."; exit 1; }
+echo ""
+echo "(egressPolicies = the allow-list; its block/allow behaviour is proven"
+echo " by test-external.sh, not this suite)"
 echo ""
 
 # ============================================================

@@ -34,11 +34,28 @@ if [[ -z "${POLICY_ID}" && -n "${ORG_ID}" ]]; then
 fi
 
 # ============================================================
-# Step 0: Remove external test fixture proxy (test-external.sh)
+# Step 0: Remove external test fixture proxies (test-external.sh)
 # ============================================================
-echo "--- Step 0: Remove external test fixture proxy ---"
-apigee_api DELETE "organizations/${PROJECT_ID}/environments/${APIGEE_ENV}/apis/cr-external-passthrough/revisions/1/deployments"
-apigee_api DELETE "organizations/${PROJECT_ID}/apis/cr-external-passthrough"
+# cr-external-passthrough is the legacy single-fixture name; the blocked/
+# allowed pair replaced it.
+echo "--- Step 0: Remove external test fixture proxies ---"
+for FIXTURE in cr-external-blocked cr-external-allowed cr-external-passthrough; do
+  # Undeploy whichever revision is actually deployed (fixtures gain revisions
+  # when their target URL changes), then delete the proxy.
+  FIXTURE_REV="$(apigee_api GET "organizations/${PROJECT_ID}/environments/${APIGEE_ENV}/apis/${FIXTURE}/deployments" \
+    | python3 -c "
+import sys,json
+try:
+    d = json.load(sys.stdin).get('deployments', [])
+    print(d[0].get('revision','') if d else '')
+except Exception:
+    print('')
+" 2>/dev/null || true)"
+  if [[ -n "${FIXTURE_REV}" ]]; then
+    apigee_api DELETE "organizations/${PROJECT_ID}/environments/${APIGEE_ENV}/apis/${FIXTURE}/revisions/${FIXTURE_REV}/deployments"
+  fi
+  apigee_api DELETE "organizations/${PROJECT_ID}/apis/${FIXTURE}"
+done
 echo ""
 
 # ============================================================

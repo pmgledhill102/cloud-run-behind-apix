@@ -19,16 +19,27 @@ Test 3 [PASS]  perimeter blocks cross-perimeter access
 Test 4 [PASS]  Apigee southbound admitted through the perimeter
 ```
 
-And the sharper claim — **Apigee can only reach Cloud Run services inside
-the perimeter** — proven with controls on both sides
-([`test-external.sh`](../scripts/option2b/test-external.sh)):
+And the sharper claim — **egress is denied by default and admitted only
+where an explicit policy names the target project** — proven with controls
+on both sides and both outcomes in one run
+([`test-external.sh`](../scripts/option2b/test-external.sh), validated
+2026-07-10):
 
 ```
-Probe 0 [PASS]  control: laptop → external service (expect OK)
-Probe 1 [PASS]  control: Apigee → in-perimeter cr-hello (expect OK)
-Probe 2 [PASS]  Apigee → external Cloud Run (expect BLOCKED)
-Probe 3 [PASS]  VM → external Cloud Run (expect BLOCKED)
+Probe 0a [PASS]  control: laptop → blocked-list service (expect OK)
+Probe 0b [PASS]  control: laptop → allow-list service (expect OK)
+Probe 1  [PASS]  control: Apigee → in-perimeter cr-hello (expect OK)
+Probe 2  [PASS]  Apigee → BLOCKED external (expect BLOCKED)
+Probe 3  [PASS]  VM → BLOCKED external (expect BLOCKED)
+Probe 4  [PASS]  Apigee → ALLOWED external (expect OK)
+Probe 5  [PASS]  VM → ALLOWED external (expect OK)
 ```
+
+The detail that makes this conclusive: the VM's DNS resolution, printed in
+the probe output, shows **both** external services resolving to the same
+restricted VIP (`199.36.153.4-7`). Blocked and allowed traffic take the
+*identical* network path — the only difference is the egress policy naming
+one target project. This is governance, not routing.
 
 Worth knowing for monitoring/assertions: the blocked Cloud Run request is
 refused by the Google Front End at the restricted VIP with a **plain HTML
@@ -40,6 +51,17 @@ and its ingress/egress violation details — the HTML 403 offers no such
 handle, so for Cloud Run denials go straight to the audit logs. The same
 wildcard `*.run.app → 199.36.153.x` zone resolves *external* services'
 hostnames too — that is precisely why the perimeter catches them.
+
+The egress allow-list is applied by `setup.sh` (admitting Cloud Run in a
+single named external project, `ALLOWED_EGRESS_PROJECT_NUMBER`); the fixture
+proxies are provisioned by `setup-external.sh` so the test itself only
+observes. No DNS changes anywhere: the same restricted-VIP path simply
+starts admitting the one named egress, on Google's backbone, still
+perimeter-audited. **Syntax trap (found live)**: the permission name that
+denials log (`targetResourcePermissions: run.routes.invoke`) is *not*
+accepted as an egress `methodSelector` for `run.googleapis.com` —
+`INVALID_ARGUMENT`. Use `method: '*'` and scope by target project instead;
+the audit-log entry tells you *what* to allow, not the literal syntax.
 
 But it took ~3 elapsed days, 11 distinct failure modes, and several
 multi-hour waits to get those lines. Budget accordingly.
@@ -346,6 +368,13 @@ project** — direct audit-log evidence that `enable-vpc-service-controls` on
 the peering makes Apigee "inside" the perimeter, exactly the mechanism §4
 relies on. It also means Apigee-originated denials are distinguishable from
 VM/workload-originated ones at a glance, which your SOC will appreciate.
+
+One caution when turning a denial into an egress allow rule: the entry's
+`targetResource` is exactly what the rule's `resources:` needs, but the
+`targetResourcePermissions` value is **not** valid `methodSelector` syntax —
+`run.routes.invoke` was rejected with `INVALID_ARGUMENT` when used as a
+`permission:` selector for `run.googleapis.com`. Use `method: '*'` scoped by
+target project (§1 has the working rule).
 
 ## 8. Checklist for implementing teams
 
