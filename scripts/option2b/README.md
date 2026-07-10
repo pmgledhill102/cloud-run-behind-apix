@@ -23,9 +23,27 @@ VM ─────────────────│──► restricted VI
 
 | Script | Resources |
 |---|---|
-| `setup.sh` | ACM API, scoped access policy `apigee-poc-policy`, VPC-SC on the Apigee peering, enforced perimeter `apigee_poc_perimeter` (restricts `run.googleapis.com`, `storage.googleapis.com`; ingress rule admits the caller identity; underscores because perimeter names disallow hyphens) |
+| `setup.sh` | ACM API, scoped access policy `apigee-poc-policy`, VPC-SC on the Apigee peering, `dns.peer` grant for the Apigee service agent, restricted-VIP static route + custom route export, peered DNS domain `run-app` (tenant resolves `run.app` via this VPC), enforced perimeter `apigee_poc_perimeter` (restricts `run.googleapis.com`, `storage.googleapis.com`; ingress rule admits the caller identity; underscores because perimeter names disallow hyphens) |
 | `test.sh` | Perimeter status + positive/negative enforcement tests + Apigee E2E |
-| `teardown.sh` | Perimeter, policy (only if ours and empty), peering VPC-SC off |
+| `teardown.sh` | Perimeter, policy (only if ours and empty), peered DNS domain, route + export, `dns.peer`, peering VPC-SC off |
+
+## Why the Apigee tenant needs DNS + routing plumbing
+
+Enabling VPC-SC on the servicenetworking peering **removes the tenant
+project's default internet route** and installs restricted-VIP DNS/routing for
+`googleapis.com` names — but not `run.app`. Without help, the tenant resolves
+`run.app` to public IPs it can no longer route to (`TARGET_CONNECT_TIMEOUT`).
+Two mechanisms exist to peer DNS into the customer VPC, and they are
+**mutually exclusive by provisioning model**:
+
+- **PSC (non-peering) orgs**: the Apigee `organizations.dnsZones` API.
+- **VPC-peered orgs (this repo)**: a servicenetworking **peered DNS domain**
+  (`gcloud services peered-dns-domains create`). The `dnsZones` API returns
+  `FAILED_PRECONDITION` for peered orgs (found live).
+
+With the peered DNS domain in place, the tenant resolves `run.app` via this
+VPC's `run-app-pga` zone → restricted VIP → its own restricted-VIP route
+(installed by the VPC-SC enablement) → Cloud Run, inside the perimeter.
 
 ## Prerequisites
 
