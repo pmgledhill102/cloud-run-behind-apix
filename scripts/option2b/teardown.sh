@@ -89,10 +89,12 @@ else
 fi
 
 # ============================================================
-# Step 4: Remove restricted-VIP route, route export, dns.peer
+# Step 4: Remove Apigee DNS peering zone, route, export, dns.peer
 # ============================================================
 echo ""
-echo "--- Step 4: Remove restricted-VIP route + route export + dns.peer ---"
+echo "--- Step 4: Remove Apigee DNS peering zone + route + export + dns.peer ---"
+echo "Deleting Apigee DNS peering zone 'run-app' (if present)..."
+apigee_api DELETE "organizations/${PROJECT_ID}/dnsZones/run-app"
 if resource_exists gcloud compute routes describe "restricted-vip" --project="${PROJECT_ID}"; then
   gcloud compute routes delete "restricted-vip" --project="${PROJECT_ID}" --quiet
   echo "Route 'restricted-vip' deleted."

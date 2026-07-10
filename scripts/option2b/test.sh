@@ -24,6 +24,7 @@ EXTERNAL_BUCKET="gcp-public-data-landsat"
 
 echo "=== Testing VPC-SC Perimeter Enforcement ==="
 echo "Project: ${PROJECT_ID}"
+echo "Run at:  $(date '+%Y-%m-%d %H:%M:%S %Z')"
 echo ""
 
 # Get Cloud Run service URL. Don't suppress stderr: with the perimeter up,
