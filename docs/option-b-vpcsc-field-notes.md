@@ -229,7 +229,7 @@ going to fix itself (§4).
 |---|---|---|
 | Apigee org creation | 30–50 min | ~40 min |
 | Apigee instance creation | 30–60 min | ~45 min |
-| VPC-SC perimeter **enforcement** after create | "a few minutes, up to 30" | **not observably enforcing same-day; confirmed blocking the following morning** (confounded by an auth issue — see below — but plan for hours, not minutes) |
+| VPC-SC perimeter **enforcement** after create | "a few minutes, up to 30" | **~30 minutes** (narrowed by re-testing; our initial same-day observation looked like *hours* but was confounded by an auth expiry masking results — see below) |
 | VPC-SC perimeter deletion | similar | not separately measured — assume the same |
 | IAM grant propagation | ~1–2 min | 1–2 min (a retry loop suffices) |
 | Peered DNS domain pickup by Apigee runtime | undocumented | minutes |
@@ -243,6 +243,11 @@ going to fix itself (§4).
 - Put a timestamp in every test run's output. When you're comparing scroll
   back across a day of attempts, "which run was this?" matters.
 - Poll `state == ACTIVE`; never trust resource existence.
+- Don't measure propagation by ad-hoc manual retries — run a probe loop that
+  timestamps every attempt and reports the flip
+  ([`measure-propagation.sh`](../scripts/option2b/measure-propagation.sh)).
+  Manual spot-checks gave us "somewhere between 15 minutes and overnight";
+  the loop gives a number.
 
 ---
 
