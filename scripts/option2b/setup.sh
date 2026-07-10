@@ -245,9 +245,12 @@ echo "--- Step 5: Create service perimeter ---"
 # default; this admits ONE named external project — proving the perimeter is
 # governable (deny by default, admit by explicit policy). test-external.sh
 # asserts both: the allow-listed service succeeds, everything else stays
-# blocked. The resource/permission values mirror the fields VPC-SC denials
-# log in the Policy Denied audit log (targetResource /
-# targetResourcePermissions).
+# blocked.
+#
+# NOTE: method: '*' — although VPC-SC denials log run.routes.invoke in
+# targetResourcePermissions, that permission name is NOT accepted as an
+# egress methodSelector for run.googleapis.com (INVALID_ARGUMENT, found
+# live). Scoping is by target project instead.
 EGRESS_FILE="$(mktemp)"
 cat > "${EGRESS_FILE}" << YAMLEOF
 - egressFrom:
@@ -256,7 +259,7 @@ cat > "${EGRESS_FILE}" << YAMLEOF
     operations:
     - serviceName: run.googleapis.com
       methodSelectors:
-      - permission: run.routes.invoke
+      - method: '*'
     resources:
     - projects/${ALLOWED_EGRESS_PROJECT_NUMBER}
 YAMLEOF

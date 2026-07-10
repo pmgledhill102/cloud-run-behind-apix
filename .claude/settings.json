@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(gcloud logging read *)",
+      "Bash(gcloud run services describe *)",
+      "Bash(gcloud projects describe *)",
+      "Bash(gcloud projects list *)",
+      "Bash(gcloud projects get-ancestors *)",
+      "Bash(gcloud access-context-manager perimeters describe *)",
+      "Bash(gcloud access-context-manager policies list *)",
+      "Bash(gcloud services peered-dns-domains list *)",
+      "Bash(bash -n *)",
+      "Bash(shellcheck *)",
+      "mcp__github__pull_request_read",
+      "mcp__google-developer-knowledge__answer_query"
+    ]
+  }
+}
