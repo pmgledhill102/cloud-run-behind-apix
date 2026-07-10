@@ -43,6 +43,10 @@ source "${SHARED_DIR}/lib/helpers.sh"
 PERIMETER_NAME="apigee_poc_perimeter"
 POLICY_TITLE="apigee-poc-policy"
 RESTRICTED_SERVICES="run.googleapis.com,storage.googleapis.com"
+# Project number of the ONE external Cloud Run project admitted by the egress
+# allow-list (deny-by-default proof lives in test-external.sh). Default is the
+# project behind https://neukin-barn-433004719812.europe-west1.run.app/.
+ALLOWED_EGRESS_PROJECT_NUMBER="${ALLOWED_EGRESS_PROJECT_NUMBER:-433004719812}"
 
 echo "=== Option 2b: PGA + VPC-SC perimeter — project: ${PROJECT_ID} ==="
 echo "Perimeter:           ${PERIMETER_NAME}"
@@ -232,20 +236,46 @@ else
 fi
 
 # ============================================================
-# Step 5: Create enforced service perimeter
+# Step 5: Create enforced service perimeter (+ egress allow-list)
 # ============================================================
 echo ""
 echo "--- Step 5: Create service perimeter ---"
 
+# Egress allow-list: the perimeter denies out-of-perimeter Cloud Run by
+# default; this admits ONE named external project — proving the perimeter is
+# governable (deny by default, admit by explicit policy). test-external.sh
+# asserts both: the allow-listed service succeeds, everything else stays
+# blocked. The resource/permission values mirror the fields VPC-SC denials
+# log in the Policy Denied audit log (targetResource /
+# targetResourcePermissions).
+EGRESS_FILE="$(mktemp)"
+cat > "${EGRESS_FILE}" << YAMLEOF
+- egressFrom:
+    identityType: ANY_IDENTITY
+  egressTo:
+    operations:
+    - serviceName: run.googleapis.com
+      methodSelectors:
+      - permission: run.routes.invoke
+    resources:
+    - projects/${ALLOWED_EGRESS_PROJECT_NUMBER}
+YAMLEOF
+
 if resource_exists gcloud access-context-manager perimeters describe \
     "${PERIMETER_NAME}" --policy="${POLICY_ID}" --billing-project="${PROJECT_ID}"; then
-  echo "Perimeter '${PERIMETER_NAME}' already exists, skipping."
+  echo "Perimeter '${PERIMETER_NAME}' already exists — ensuring egress allow-list..."
+  gcloud access-context-manager perimeters update "${PERIMETER_NAME}" \
+    --policy="${POLICY_ID}" \
+    --set-egress-policies="${EGRESS_FILE}" \
+    --billing-project="${PROJECT_ID}"
+  echo "Egress allow-list applied: projects/${ALLOWED_EGRESS_PROJECT_NUMBER} (run.routes.invoke)."
 else
   CALLER_ACCOUNT="$(gcloud config get-value account 2>/dev/null)"
   echo "Creating perimeter '${PERIMETER_NAME}'..."
   echo "  Resources:  projects/${PROJECT_NUMBER}"
   echo "  Restricted: ${RESTRICTED_SERVICES}"
   echo "  Ingress:    ${CALLER_ACCOUNT} allowed from any source (admin continuity)"
+  echo "  Egress:     projects/${ALLOWED_EGRESS_PROJECT_NUMBER} allowed (run.routes.invoke)"
 
   INGRESS_FILE="$(mktemp)"
   cat > "${INGRESS_FILE}" << YAMLEOF
@@ -267,11 +297,13 @@ YAMLEOF
     --resources="projects/${PROJECT_NUMBER}" \
     --restricted-services="${RESTRICTED_SERVICES}" \
     --ingress-policies="${INGRESS_FILE}" \
+    --egress-policies="${EGRESS_FILE}" \
     --billing-project="${PROJECT_ID}"
 
   rm -f "${INGRESS_FILE}"
-  echo "Perimeter '${PERIMETER_NAME}' created (ENFORCED)."
+  echo "Perimeter '${PERIMETER_NAME}' created (ENFORCED, with egress allow-list)."
 fi
+rm -f "${EGRESS_FILE}"
 
 # ============================================================
 # Summary
@@ -281,6 +313,7 @@ echo "=== Option 2b setup complete ==="
 echo ""
 echo "Perimeter '${PERIMETER_NAME}' now encloses project ${PROJECT_ID}:"
 echo "  - run.googleapis.com and storage.googleapis.com are restricted"
+echo "  - egress allow-list admits Cloud Run in projects/${ALLOWED_EGRESS_PROJECT_NUMBER} ONLY"
 echo "  - only ${PROJECT_ID}'s own network (and the caller identity) may"
 echo "    access them; cross-perimeter access is denied"
 echo ""

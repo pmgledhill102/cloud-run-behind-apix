@@ -34,11 +34,15 @@ if [[ -z "${POLICY_ID}" && -n "${ORG_ID}" ]]; then
 fi
 
 # ============================================================
-# Step 0: Remove external test fixture proxy (test-external.sh)
+# Step 0: Remove external test fixture proxies (test-external.sh)
 # ============================================================
-echo "--- Step 0: Remove external test fixture proxy ---"
-apigee_api DELETE "organizations/${PROJECT_ID}/environments/${APIGEE_ENV}/apis/cr-external-passthrough/revisions/1/deployments"
-apigee_api DELETE "organizations/${PROJECT_ID}/apis/cr-external-passthrough"
+# cr-external-passthrough is the legacy single-fixture name; the blocked/
+# allowed pair replaced it.
+echo "--- Step 0: Remove external test fixture proxies ---"
+for FIXTURE in cr-external-blocked cr-external-allowed cr-external-passthrough; do
+  apigee_api DELETE "organizations/${PROJECT_ID}/environments/${APIGEE_ENV}/apis/${FIXTURE}/revisions/1/deployments"
+  apigee_api DELETE "organizations/${PROJECT_ID}/apis/${FIXTURE}"
+done
 echo ""
 
 # ============================================================
