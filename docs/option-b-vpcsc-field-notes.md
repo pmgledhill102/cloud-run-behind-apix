@@ -19,8 +19,30 @@ Test 3 [PASS]  perimeter blocks cross-perimeter access
 Test 4 [PASS]  Apigee southbound admitted through the perimeter
 ```
 
+And the sharper claim — **Apigee can only reach Cloud Run services inside
+the perimeter** — proven with controls on both sides
+([`test-external.sh`](../scripts/option2b/test-external.sh)):
+
+```
+Probe 0 [PASS]  control: laptop → external service (expect OK)
+Probe 1 [PASS]  control: Apigee → in-perimeter cr-hello (expect OK)
+Probe 2 [PASS]  Apigee → external Cloud Run (expect BLOCKED)
+Probe 3 [PASS]  VM → external Cloud Run (expect BLOCKED)
+```
+
+Worth knowing for monitoring/assertions: the blocked Cloud Run request is
+refused by the Google Front End at the restricted VIP with a **plain HTML
+`403 Forbidden` ("Access is forbidden")** — not a structured VPC-SC JSON
+error like the storage API returns. Match on status, not body shape. The
+storage-API denial *does* include a `vpcServiceControlsUniqueIdentifier`,
+which can be searched in Cloud Audit Logs to locate the exact denial event
+and its ingress/egress violation details — the HTML 403 offers no such
+handle, so for Cloud Run denials go straight to the audit logs. The same
+wildcard `*.run.app → 199.36.153.x` zone resolves *external* services'
+hostnames too — that is precisely why the perimeter catches them.
+
 But it took ~3 elapsed days, 11 distinct failure modes, and several
-multi-hour waits to get those three lines. Budget accordingly.
+multi-hour waits to get those lines. Budget accordingly.
 
 ---
 
@@ -282,7 +304,50 @@ These cost us real debugging time and none of them were the pattern's fault:
 
 ---
 
-## 7. Checklist for implementing teams
+## 7. Finding denials in Cloud Audit Logs
+
+Every VPC-SC denial lands in the project's **Policy Denied** audit log
+(`cloudaudit.googleapis.com/policy`) — enabled by default. For egress
+violations (a caller inside your perimeter reaching out), the entry is in
+*your* project, not the target's. Two query recipes, both validated live:
+
+```bash
+# By the unique ID from a storage-API denial response:
+gcloud logging read \
+  'protoPayload.metadata.vpcServiceControlsUniqueId="<ID>"' \
+  --project=<project> --freshness=3h
+
+# All Cloud Run denials (the HTML 403s give you no ID — sweep by service):
+gcloud logging read 'logName="projects/<project>/logs/cloudaudit.googleapis.com%2Fpolicy"
+  AND protoPayload.serviceName="run.googleapis.com"' \
+  --project=<project> --freshness=3h
+```
+
+What the entries contain (far more than any client-visible error):
+`violationReason`, the perimeter name, the caller IP, the **target project
+number**, the permission that was attempted (`storage.buckets.get`,
+`run.routes.invoke`), and a `vpcServiceControlsTroubleshootToken` for the
+console's VPC-SC troubleshooter.
+
+The denials from our two blocked probes, side by side — note how the source
+attribution differs:
+
+| Field | VM probe | Apigee probe |
+|---|---|---|
+| `methodName` | `run.googleapis.com/HttpIngress` | `run.googleapis.com/HttpIngress` |
+| `callerIp` | `10.0.0.2` (the VM) | `gce-internal-ip` |
+| `source` | `projects/<num>` | `projects/<num>/[servicenetworking.googleapis.com]` |
+| `sourceType` | `Network` | `Resource` |
+| `violationReason` | `NETWORK_NOT_IN_SAME_SERVICE_PERIMETER` | `RESOURCES_NOT_IN_SAME_SERVICE_PERIMETER` |
+
+The Apigee row is the notable one: the tenant's southbound traffic is
+attributed as a **servicenetworking-attached resource of the customer
+project** — direct audit-log evidence that `enable-vpc-service-controls` on
+the peering makes Apigee "inside" the perimeter, exactly the mechanism §4
+relies on. It also means Apigee-originated denials are distinguishable from
+VM/workload-originated ones at a glance, which your SOC will appreciate.
+
+## 8. Checklist for implementing teams
 
 Provisioning (hardened org):
 
@@ -315,7 +380,7 @@ VPC-SC:
 
 ---
 
-## 8. Pointers
+## 9. Pointers
 
 - Working scripts: [`scripts/option2b/`](../scripts/option2b/) (setup, test
   with real PASS/FAIL reporting, teardown)
