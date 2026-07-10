@@ -19,8 +19,26 @@ Test 3 [PASS]  perimeter blocks cross-perimeter access
 Test 4 [PASS]  Apigee southbound admitted through the perimeter
 ```
 
+And the sharper claim — **Apigee can only reach Cloud Run services inside
+the perimeter** — proven with controls on both sides
+([`test-external.sh`](../scripts/option2b/test-external.sh)):
+
+```
+Probe 0 [PASS]  control: laptop → external service (expect OK)
+Probe 1 [PASS]  control: Apigee → in-perimeter cr-hello (expect OK)
+Probe 2 [PASS]  Apigee → external Cloud Run (expect BLOCKED)
+Probe 3 [PASS]  VM → external Cloud Run (expect BLOCKED)
+```
+
+Worth knowing for monitoring/assertions: the blocked Cloud Run request is
+refused by the Google Front End at the restricted VIP with a **plain HTML
+`403 Forbidden` ("Access is forbidden")** — not a structured VPC-SC JSON
+error like the storage API returns. Match on status, not body shape. The
+same wildcard `*.run.app → 199.36.153.x` zone resolves *external* services'
+hostnames too — that is precisely why the perimeter catches them.
+
 But it took ~3 elapsed days, 11 distinct failure modes, and several
-multi-hour waits to get those three lines. Budget accordingly.
+multi-hour waits to get those lines. Budget accordingly.
 
 ---
 
