@@ -82,6 +82,7 @@ SERVICE_COUNT=20 ./scripts/option3/setup.sh
 ### Options
 - `scripts/option1/` — Option A: ILB via VPN (workloads-vpc + VPN + ILB + DNS)
 - `scripts/option2/` — Option B: PGA (DNS zone only — simplest)
+- `scripts/option2b/` — Option B + VPC-SC: enforced service perimeter on top of option2 (requires org-level `accesscontextmanager.policyAdmin`; run option2 first)
 - `scripts/option3/` — Option C: PSC Google APIs (PSC endpoint + DNS; `SERVICE_COUNT=20` for scaled)
 - `scripts/option4/` — Option D: PSC Service Attachment (workloads-vpc + ILB + SA + PSC + Apigee EA)
 

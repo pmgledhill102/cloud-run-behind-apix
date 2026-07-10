@@ -29,6 +29,7 @@ gcloud services enable \
   iap.googleapis.com \
   artifactregistry.googleapis.com \
   cloudbuild.googleapis.com \
+  iamcredentials.googleapis.com \
   --project="${PROJECT_ID}"
 echo "APIs enabled."
 
@@ -135,6 +136,27 @@ gcloud projects add-iam-policy-binding "${PROJECT_ID}" \
   --condition=None \
   --quiet >/dev/null
 echo "Default compute SA granted run.invoker (for test VM auth)."
+
+# --- Grant Apigee service agent tokenCreator on the PoC SA ---
+# Apigee mints GoogleIDToken southbound credentials by impersonating the
+# proxy's deploy-time SA via the Apigee service agent
+# (service-<num>@gcp-sa-apigee.iam.gserviceaccount.com). Without tokenCreator
+# on the SA, target calls fail at runtime with GoogleTokenGenerationFailure.
+# Non-fatal: the agent may not exist before Apigee provisioning — re-run this
+# script after setup-slow.sh in that case.
+echo ""
+echo "--- Granting Apigee service agent tokenCreator on ${SA_NAME} ---"
+APIGEE_AGENT_SA="service-${PROJECT_NUMBER}@gcp-sa-apigee.iam.gserviceaccount.com"
+if gcloud iam service-accounts add-iam-policy-binding "${SA_EMAIL}" \
+  --member="serviceAccount:${APIGEE_AGENT_SA}" \
+  --role="roles/iam.serviceAccountTokenCreator" \
+  --project="${PROJECT_ID}" \
+  --quiet >/dev/null 2>&1; then
+  echo "Apigee service agent granted tokenCreator on '${SA_EMAIL}'."
+else
+  echo "SKIPPED: Apigee service agent '${APIGEE_AGENT_SA}' does not exist yet."
+  echo "         setup-slow.sh will grant this once Apigee is provisioned."
+fi
 
 # --- Grant default compute SA Cloud Build roles ---
 # setup-base.sh builds the image with `gcloud builds submit`, which runs as the
