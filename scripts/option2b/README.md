@@ -27,7 +27,7 @@ VM ─────────────────│──► restricted VI
 | `test.sh` | Perimeter status + positive/negative enforcement tests + Apigee E2E |
 | `measure-propagation.sh` | Probes the negative test every `INTERVAL` (60s) until the expected state arrives and reports elapsed time — `measure-propagation.sh blocked` after `setup.sh`, `measure-propagation.sh open` after `teardown.sh`. Pass the target: if the flip lands before the first probe (deletion has been near-instant), auto-detect would anchor on the wrong state |
 | `test-external.sh` | Proves the perimeter is **governable** — deny by default, admit by explicit egress policy. Two out-of-perimeter Cloud Run services with opposite expectations: `BLOCKED_RUN_URL` (no egress rule → must be denied) and `ALLOWED_RUN_URL` (allow-listed by setup.sh → must succeed). Seven probes: laptop controls for both, Apigee→internal control, then Apigee/VM → blocked (expect BLOCKED) and Apigee/VM → allowed (expect OK) — with explicit leak and lockout checks |
-| `teardown.sh` | Perimeter, policy (only if ours and empty), peered DNS domain, route + export, `dns.peer`, peering VPC-SC off |
+| `teardown.sh` | Test fixture proxies, perimeter (incl. egress allow-list), policy (only if ours and empty), peered DNS domain, route + export, `dns.peer`, peering VPC-SC off |
 
 ## Why the Apigee tenant needs DNS + routing plumbing
 

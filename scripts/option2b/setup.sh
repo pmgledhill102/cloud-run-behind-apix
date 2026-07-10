@@ -21,6 +21,8 @@
 #          (run = the service under test; storage = used by test.sh negative test)
 #        - ingress rule allowing the caller's identity from any source, so
 #          gcloud/laptop admin access and the other PoC scripts keep working
+#        - egress allow-list admitting Cloud Run in ONE named external project
+#          (ALLOWED_EGRESS_PROJECT_NUMBER) — proven by test-external.sh
 #
 # Prerequisites:
 #   - shared/setup-base.sh and option2/setup.sh completed
