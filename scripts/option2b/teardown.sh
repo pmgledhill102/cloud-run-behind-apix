@@ -34,6 +34,14 @@ if [[ -z "${POLICY_ID}" && -n "${ORG_ID}" ]]; then
 fi
 
 # ============================================================
+# Step 0: Remove external test fixture proxy (test-external.sh)
+# ============================================================
+echo "--- Step 0: Remove external test fixture proxy ---"
+apigee_api DELETE "organizations/${PROJECT_ID}/environments/${APIGEE_ENV}/apis/cr-external-passthrough/revisions/1/deployments"
+apigee_api DELETE "organizations/${PROJECT_ID}/apis/cr-external-passthrough"
+echo ""
+
+# ============================================================
 # Step 1: Delete service perimeter
 # ============================================================
 echo "--- Step 1: Delete service perimeter ---"
