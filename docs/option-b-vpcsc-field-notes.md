@@ -304,7 +304,50 @@ These cost us real debugging time and none of them were the pattern's fault:
 
 ---
 
-## 7. Checklist for implementing teams
+## 7. Finding denials in Cloud Audit Logs
+
+Every VPC-SC denial lands in the project's **Policy Denied** audit log
+(`cloudaudit.googleapis.com/policy`) — enabled by default. For egress
+violations (a caller inside your perimeter reaching out), the entry is in
+*your* project, not the target's. Two query recipes, both validated live:
+
+```bash
+# By the unique ID from a storage-API denial response:
+gcloud logging read \
+  'protoPayload.metadata.vpcServiceControlsUniqueId="<ID>"' \
+  --project=<project> --freshness=3h
+
+# All Cloud Run denials (the HTML 403s give you no ID — sweep by service):
+gcloud logging read 'logName="projects/<project>/logs/cloudaudit.googleapis.com%2Fpolicy"
+  AND protoPayload.serviceName="run.googleapis.com"' \
+  --project=<project> --freshness=3h
+```
+
+What the entries contain (far more than any client-visible error):
+`violationReason`, the perimeter name, the caller IP, the **target project
+number**, the permission that was attempted (`storage.buckets.get`,
+`run.routes.invoke`), and a `vpcServiceControlsTroubleshootToken` for the
+console's VPC-SC troubleshooter.
+
+The denials from our two blocked probes, side by side — note how the source
+attribution differs:
+
+| Field | VM probe | Apigee probe |
+|---|---|---|
+| `methodName` | `run.googleapis.com/HttpIngress` | `run.googleapis.com/HttpIngress` |
+| `callerIp` | `10.0.0.2` (the VM) | `gce-internal-ip` |
+| `source` | `projects/<num>` | `projects/<num>/[servicenetworking.googleapis.com]` |
+| `sourceType` | `Network` | `Resource` |
+| `violationReason` | `NETWORK_NOT_IN_SAME_SERVICE_PERIMETER` | `RESOURCES_NOT_IN_SAME_SERVICE_PERIMETER` |
+
+The Apigee row is the notable one: the tenant's southbound traffic is
+attributed as a **servicenetworking-attached resource of the customer
+project** — direct audit-log evidence that `enable-vpc-service-controls` on
+the peering makes Apigee "inside" the perimeter, exactly the mechanism §4
+relies on. It also means Apigee-originated denials are distinguishable from
+VM/workload-originated ones at a glance, which your SOC will appreciate.
+
+## 8. Checklist for implementing teams
 
 Provisioning (hardened org):
 
@@ -337,7 +380,7 @@ VPC-SC:
 
 ---
 
-## 8. Pointers
+## 9. Pointers
 
 - Working scripts: [`scripts/option2b/`](../scripts/option2b/) (setup, test
   with real PASS/FAIL reporting, teardown)
