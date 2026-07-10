@@ -52,5 +52,18 @@ APIGEE_INSTANCE_CIDR="10.2.0.0/22"
 INSTANCE_NAME="instance-${REGION}"
 PROXY_NAME="cr-hello-passthrough"
 
+# --- Option 2b: VPC-SC perimeter governance test ---
+# External Cloud Run services used by option2b's governance test:
+#   BLOCKED_RUN_URL — public service in a project with NO egress rule; the
+#                     perimeter must deny it (EXTERNAL_RUN_URL honoured as a
+#                     legacy alias).
+#   ALLOWED_RUN_URL — public service in the project admitted by the perimeter
+#                     egress allow-list (option2b/setup.sh Step 5).
+#                     /health.json keeps probe payloads small in test logs.
+# ALLOWED_EGRESS_PROJECT_NUMBER must match ALLOWED_RUN_URL's project.
+BLOCKED_RUN_URL="${BLOCKED_RUN_URL:-${EXTERNAL_RUN_URL:-https://sandbox-manager-255182376214.europe-west2.run.app/health}}"
+ALLOWED_RUN_URL="${ALLOWED_RUN_URL:-https://neukin-barn-433004719812.europe-west1.run.app/health.json}"
+ALLOWED_EGRESS_PROJECT_NUMBER="${ALLOWED_EGRESS_PROJECT_NUMBER:-433004719812}"
+
 # --- Paths ---
 SHARED_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

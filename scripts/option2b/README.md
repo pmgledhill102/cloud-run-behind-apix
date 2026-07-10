@@ -26,7 +26,8 @@ VM ─────────────────│──► restricted VI
 | `setup.sh` | ACM API, scoped access policy `apigee-poc-policy`, VPC-SC on the Apigee peering, `dns.peer` grant for the Apigee service agent, restricted-VIP static route + custom route export, peered DNS domain `run-app` (tenant resolves `run.app` via this VPC), enforced perimeter `apigee_poc_perimeter` (restricts `run.googleapis.com`, `storage.googleapis.com`; ingress rule admits the caller identity; **egress allow-list** admits Cloud Run in `ALLOWED_EGRESS_PROJECT_NUMBER` only; underscores because perimeter names disallow hyphens) |
 | `test.sh` | Perimeter status + positive/negative enforcement tests + Apigee E2E |
 | `measure-propagation.sh` | Probes the negative test every `INTERVAL` (60s) until the expected state arrives and reports elapsed time — `measure-propagation.sh blocked` after `setup.sh`, `measure-propagation.sh open` after `teardown.sh`. Pass the target: if the flip lands before the first probe (deletion has been near-instant), auto-detect would anchor on the wrong state |
-| `test-external.sh` | Proves the perimeter is **governable** — deny by default, admit by explicit egress policy. Two out-of-perimeter Cloud Run services with opposite expectations: `BLOCKED_RUN_URL` (no egress rule → must be denied) and `ALLOWED_RUN_URL` (allow-listed by setup.sh → must succeed). Seven probes: laptop controls for both, Apigee→internal control, then Apigee/VM → blocked (expect BLOCKED) and Apigee/VM → allowed (expect OK) — with explicit leak and lockout checks |
+| `setup-external.sh` | Governance-test fixtures: two Apigee pass-through proxies (`/external-blocked` → `BLOCKED_RUN_URL`, `/external-allowed` → `ALLOWED_RUN_URL`, both from `shared/env.sh`). Drift-aware: retargets via a new revision if a URL changes |
+| `test-external.sh` | Proves the perimeter is **governable** — deny by default, admit by explicit egress policy. **Observes only** (fixtures come from `setup-external.sh`; exits with a hint if they're missing). Seven probes: laptop controls for both external services, Apigee→internal control, then Apigee/VM → blocked (expect BLOCKED) and Apigee/VM → allowed (expect OK) — with explicit leak and lockout checks |
 | `teardown.sh` | Test fixture proxies, perimeter (incl. egress allow-list), policy (only if ours and empty), peered DNS domain, route + export, `dns.peer`, peering VPC-SC off |
 
 ## Why the Apigee tenant needs DNS + routing plumbing
@@ -59,9 +60,14 @@ VPC's `run-app-pga` zone → restricted VIP → its own restricted-VIP route
 ## Run instructions
 
 ```bash
-./scripts/option2b/setup.sh           # ~2-5 min
-# wait a few minutes for perimeter propagation (can be up to ~30)
-./scripts/option2b/test.sh
+./scripts/option2b/setup.sh                        # ~2-5 min (perimeter + egress allow-list)
+./scripts/option2b/measure-propagation.sh blocked  # optional: measure enforcement arrival
+./scripts/option2b/test.sh                         # core perimeter validation
+
+# Governance test (blocked AND allowed external Cloud Run):
+./scripts/option2b/setup-external.sh               # ~1-2 min (fixture proxies)
+./scripts/option2b/test-external.sh
+
 # when done:
 ./scripts/option2b/teardown.sh
 ```

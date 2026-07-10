@@ -22,15 +22,17 @@
 # contractual). "ALLOWED" is asserted on HTTP 200. Leaks and lockouts both
 # fail loudly; failed controls exit INCONCLUSIVE rather than false-passing.
 #
-# Requires: option2b/setup.sh applied (including the egress allow-list),
-# Apigee provisioned. Two fixture pass-through proxies are created and
-# deployed idempotently; option2b/teardown.sh removes them.
+# This script only OBSERVES — it provisions nothing. The fixture proxies it
+# probes are created by option2b/setup-external.sh and removed by
+# option2b/teardown.sh. URLs come from shared/env.sh (BLOCKED_RUN_URL /
+# ALLOWED_RUN_URL), overridable via environment — but if you override, re-run
+# setup-external.sh so the fixtures retarget (it is drift-aware).
+#
+# Requires: option2b/setup.sh (egress allow-list) + option2b/setup-external.sh
+# applied, Apigee provisioned.
 #
 # Usage:
 #   ./scripts/option2b/test-external.sh
-#   BLOCKED_RUN_URL=https://svc-<num>.<region>.run.app/health \
-#   ALLOWED_RUN_URL=https://svc2-<num>.<region>.run.app/ \
-#     ./scripts/option2b/test-external.sh
 #
 set -euo pipefail
 
@@ -38,11 +40,6 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/../shared/env.sh"
 source "${SHARED_DIR}/lib/helpers.sh"
 
-# A public Cloud Run service in a project with NO egress rule — must be denied.
-BLOCKED_RUN_URL="${BLOCKED_RUN_URL:-${EXTERNAL_RUN_URL:-https://sandbox-manager-255182376214.europe-west2.run.app/health}}"
-# A public Cloud Run service in the egress-allow-listed project — must succeed.
-# (/health.json keeps the probe payload small in the test log.)
-ALLOWED_RUN_URL="${ALLOWED_RUN_URL:-https://neukin-barn-433004719812.europe-west1.run.app/health.json}"
 BLOCKED_HEALTHY_PATTERN='"ok"'
 
 BLOCKED_HOST="${BLOCKED_RUN_URL#https://}"; BLOCKED_HOST="${BLOCKED_HOST%%/*}"
@@ -79,134 +76,22 @@ if [[ -z "${INSTANCE_IP}" ]]; then
 fi
 
 # ============================================================
-# Fixtures: pass-through proxies to both external services (idempotent)
+# Precondition: fixture proxies deployed (by setup-external.sh)
 # ============================================================
-# deploy_fixture_proxy <name> <basepath> <target-url>
-deploy_fixture_proxy() {
-  local name="$1" basepath="$2" target_url="$3"
-  echo "--- Fixture: proxy '${name}' (${basepath} → ${target_url}) ---"
-
-  # Drift-aware skip: "a proxy with this name exists" is not enough — compare
-  # the DEPLOYED revision's actual target URL (same approach as
-  # shared/lib/apigee-proxy.sh). Name-only checks silently keep serving a
-  # stale target after the URL changes.
-  local deployed_rev
-  deployed_rev="$(curl -s \
+for FIXTURE in cr-external-blocked cr-external-allowed; do
+  DEPLOY_CHECK="$(curl -s \
     -H "Authorization: Bearer ${TOKEN}" \
-    "${APIGEE_API}/organizations/${PROJECT_ID}/environments/${APIGEE_ENV}/apis/${name}/deployments" \
-    | python3 -c "
-import sys,json
-d = json.load(sys.stdin).get('deployments', [])
-print(d[0].get('revision','') if d else '')
-" 2>/dev/null || true)"
-
-  if [[ -n "${deployed_rev}" ]]; then
-    local current_target
-    current_target="$(curl -s \
-      -H "Authorization: Bearer ${TOKEN}" \
-      "${APIGEE_API}/organizations/${PROJECT_ID}/apis/${name}/revisions/${deployed_rev}?format=bundle" \
-      -o "/tmp/fixture-rev-check-$$.zip" 2>/dev/null && \
-      unzip -p "/tmp/fixture-rev-check-$$.zip" apiproxy/targets/default.xml 2>/dev/null || true)"
-    rm -f "/tmp/fixture-rev-check-$$.zip"
-    if echo "${current_target}" | grep -qF "<URL>${target_url}</URL>"; then
-      echo "Deployed revision ${deployed_rev} already targets ${target_url}, skipping."
-      return 0
-    fi
-    echo "Deployed revision ${deployed_rev} targets a different URL — updating."
-  fi
-
-  local bundle_dir
-  bundle_dir="$(mktemp -d)"
-    mkdir -p "${bundle_dir}/apiproxy/proxies" "${bundle_dir}/apiproxy/targets"
-
-    cat > "${bundle_dir}/apiproxy/proxies/default.xml" << XMLEOF
-<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<ProxyEndpoint name="default">
-  <PreFlow name="PreFlow"><Request/><Response/></PreFlow>
-  <Flows/>
-  <PostFlow name="PostFlow"><Request/><Response/></PostFlow>
-  <HTTPProxyConnection>
-    <BasePath>${basepath}</BasePath>
-  </HTTPProxyConnection>
-  <RouteRule name="default">
-    <TargetEndpoint>default</TargetEndpoint>
-  </RouteRule>
-</ProxyEndpoint>
-XMLEOF
-
-    # No <Authentication> block: both external endpoints are public, so this
-    # tests the network path in isolation (no token minting involved).
-    cat > "${bundle_dir}/apiproxy/targets/default.xml" << XMLEOF
-<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<TargetEndpoint name="default">
-  <PreFlow name="PreFlow"><Request/><Response/></PreFlow>
-  <Flows/>
-  <PostFlow name="PostFlow"><Request/><Response/></PostFlow>
-  <HTTPTargetConnection>
-    <URL>${target_url}</URL>
-  </HTTPTargetConnection>
-</TargetEndpoint>
-XMLEOF
-
-    cat > "${bundle_dir}/apiproxy/${name}.xml" << XMLEOF
-<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<APIProxy name="${name}">
-  <Description>Test fixture: pass-through to out-of-perimeter Cloud Run</Description>
-  <BasePaths>${basepath}</BasePaths>
-</APIProxy>
-XMLEOF
-
-    local bundle_zip import_response new_rev
-    bundle_zip="$(mktemp).zip"
-    (cd "${bundle_dir}" && zip -r "${bundle_zip}" apiproxy/) >/dev/null
-    import_response="$(curl -s -X POST \
-      -H "Authorization: Bearer ${TOKEN}" \
-      -H "Content-Type: application/octet-stream" \
-      "${APIGEE_API}/organizations/${PROJECT_ID}/apis?name=${name}&action=import" \
-      --data-binary "@${bundle_zip}")"
-    rm -rf "${bundle_dir}" "${bundle_zip}"
-    if echo "${import_response}" | grep -q '"error"'; then
-      echo "ERROR importing fixture proxy '${name}':"
-      echo "${import_response}" | python3 -m json.tool 2>/dev/null || echo "${import_response}"
-      exit 1
-    fi
-    new_rev="$(echo "${import_response}" | python3 -c "import sys,json; print(json.load(sys.stdin).get('revision',''))" 2>/dev/null || true)"
-    if [[ -z "${new_rev}" ]]; then
-      echo "ERROR: could not determine imported revision for '${name}'."
-      exit 1
-    fi
-    echo "Proxy imported (revision ${new_rev})."
-
-  local deploy_response
-  deploy_response="$(curl -s -X POST \
-    -H "Authorization: Bearer ${TOKEN}" \
-    "${APIGEE_API}/organizations/${PROJECT_ID}/environments/${APIGEE_ENV}/apis/${name}/revisions/${new_rev}/deployments?override=true")"
-  if echo "${deploy_response}" | grep -q '"error"'; then
-    echo "ERROR deploying fixture proxy '${name}':"
-    echo "${deploy_response}" | python3 -m json.tool 2>/dev/null || echo "${deploy_response}"
+    "${APIGEE_API}/organizations/${PROJECT_ID}/environments/${APIGEE_ENV}/deployments")"
+  if ! echo "${DEPLOY_CHECK}" | grep -q "\"${FIXTURE}\""; then
+    echo "ERROR: fixture proxy '${FIXTURE}' is not deployed."
+    echo "Run ./scripts/option2b/setup-external.sh first (this script only"
+    echo "observes — it provisions nothing)."
     exit 1
   fi
-  echo "Deployment of revision ${new_rev} started; waiting for READY..."
-  local elapsed=0 state
-  while true; do
-    state="$(curl -s \
-      -H "Authorization: Bearer ${TOKEN}" \
-      "${APIGEE_API}/organizations/${PROJECT_ID}/environments/${APIGEE_ENV}/apis/${name}/revisions/${new_rev}/deployments" \
-      | python3 -c "import sys,json; print(json.load(sys.stdin).get('state',''))" 2>/dev/null || true)"
-    [[ "${state}" == "READY" ]] && { echo "Deployment READY."; break; }
-    if (( elapsed >= 180 )); then
-      echo "WARNING: deployment not READY after 180s (state: ${state:-unknown}); probing anyway."
-      break
-    fi
-    sleep 10; elapsed=$((elapsed + 10))
-  done
-  sleep 10  # small settle for runtime routing
-}
+done
+echo "Fixture proxies deployed: cr-external-blocked, cr-external-allowed"
+echo ""
 
-deploy_fixture_proxy "cr-external-blocked" "/external-blocked" "${BLOCKED_RUN_URL}"
-echo ""
-deploy_fixture_proxy "cr-external-allowed" "/external-allowed" "${ALLOWED_RUN_URL}"
-echo ""
 
 # ============================================================
 # Probes 0a/0b (controls): laptop → both external services

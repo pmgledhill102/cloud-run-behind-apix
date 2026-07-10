@@ -45,10 +45,9 @@ source "${SHARED_DIR}/lib/helpers.sh"
 PERIMETER_NAME="apigee_poc_perimeter"
 POLICY_TITLE="apigee-poc-policy"
 RESTRICTED_SERVICES="run.googleapis.com,storage.googleapis.com"
-# Project number of the ONE external Cloud Run project admitted by the egress
-# allow-list (deny-by-default proof lives in test-external.sh). Default is the
-# project behind https://neukin-barn-433004719812.europe-west1.run.app/health.json.
-ALLOWED_EGRESS_PROJECT_NUMBER="${ALLOWED_EGRESS_PROJECT_NUMBER:-433004719812}"
+# ALLOWED_EGRESS_PROJECT_NUMBER (the ONE external Cloud Run project admitted
+# by the egress allow-list) comes from shared/env.sh, alongside the
+# BLOCKED/ALLOWED_RUN_URL pair used by setup-external.sh + test-external.sh.
 
 echo "=== Option 2b: PGA + VPC-SC perimeter — project: ${PROJECT_ID} ==="
 echo "Perimeter:           ${PERIMETER_NAME}"
