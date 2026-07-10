@@ -296,6 +296,13 @@ a **[VERIFY]** above; ordered so the cheap, structural proofs come first:
 7. **Env sharding under one hostname** — second environment attached to the
    same env group, proxy deployed there with a distinct Domain prefix;
    prove `api.example.com/<other-domain>/…` routes cross-env.
+8. **Egress governance** — implemented ahead of this plan: `option2b/setup.sh`
+   applies a perimeter egress allow-list admitting one named external Cloud
+   Run project, and `option2b/test-external.sh` asserts blocked *and* allowed
+   external targets in one run. Remaining: measure egress-rule change
+   propagation with the harness, and record the syntax trap (logged
+   `run.routes.invoke` is not valid `methodSelector` syntax — use
+   `method: '*'` scoped by target project).
 
 Success = each item either validated (moves from **[VERIFY]** into fact) or
 produces a captured failure mode for the
@@ -303,7 +310,39 @@ produces a captured failure mode for the
 
 ---
 
-## 10. Open questions (out of PoC scope, needed for production)
+## 10. Reaching targets outside the perimeter
+
+Not every legitimate target lives inside the perimeter. Three cases, three
+mechanisms — decided per target type, not per team:
+
+| Target | Mechanism | DNS | Path |
+|---|---|---|---|
+| In-perimeter Cloud Run | the design above | wildcard `*.run.app` → restricted VIP | Google backbone |
+| Out-of-perimeter Cloud Run / GCP service | **perimeter egress rule** naming the target project | unchanged | backbone, still perimeter-audited |
+| Non-Google external API (e.g. partner SaaS) | corporate proxy egress | public resolution | tenant → VPC → VPN/Interconnect → corp proxy → internet |
+
+Two traps worth naming:
+
+- **The DNS-override route is a mirage.** Pointing a more-specific private
+  zone at `run.app`'s public IPs is fragile (hardcoded GFE anycast IPs) and
+  mostly futile: VPC-SC enforcement is **not VIP-dependent** — traffic
+  NAT-egressing from the perimeter project to the *public* `run.app` front
+  door is still attributed to the project and still denied. Public front
+  door ≠ perimeter bypass. It only "works" via egress that isn't attributed
+  to the perimeter (i.e. hairpinned through the corporate proxy) — at which
+  point a governed exfiltration path has been deliberately re-opened for
+  traffic that never needed to leave Google. Use an egress rule instead.
+- **Apigee has no internet route of its own** once VPC-SC is enabled on the
+  peering, so the corp-proxy case requires tenant → customer-VPC routing
+  (custom route export) and a route-based ("routable"/transparent) proxy —
+  Apigee X's support for *explicit* forward-proxy configuration on targets
+  is limited. **[VERIFY]** before committing to the corp-proxy pattern for
+  Apigee southbound.
+
+The egress-rule mechanism is implemented and testable today in
+[`scripts/option2b/`](../scripts/option2b/) (see §9 item 8).
+
+## 11. Open questions (out of PoC scope, needed for production)
 
 - **Northbound TLS**: the PoC curls the instance IP with a `Host` header;
   production `api.example.com` needs a load balancer + managed cert in front
