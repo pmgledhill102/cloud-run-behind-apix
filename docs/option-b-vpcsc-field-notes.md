@@ -34,7 +34,11 @@ Worth knowing for monitoring/assertions: the blocked Cloud Run request is
 refused by the Google Front End at the restricted VIP with a **plain HTML
 `403 Forbidden` ("Access is forbidden")** — not a structured VPC-SC JSON
 error like the storage API returns. Match on status, not body shape. The
-same wildcard `*.run.app → 199.36.153.x` zone resolves *external* services'
+storage-API denial *does* include a `vpcServiceControlsUniqueIdentifier`,
+which can be searched in Cloud Audit Logs to locate the exact denial event
+and its ingress/egress violation details — the HTML 403 offers no such
+handle, so for Cloud Run denials go straight to the audit logs. The same
+wildcard `*.run.app → 199.36.153.x` zone resolves *external* services'
 hostnames too — that is precisely why the perimeter catches them.
 
 But it took ~3 elapsed days, 11 distinct failure modes, and several
