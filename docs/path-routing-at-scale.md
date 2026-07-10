@@ -66,9 +66,9 @@ The core of the design — every URL segment is resolved by exactly one layer:
         /issuing/disputes/v1/… ────────►│  Flow: pathsuffix ~ /issuing/       │
                                         │        disputes/v1/**               │
                                         │    └─► RouteRule → TargetEndpoint   │
-                                        │          GoogleIDToken audience =   │
-                                        │          https://payments-cards-    │
-                                        │          disputes-<hash>.run.app    │
+                                        │          auth per scenario (§4):    │
+                                        │          A: GoogleIDToken audience  │
+                                        │          B: client JWT forwarded    │
                                         └─────────────────┬───────────────────┘
                                                           ▼
                               restricted VIP (199.36.153.4/30, in-perimeter)
@@ -134,6 +134,20 @@ Sketch of the `payments-cards` proxy (base path `/payments/cards`):
   <!-- … one RouteRule per target … -->
 </ProxyEndpoint>
 
+<!-- TargetEndpoint: see the two auth scenarios below -->
+```
+
+### The target endpoint: two auth scenarios
+
+The proxy/flow structure above is identical in both; only the
+`TargetEndpoint` and the Cloud Run service's own configuration differ.
+
+**Scenario A — platform IAM (Google ID token).** What the PoC validates.
+Apigee mints a Google ID token per target; the service is closed at the
+Google layer (`--no-allow-unauthenticated`) and Cloud Run's front end
+rejects unauthenticated callers before any service code runs.
+
+```xml
 <TargetEndpoint name="disputes-v2">
   <HTTPTargetConnection>
     <URL>https://payments-cards-disputes-v2-HASH.REGION.run.app</URL>
@@ -146,13 +160,59 @@ Sketch of the `payments-cards` proxy (base path `/payments/cards`):
 </TargetEndpoint>
 ```
 
-Key mechanics:
+Cost: the audience must match each service's URL exactly, the proxy's
+deploy-time SA needs `run.invoker` on every target, and the Apigee service
+agent needs `tokenCreator` on that SA — the full plumbing catalogued in
+[field notes §3](option-b-vpcsc-field-notes.md).
 
-- **Each Cloud Run service is a distinct TargetEndpoint** because the
-  `GoogleIDToken` audience must match that service's URL exactly (learned
-  the hard way — see [field notes §3](option-b-vpcsc-field-notes.md)). One
-  deploy-time SA can serve all targets in the proxy, provided it holds
-  `run.invoker` on each service.
+**Scenario B — in-house JWT, validated in the service.** The client's JWT
+(issued by the in-house auth system) rides the `Authorization` header;
+Apigee forwards request headers to the target by default, so the target
+endpoint needs **no** `<Authentication>` block at all:
+
+```xml
+<TargetEndpoint name="disputes-v2">
+  <HTTPTargetConnection>
+    <URL>https://payments-cards-disputes-v2-HASH.REGION.run.app</URL>
+    <!-- no <Authentication>: the client's JWT in the Authorization
+         header is forwarded untouched; the service validates it -->
+  </HTTPTargetConnection>
+</TargetEndpoint>
+```
+
+The Cloud Run service is open at the Google layer
+(`--allow-unauthenticated`) and instead relies on: `--ingress=internal` +
+the VPC-SC perimeter (network reachability — only in-perimeter callers can
+connect at all) and **JWT validation in service code** (shared middleware).
+Recommended addition: a `VerifyJWT` policy in the proxy PreFlow so obviously
+bad tokens are rejected at the edge and never reach a service. Cost vs A:
+no platform-level caller identity — anything that can reach the service on
+the network can attempt requests, so the JWT middleware must be universal
+and non-optional in every service. Gain: no per-target audience/IAM
+plumbing (every TargetEndpoint is identical in shape), and the end-user
+identity arrives at the service rather than a proxy service account.
+
+**Combining both (defence in depth)** has a trap: Apigee's `GoogleIDToken`
+authentication *writes* the `Authorization` header — clobbering the client
+JWT. Cloud Run accepts the Google token in the **`X-Serverless-Authorization`**
+header for exactly this collision; Apigee's `<Authentication>` block can be
+pointed at it (`<HeaderName>`) so the client JWT keeps `Authorization`.
+**[VERIFY]** the combined-headers pattern live before relying on it.
+
+| | A: platform IAM | B: in-house JWT | A + B |
+|---|---|---|---|
+| Cloud Run flag | `--no-allow-unauthenticated` | `--allow-unauthenticated` | `--no-allow-unauthenticated` |
+| Network boundary (ingress=internal + perimeter) | ✓ | ✓ (now the *only* platform control) | ✓ |
+| Caller identity at service | proxy SA | end-user (JWT claims) | both |
+| Per-target Apigee config | audience + SA plumbing | none | audience + `HeaderName` |
+| Blast radius of a service missing auth middleware | still IAM-closed | **open to any in-perimeter caller** | still IAM-closed |
+
+### Key mechanics (both scenarios)
+
+- **Each Cloud Run service is a distinct TargetEndpoint** — the URL differs
+  per service regardless; in scenario A the audience must additionally match
+  that URL exactly (learned the hard way — see
+  [field notes §3](option-b-vpcsc-field-notes.md)).
 - **Path suffix forwarding**: Apigee strips the base path and appends the
   remainder to the target URL — `ResourcePath?params` arrive at the service
   untouched. The service must either accept the full suffix
@@ -303,6 +363,16 @@ a **[VERIFY]** above; ordered so the cheap, structural proofs come first:
    propagation with the harness, and record the syntax trap (logged
    `run.routes.invoke` is not valid `methodSelector` syntax — use
    `method: '*'` scoped by target project).
+9. **Auth scenarios (§4)** — the PoC validates scenario A only. Deploy one
+   service as scenario B (`--allow-unauthenticated`, JWT-validating handler,
+   no `<Authentication>` block) and prove the client's `Authorization` header
+   arrives intact and a bad/missing JWT is rejected by the service; then the
+   combined pattern (Google token via `<HeaderName>` →
+   `X-Serverless-Authorization`, client JWT untouched in `Authorization`) and
+   prove both headers arrive. Also probe the scenario-B failure mode: an
+   in-perimeter caller hitting the open service's `run.app` URL directly,
+   bypassing Apigee — reachable by design, so the JWT middleware is the only
+   application-layer control.
 
 Success = each item either validated (moves from **[VERIFY]** into fact) or
 produces a captured failure mode for the
