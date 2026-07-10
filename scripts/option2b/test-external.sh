@@ -41,7 +41,8 @@ source "${SHARED_DIR}/lib/helpers.sh"
 # A public Cloud Run service in a project with NO egress rule — must be denied.
 BLOCKED_RUN_URL="${BLOCKED_RUN_URL:-${EXTERNAL_RUN_URL:-https://sandbox-manager-255182376214.europe-west2.run.app/health}}"
 # A public Cloud Run service in the egress-allow-listed project — must succeed.
-ALLOWED_RUN_URL="${ALLOWED_RUN_URL:-https://neukin-barn-433004719812.europe-west1.run.app/}"
+# (/health.json keeps the probe payload small in the test log.)
+ALLOWED_RUN_URL="${ALLOWED_RUN_URL:-https://neukin-barn-433004719812.europe-west1.run.app/health.json}"
 BLOCKED_HEALTHY_PATTERN='"ok"'
 
 BLOCKED_HOST="${BLOCKED_RUN_URL#https://}"; BLOCKED_HOST="${BLOCKED_HOST%%/*}"
