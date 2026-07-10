@@ -230,7 +230,7 @@ going to fix itself (§4).
 | Apigee org creation | 30–50 min | ~40 min |
 | Apigee instance creation | 30–60 min | ~45 min |
 | VPC-SC perimeter **enforcement** after create | "a few minutes, up to 30" | **~30 minutes** (narrowed by re-testing; our initial same-day observation looked like *hours* but was confounded by an auth expiry masking results — see below) |
-| VPC-SC perimeter deletion | similar | not separately measured — assume the same |
+| VPC-SC perimeter deletion | similar | **near-instant in our one measured sample** — already OPEN at the first probe seconds after teardown finished. Asymmetry with creation (~30 min) noted; don't assume either direction's timing from the other |
 | IAM grant propagation | ~1–2 min | 1–2 min (a retry loop suffices) |
 | Peered DNS domain pickup by Apigee runtime | undocumented | minutes |
 | Access policy creation (async) | — | < 1 min, but poll — the create returns before it's listable |
