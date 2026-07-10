@@ -88,6 +88,44 @@ else
   echo "         or the peering no longer exists). Non-fatal."
 fi
 
+# ============================================================
+# Step 4: Remove restricted-VIP route, route export, dns.peer
+# ============================================================
+echo ""
+echo "--- Step 4: Remove restricted-VIP route + route export + dns.peer ---"
+if resource_exists gcloud compute routes describe "restricted-vip" --project="${PROJECT_ID}"; then
+  gcloud compute routes delete "restricted-vip" --project="${PROJECT_ID}" --quiet
+  echo "Route 'restricted-vip' deleted."
+else
+  echo "Route 'restricted-vip' does not exist, skipping."
+fi
+
+PEERING_NAME="$(gcloud compute networks peerings list \
+  --network="${APIGEE_NETWORK}" --project="${PROJECT_ID}" \
+  --format='value(name)' --filter='network~servicenetworking' 2>/dev/null || true)"
+if [[ -n "${PEERING_NAME}" ]]; then
+  gcloud compute networks peerings update "${PEERING_NAME}" \
+    --network="${APIGEE_NETWORK}" \
+    --no-export-custom-routes \
+    --project="${PROJECT_ID}" 2>/dev/null \
+    && echo "Custom route export disabled on peering '${PEERING_NAME}'." \
+    || echo "WARNING: could not disable custom route export. Non-fatal."
+else
+  echo "Servicenetworking peering not found, skipping route export."
+fi
+
+PROJECT_NUMBER="$(gcloud projects describe "${PROJECT_ID}" --format='value(projectNumber)')"
+APIGEE_AGENT_SA="service-${PROJECT_NUMBER}@gcp-sa-apigee.iam.gserviceaccount.com"
+if gcloud projects remove-iam-policy-binding "${PROJECT_ID}" \
+    --member="serviceAccount:${APIGEE_AGENT_SA}" \
+    --role="roles/dns.peer" \
+    --condition=None \
+    --quiet >/dev/null 2>&1; then
+  echo "dns.peer removed from Apigee service agent."
+else
+  echo "dns.peer binding not present, skipping."
+fi
+
 echo ""
 echo "=== Teardown complete ==="
 echo ""

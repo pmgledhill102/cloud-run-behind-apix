@@ -13,7 +13,9 @@
 #   2. Scoped access policy (org-level resource, scoped to this project)
 #   3. VPC-SC enforcement on the Apigee servicenetworking peering
 #      (required so Apigee tenant-project southbound traffic is treated as
-#      inside the perimeter — see Apigee VPC-SC docs)
+#      inside the perimeter — see Apigee VPC-SC docs), plus the tenant
+#      DNS/routing plumbing that enablement requires: dns.peer for the Apigee
+#      service agent, a restricted-VIP static route, and custom route export
 #   4. Enforced service perimeter around the project:
 #        - restricted services: run.googleapis.com, storage.googleapis.com
 #          (run = the service under test; storage = used by test.sh negative test)
@@ -148,6 +150,61 @@ else
   echo "         Apigee southbound traffic may be blocked by the perimeter."
   echo "         Retry manually:"
   echo "         gcloud services vpc-peerings enable-vpc-service-controls --network=${APIGEE_NETWORK} --project=${PROJECT_ID}"
+fi
+
+# ============================================================
+# Step 4b: Grant Apigee service agent dns.peer
+# ============================================================
+echo ""
+echo "--- Step 4b: Grant Apigee service agent roles/dns.peer ---"
+# enable-vpc-service-controls removes the tenant project's default internet
+# route and adds DNS zones + a restricted-VIP route for googleapis.com names —
+# but NOT for run.app. Without visibility of this VPC's run-app-pga zone the
+# tenant resolves run.app to public IPs it can no longer route to, and
+# southbound calls fail with TARGET_CONNECT_TIMEOUT. dns.peer lets the Apigee
+# tenant DNS-peer into this VPC and resolve the private run.app zone
+# (per the Apigee VPC-SC docs).
+APIGEE_AGENT_SA="service-${PROJECT_NUMBER}@gcp-sa-apigee.iam.gserviceaccount.com"
+if gcloud projects add-iam-policy-binding "${PROJECT_ID}" \
+    --member="serviceAccount:${APIGEE_AGENT_SA}" \
+    --role="roles/dns.peer" \
+    --condition=None \
+    --quiet >/dev/null 2>&1; then
+  echo "Apigee service agent granted dns.peer."
+else
+  echo "WARNING: could not grant dns.peer to '${APIGEE_AGENT_SA}'."
+fi
+
+# ============================================================
+# Step 4c: Restricted-VIP route + export to the tenant
+# ============================================================
+echo ""
+echo "--- Step 4c: Restricted-VIP static route + custom route export ---"
+# Per the Apigee VPC-SC docs: a static route for the restricted VIP with
+# next-hop default-internet-gateway (traffic stays on Google's backbone), and
+# custom-route export on the peering so the tenant project can use it.
+if resource_exists gcloud compute routes describe "restricted-vip" --project="${PROJECT_ID}"; then
+  echo "Route 'restricted-vip' already exists, skipping."
+else
+  gcloud compute routes create "restricted-vip" \
+    --network="${APIGEE_NETWORK}" \
+    --destination-range="199.36.153.4/30" \
+    --next-hop-gateway="default-internet-gateway" \
+    --project="${PROJECT_ID}"
+  echo "Route 'restricted-vip' (199.36.153.4/30 → default-internet-gateway) created."
+fi
+
+PEERING_NAME="$(gcloud compute networks peerings list \
+  --network="${APIGEE_NETWORK}" --project="${PROJECT_ID}" \
+  --format='value(name)' --filter='network~servicenetworking' 2>/dev/null || true)"
+if [[ -n "${PEERING_NAME}" ]]; then
+  gcloud compute networks peerings update "${PEERING_NAME}" \
+    --network="${APIGEE_NETWORK}" \
+    --export-custom-routes \
+    --project="${PROJECT_ID}"
+  echo "Custom route export enabled on peering '${PEERING_NAME}'."
+else
+  echo "WARNING: servicenetworking peering not found — is Apigee provisioned?"
 fi
 
 # ============================================================

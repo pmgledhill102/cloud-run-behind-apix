@@ -92,7 +92,13 @@ echo "VM (inside) → restricted VIP → Cloud Run (inside) — expect HTTP 200"
 echo ""
 
 echo "--- curl ${SERVICE_URL} (with ID token) ---"
-ssh_curl_auth "${SERVICE_URL}" "-s --max-time 10 ${SERVICE_URL}/" || echo "  FAILED"
+POSITIVE_OUT="$(ssh_curl_auth "${SERVICE_URL}" "-s --max-time 10 ${SERVICE_URL}/" || true)"
+echo "${POSITIVE_OUT}"
+if echo "${POSITIVE_OUT}" | grep -q "^OK"; then
+  RESULT2="PASS"
+else
+  RESULT2="FAIL"
+fi
 echo ""
 
 # ============================================================
@@ -124,8 +130,10 @@ for attempt in 1 2 3; do
 done
 
 if [[ "${BLOCKED}" == "true" ]]; then
+  RESULT3="PASS"
   echo "PASS: request blocked (403). VPC-SC perimeter is enforcing."
 else
+  RESULT3="FAIL"
   echo "FAIL: request was NOT blocked."
   echo "  - Perimeter propagation can take up to ~30 minutes; re-run this test."
   echo "  - Check the perimeter restricts storage.googleapis.com (Test 1 output)."
@@ -145,6 +153,7 @@ APIGEE_HTTP="$(curl -s -o /dev/null -w '%{http_code}' \
   -H "Authorization: Bearer ${TOKEN}" \
   "${APIGEE_API}/organizations/${PROJECT_ID}")"
 
+RESULT4="SKIP"
 if [[ "${APIGEE_HTTP}" != "200" ]]; then
   echo "Apigee not provisioned, skipping."
   echo ""
@@ -163,19 +172,39 @@ else
     echo ""
 
     echo "--- curl https://${INSTANCE_IP}/hello (via Apigee → PGA) ---"
-    ssh_cmd "curl -sk --max-time 15 -H 'Host: ${APIGEE_ENV_GROUP_HOSTNAME}' https://${INSTANCE_IP}/hello" || echo "  FAILED"
+    APIGEE_OUT="$(ssh_cmd "curl -sk --max-time 15 -H 'Host: ${APIGEE_ENV_GROUP_HOSTNAME}' https://${INSTANCE_IP}/hello" || true)"
+    echo "${APIGEE_OUT}"
+    if echo "${APIGEE_OUT}" | grep -q "^OK"; then
+      RESULT4="PASS"
+    else
+      RESULT4="FAIL"
+    fi
     echo ""
   fi
 fi
 
 # ============================================================
-# Summary
+# Summary — actual results, not a legend
 # ============================================================
-echo "=== Test complete ==="
+echo "=== Test results ==="
 echo ""
-echo "Test 2 'OK'          → inside-perimeter path unaffected by enforcement"
-echo "Test 3 403           → perimeter blocks cross-perimeter access (the proof)"
-echo "Test 4 'OK'          → Apigee southbound admitted through the perimeter"
+echo "Test 2 [${RESULT2}]  inside-perimeter path (VM → PGA → Cloud Run)"
+echo "Test 3 [${RESULT3}]  perimeter blocks cross-perimeter access (the proof)"
+echo "Test 4 [${RESULT4}]  Apigee southbound admitted through the perimeter"
 echo ""
-echo "Together: same DNS + restricted VIP as option2, but now with real"
-echo "VPC-SC enforcement — access is bounded by the perimeter, not just IAM."
+if [[ "${RESULT4}" == "FAIL" ]]; then
+  echo "Test 4 failure hints:"
+  echo "  GoogleTokenGenerationFailure → missing tokenCreator/iamcredentials"
+  echo "    (re-run shared/setup-iam.sh)"
+  echo "  TARGET_CONNECT_TIMEOUT → tenant cannot resolve/route run.app to the"
+  echo "    restricted VIP; re-run option2b/setup.sh (steps 4b/4c) and allow"
+  echo "    time for DNS peering to take effect"
+  echo ""
+fi
+if [[ "${RESULT2}" == "PASS" && "${RESULT3}" == "PASS" ]]; then
+  echo "Perimeter validated: same DNS + restricted VIP as option2, but now"
+  echo "with real VPC-SC enforcement — access is bounded by the perimeter,"
+  echo "not just IAM."
+else
+  echo "Not fully validated yet — see failures above."
+fi
