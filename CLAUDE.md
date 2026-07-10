@@ -36,6 +36,8 @@ Cross-cutting docs:
 - `docs/dns-guide.md` — DNS reference across all options
 - `docs/scaling-analysis.md` — Scale to 1000s of services analysis
 - `docs/option-c-scaled.md` — 20-service PoC validating Option C linear scaling
+- `docs/option-b-vpcsc-field-notes.md` — Option 2b lessons learned: failures, propagation, audit logs
+- `docs/path-routing-at-scale.md` — Paper design: URL hierarchy → Apigee → Cloud Run at ~50 domains / ~500 APIs (PoC extension plan in §9)
 
 ## PoC Scripts
 
