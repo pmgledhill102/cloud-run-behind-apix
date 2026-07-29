@@ -218,10 +218,9 @@ says it **must** run (bold):
 ¹ A sidecar or app *can* also validate the Google ID token from
 `X-Serverless-Authorization`, but Cloud Run IAM has already done so
 platform-side; re-checking adds little.
-² If the issuer publishes revocation (introspection endpoint or short-TTL
-deny-list), the edge is the one place that check runs once per request
-rather than per service. With short-lived access tokens, revocation may
-reduce to "keep TTLs short" — issuer-policy decision, not platform.
+² Tiered: TTL bound → edge deny-list → introspection; see §7.7. The edge
+is the one place a revocation check runs once per request rather than per
+service.
 
 Reading of the matrix: **every token check lands in Apigee; the bypass
 problem lands on Cloud Run IAM; fine-grained authz lands in the app; the
@@ -417,6 +416,56 @@ verification that reality matches:
 | Service-side validation failure while Apigee passed it | Service logs — should be **near-zero**; non-zero means skew between edge and service validation configs (alert) |
 | JWKS refresh failures | Apigee policy faults / middleware logs — leading indicator of a looming fail-closed event |
 
+### 7.7 Revocation — how fast can access be killed?
+
+A JWT is a bearer credential validated **offline**: between issuance and
+`exp`, nothing in the request path consults the issuer. "Revocation" is
+therefore not one mechanism but a tiered trade of latency vs cost:
+
+| Tier | Mechanism | Revocation latency | Per-request cost | Operated by |
+|---|---|---|---|---|
+| 0 | Short access-token TTL; revocation enforced at the **refresh** boundary (issuer refuses to refresh a killed session) | worst case = remaining TTL | zero | identity team (issuer policy) |
+| 1 | **Deny-list at the Apigee edge** (`jti` / `sub` / client id) in the auth shared flow | list propagation (seconds–minutes) | one cache/KVM lookup | identity team publishes; Apigee platform team enforces |
+| 2 | Per-request introspection (RFC 7662) | ~zero | issuer round-trip on **every** request; issuer becomes a per-request availability dependency | rejected as a default |
+
+**Is tier 0 alone enough?** For logout and routine session termination,
+usually yes — 5–15 minutes of residual access is a commonly accepted
+bound, *provided* refresh-token revocation is actually enforced
+issuer-side (worth stating as an explicit requirement on the identity
+team, not an assumption). For compromise response — stolen token detected,
+client credential leaked — "attacker keeps access until `exp`" is a
+risk-appetite decision per operation class, not a platform decision. The
+platform's job is to state the bound precisely so risk owners can accept
+or reject it. Note the TTL dial isn't free: shorter tokens mean more
+refresh traffic and tighter coupling to issuer availability (§7.4's
+trade, one layer up).
+
+**Tier 1 is this design's upgrade path, and it is unusually cheap here.**
+Because Cloud Run IAM closes the direct-PGA bypass (§6), every request
+provably traverses Apigee — so a deny-list check in the shared flow
+covers the entire fleet at **one** enforcement point, with zero changes
+to the 1000 services. This is a structural payoff of the layered design
+worth naming: *stateful or expensive checks can be edge-only, because the
+platform guarantees there is no path around the edge.* The list also
+stays small: an entry only needs to live until its token's `exp`, so
+short TTLs (tier 0) and the deny-list (tier 1) are complements — tier 0
+caps list size, tier 1 caps revocation latency. Distribution reuses the
+§7.4 machinery (mirror or push). **[VERIFY]** lookup mechanism and added
+latency in the shared flow (KVM vs cache vs ExternalCallout).
+
+**Tier 2 stays rejected as a default** — it converts stateless JWT
+validation back into a per-request issuer dependency at fleet scale. For
+the small class of genuinely high-risk operations, prefer a **freshness
+requirement** instead: the shared flow (or the service) demands
+`auth_time`/`iat` newer than N minutes — or a step-up claim — for those
+specific operations. That narrows the stolen-token window where it
+matters without shortening every token's TTL or introspecting every call.
+
+**Mass revocation** (issuer key compromise) is not token revocation at
+all — it is key rotation (§7.4): pull the key from the JWKS and every
+token signed by it dies as caches refresh; latency = max end-to-end JWKS
+cache TTL.
+
 ## 8. Resulting shape (recommended baseline)
 
 ```
@@ -464,7 +513,14 @@ Service: middleware re-validates JWT (defence in depth),
    works on Cloud Run? cold-start and latency cost vs library?
 7. **[VERIFY]** Preventive controls: which of the §7.5 postures can org
    policy enforce vs audit-only?
-8. Open: proxy-SA segmentation granularity (one per env vs per domain) —
+8. **[VERIFY]** Edge deny-list (§7.7 tier 1): lookup mechanism in the
+   shared flow (KVM vs cache vs ExternalCallout), propagation latency
+   from publish to enforced, and added per-request latency.
+9. Open: proxy-SA segmentation granularity (one per env vs per domain) —
    trade blast radius against IAM-plumbing volume.
-9. Open: issuer claims schema — is there a stable tenant/subject claim the
-   fine-grained layer can rely on across all 1000 services?
+10. Open: issuer claims schema — is there a stable tenant/subject claim
+    the fine-grained layer can rely on across all 1000 services?
+11. Open: revocation SLO per operation class (§7.7) — agree with risk
+    owners what residual-access bound is acceptable (worst case = access
+    TTL at tier 0), and whether refresh-token revocation is enforced
+    issuer-side today.
