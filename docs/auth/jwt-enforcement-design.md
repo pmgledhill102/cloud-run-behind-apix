@@ -315,26 +315,77 @@ recommendation is the library**, with the sidecar as the fallback if the
 estate is too polyglot for library coverage. Revisit if IAM closure cannot
 be guaranteed for some service class.
 
-### 7.4 JWKS and key rotation
+### 7.4 JWKS distribution, fetch amplification, and key rotation
 
-- Both Apigee (per instance) and every service (per container) cache the
-  issuer JWKS. Cache TTLs bound two things: how fast a *new* signing key is
-  usable (rotation) and how long a *revoked* key keeps verifying
-  (compromise). Agree TTLs with the identity team; rotation runbook =
-  publish new key in JWKS → wait > max cache TTL → start signing with it →
-  retire old key after token max-age.
-- **Egress**: the JWKS URL is an external endpoint. Apigee *and* every
-  Cloud Run service (if service-side validation is on) must be able to
-  fetch it through the egress allow-list — one more entry in the
-  [governed allow-list](../option-b-vpcsc-field-notes.md), and a good
-  argument for an **internally mirrored JWKS** (a tiny Cloud Run service
-  the platform team owns) so 1000 services don't each need external
-  egress. Mirror then becomes a critical dependency with an owner, SLO,
-  and fail-closed semantics. **[VERIFY]** JWKS fetch behaviour under the
-  perimeter/egress setup.
-- Issuer outage: JWKS caches mean validation survives *brief* outages;
-  policy question is fail-closed (reject when JWKS unrefreshable and keys
-  expired) — the answer should be fail-closed, stated up front.
+**Who fetches the JWKS, and how many of them are there?** Istio hid this
+problem: **istiod** fetches the issuer's JWKS once per control plane and
+*pushes* the keys to every sidecar as config — the issuer sees O(1)
+fetchers regardless of pod count or churn. Neither platform here
+reproduces that shape:
+
+| Validation layer | JWKS cache lives in | Fetcher population | Churn |
+|---|---|---|---|
+| Istio (reference) | istiod, pushed to sidecars | O(control planes) | none — pods never fetch |
+| Apigee `VerifyJWT` | message processor, cached | O(MPs) — small, bounded | low (long-lived) |
+| Cloud Run in-service | **per container instance**, in-process only | O(live instances), fleet-wide | **high** — scale-to-zero, burst autoscale, instance recycling, deploy waves |
+
+Apigee is a non-issue: a handful of long-lived MPs with policy-level
+caching (**[VERIFY]** exact TTL and configurability). Cloud Run is the
+concern — every new instance does a cold JWKS fetch, usually on the
+critical path of its first request. Steady-state *volume* is actually
+trivial (even 10k instance starts/hour ≈ 3 small GETs/sec against the
+issuer); the real problems are structural:
+
+1. **Correlated bursts** — a fleet-wide middleware patch (§7.2's 1000
+   redeploys) or a traffic spike synchronises thousands of cold fetches.
+2. **Availability coupling** — warm instances survive an issuer JWKS
+   outage on cached keys, but *new* instances fail closed. An issuer blip
+   during an autoscale event silently becomes a serving outage for
+   whatever scaled.
+3. **Cold-start latency** — an external fetch through the egress path
+   added to first-request latency, per instance.
+4. **Egress surface** — 1000 services each needing external egress to the
+   issuer, just for JWKS (one more entry in the
+   [governed allow-list](../option-b-vpcsc-field-notes.md)).
+
+Mitigations, in rough order of preference:
+
+- **Internal JWKS mirror** — a tiny platform-owned Cloud Run service that
+  fetches from the issuer and serves the keys in-perimeter. This is
+  *recreating istiod's role*: the issuer sees O(1) fetchers again, egress
+  is needed from one place only, and the mirror can serve **stale-on-error**,
+  which breaks the availability coupling (2). Cost: a new critical
+  dependency with an owner, SLO, and monitoring — but a ~static-file
+  service with aggressive caching is about the easiest SLO on the
+  platform. **[VERIFY]** as part of the PoC.
+- **Push distribution** — publish the JWKS into Secret Manager and have
+  services resolve it as a secret reference at instance start: the
+  per-instance fetch goes to Google infrastructure instead of the issuer,
+  and no service needs external egress. Cost: rotation becomes a *push
+  pipeline* (identity team publishes → pipeline updates the secret) that
+  must be reliable, and stale-key detection needs monitoring.
+- **CDN in front of the issuer's `jwks_uri`** — what the large public
+  IdPs do; fixes issuer load and mostly (2)/(3), but leaves the
+  per-service egress requirement (4) in place.
+- **Middleware discipline** — whichever source is used: eager fetch at
+  startup (moves latency off the first request), background refresh,
+  rate-limited re-fetch on unknown-`kid`, serve-stale-while-revalidating.
+  This is exactly the kind of behaviour the shared library (§4.4) exists
+  to make uniform.
+- `min-instances > 0` on latency-critical services reduces churn but is a
+  cost trade, not a fix.
+
+**Cache TTLs and rotation.** Cache TTLs bound two things: how fast a *new*
+signing key becomes usable (rotation) and how long a *revoked* key keeps
+verifying (compromise). Agree TTLs with the identity team — noting that
+with a mirror or push model the effective TTL is mirror/pipeline refresh +
+in-process cache. Rotation runbook: publish new key in JWKS → wait > max
+end-to-end cache TTL → start signing with it → retire the old key after
+token max-age.
+
+**Issuer outage policy**: fail-closed when keys are unrefreshable *and*
+expired — stated up front, with the stale-on-error mirror as the mechanism
+that makes brief issuer outages a non-event rather than a fleet incident.
 
 ### 7.5 Enforcement of the enforcement
 
@@ -403,13 +454,17 @@ Service: middleware re-validates JWT (defence in depth),
 3. **[VERIFY]** `VerifyJWT` shared flow via env flow hook: rejects expired
    / wrong-`aud` / missing-scope tokens; measure added latency; JWKS fetch
    + cache behaviour through the egress allow-list.
-4. **[VERIFY]** Custom audiences (`--add-custom-audiences`) to collapse
+4. **[VERIFY]** JWKS distribution (§7.4): cold-start fetch latency from a
+   Cloud Run instance; behaviour when the JWKS endpoint is unreachable at
+   instance start (fail-closed confirmation); mirror prototype with
+   stale-on-error semantics.
+5. **[VERIFY]** Custom audiences (`--add-custom-audiences`) to collapse
    per-service audience plumbing to one string.
-5. **[VERIFY]** Sidecar (ingress-container Envoy `jwt_authn`) variant:
+6. **[VERIFY]** Sidecar (ingress-container Envoy `jwt_authn`) variant:
    works on Cloud Run? cold-start and latency cost vs library?
-6. **[VERIFY]** Preventive controls: which of the §7.5 postures can org
+7. **[VERIFY]** Preventive controls: which of the §7.5 postures can org
    policy enforce vs audit-only?
-7. Open: proxy-SA segmentation granularity (one per env vs per domain) —
+8. Open: proxy-SA segmentation granularity (one per env vs per domain) —
    trade blast radius against IAM-plumbing volume.
-8. Open: issuer claims schema — is there a stable tenant/subject claim the
+9. Open: issuer claims schema — is there a stable tenant/subject claim the
    fine-grained layer can rely on across all 1000 services?
