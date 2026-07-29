@@ -466,7 +466,79 @@ all — it is key rotation (§7.4): pull the key from the JWKS and every
 token signed by it dies as caches refresh; latency = max end-to-end JWKS
 cache TTL.
 
-## 8. Resulting shape (recommended baseline)
+## 8. Performance considerations
+
+Auth is on the hot path of every one of the fleet's requests, so its cost
+model deserves the same scrutiny as its security model. The short version:
+steady-state the design adds **low single-digit milliseconds**; every
+mechanism that could break that property has already been rejected or
+cached, and the risks that remain are concentrated in **cold paths** and
+in **shared-flow regressions multiplying across the fleet**.
+
+### 8.1 The per-request auth tax (warm path)
+
+| Stage | Work done | Expected warm cost |
+|---|---|---|
+| Apigee shared flow: `VerifyJWT` | RS256 signature verify + claim checks, JWKS from MP cache | ~1–5 ms policy execution **[VERIFY]** |
+| Scope → operation check | flow-variable comparison (or cached KVM read) | negligible |
+| Deny-list lookup (§7.7 tier 1, if adopted) | local KVM/cache read | ~ms — the `ExternalCallout` variant adds a network RTT per request, which is why lookup mechanism is a **[VERIFY]** item |
+| Google ID token mint | Apigee caches minted tokens until near expiry — amortised ≈ 0; first request per target/SA pays an IAM round trip **[VERIFY]** cache behaviour | ≈ 0 amortised |
+| Cloud Run IAM check | Google-side at the front end, before the container | negligible (platform claim — not separately measurable) |
+| Service middleware revalidation | in-process signature verify, JWKS already in memory | tens–hundreds of µs |
+
+**The design rule that keeps this true: nothing on the warm path makes a
+synchronous external call.** JWKS is cached (§7.4), minted Google tokens
+are cached, the deny-list is pushed not pulled, and per-request
+introspection was rejected (§7.7) on exactly this ground. Perf and
+availability turn out to be the same argument — every cache above is also
+the thing that survives an issuer blip.
+
+### 8.2 Cold paths — where the tail latency lives
+
+- **Instance cold start + JWKS fetch** (§7.4): the fetch lands on the
+  first request of every new instance, *compounding* with Cloud Run's own
+  cold start — the same request pays both. Eager fetch at startup and the
+  internal mirror shrink this; it never disappears.
+- **First-call token mint** per target after an Apigee cache miss/expiry.
+- **Sidecar variant** (§4.5): a second container in every cold start, an
+  extra localhost hop on every request, and Envoy's memory footprint
+  (tens of MB) on every instance × the whole fleet. These are the
+  quantified reasons the library is the §7.3 default — **[VERIFY]**
+  actual numbers if the sidecar is pursued.
+- p50 barely moves from any of this; **p99 is where the auth design shows
+  up**, and it shows up on exactly the requests already paying cold-start
+  cost. Benchmark cold and warm separately or the numbers will lie.
+
+### 8.3 Fleet-scale multipliers
+
+- **The shared flow runs on every request of every proxy** (that is the
+  point of the flow hook) — so a 2 ms regression in it is 2 ms across all
+  1000 services simultaneously. Treat shared-flow latency as a
+  platform-owned SLO: p50/p95/p99 dashboards, and a latency regression
+  gate on shared-flow changes alongside the §7.2 canary discipline.
+- **Apigee capacity**: `VerifyJWT` is CPU on the message processors;
+  include auth CPU in TPS sizing rather than discovering it at the first
+  load test.
+- **Token size**: every request now carries two bearer tokens (~1–2 KB
+  each). No practical header-limit risk, but fat scope lists and claim
+  sprawl bloat every request, log line, and analytics record on the
+  platform — a lean claims schema (§10 open item) is a perf item, not
+  just hygiene.
+- **Rate limiting**: `SpikeArrest` is MP-local and cheap; distributed
+  `Quota` synchronises counters — use asynchronous quota accounting
+  unless a hard global limit genuinely matters.
+
+### 8.4 Signature algorithm note
+
+RS256 verification is cheap (small public exponent) and verify-heavy is
+exactly this fleet's profile; ES256 gives smaller tokens but costlier
+verification. Either is fine at these volumes — the rule that matters is
+**pin the expected algorithm** in both `VerifyJWT` and the middleware
+(never accept `alg: none` or issuer-driven algorithm switching), which is
+simultaneously the defence against algorithm-confusion attacks. Perf and
+security agree again.
+
+## 9. Resulting shape (recommended baseline)
 
 ```
 Client ──JWT──► Apigee env (flow hook → auth shared flow)
@@ -494,15 +566,17 @@ Service: middleware re-validates JWT (defence in depth),
 - Everything service-side rides on fleet-redeploy automation and
   conformance auditing, which are part of the design, not ops detail.
 
-## 9. Open questions / PoC target list
+## 10. Open questions / PoC target list
 
 1. **[VERIFY]** `X-Serverless-Authorization` + `Authorization` combined
    pattern end-to-end (Google token accepted, client JWT arrives intact).
 2. **[VERIFY]** Direct PGA call from an in-perimeter VM → 403 before
    container start; capture the audit-log signature for detection.
 3. **[VERIFY]** `VerifyJWT` shared flow via env flow hook: rejects expired
-   / wrong-`aud` / missing-scope tokens; measure added latency; JWKS fetch
-   + cache behaviour through the egress allow-list.
+   / wrong-`aud` / missing-scope tokens; benchmark the auth tax per §8
+   (p50/p95/p99, warm and cold measured separately, with/without the flow
+   hook); Google-token mint caching; JWKS fetch + cache behaviour through
+   the egress allow-list.
 4. **[VERIFY]** JWKS distribution (§7.4): cold-start fetch latency from a
    Cloud Run instance; behaviour when the JWKS endpoint is unreachable at
    instance start (fail-closed confirmation); mirror prototype with
