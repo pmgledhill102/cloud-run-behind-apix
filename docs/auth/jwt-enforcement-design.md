@@ -201,8 +201,14 @@ languages.
 - One image to own instead of N libraries — but images are **pinned per
   revision**, so a patched sidecar still requires redeploying every
   service (§7.2). Fine-grained authz still lives in app code regardless.
-- **[VERIFY]** ingress-container + JWT-filter pattern on Cloud Run,
-  including cold-start and latency impact.
+- **[VERIFIED]** ingress-container + JWT-filter pattern works on Cloud Run
+  (multi-container deploy, Envoy `jwt_authn` as the ingress container,
+  `--depends-on` + startup probe on the app container). Measured impact vs
+  the library: ≈ +3 ms p50 warm (up to ~12 ms on cooler instances) and
+  ≈ +0.65 s extra instance startup for the Envoy container. Note the
+  rejection-code taxonomy differs: `jwt_authn` returns 401 for
+  expired/missing but **403** for audience mismatch, where Apigee VerifyJWT
+  and the library return 401 across the board.
 
 ### 4.6 Considered and rejected
 
@@ -321,7 +327,7 @@ Consequences:
 | Polyglot estate (many languages) | **Sidecar** — one image vs N libraries |
 | Mostly one/two languages with strong shared framework | **Library** — no extra hop, no second container's memory/CPU, simpler local dev |
 | Fine-grained authz complexity (claims deep in business logic) | Library involved either way — sidecar never removes the in-app layer (§5), it only de-duplicates *validation* |
-| Cold-start / latency sensitivity | Library (sidecar adds a proxy hop + container start) **[VERIFY]** magnitude |
+| Cold-start / latency sensitivity | Library (sidecar adds a proxy hop + container start). **[VERIFIED]** magnitude: hop ≈ +3 ms p50 warm; Envoy container ≈ +0.65 s per instance start |
 | Trust in deploy tooling to inject uniformly | Sidecar needs it; library needs the same discipline via build tooling |
 
 Given Cloud Run IAM already guarantees requests came through Apigee (which
@@ -614,8 +620,13 @@ Service: middleware re-validates JWT (defence in depth),
    open: mirror stale-on-error prototype.
 5. **[VERIFIED]** Custom audiences (`--add-custom-audiences`) collapse
    per-service audience plumbing to one fixed string, end-to-end.
-6. **[VERIFY]** Sidecar (ingress-container Envoy `jwt_authn`) variant:
-   works on Cloud Run? cold-start and latency cost vs library?
+6. **[VERIFIED]** Sidecar (ingress-container Envoy `jwt_authn`) variant
+   works on Cloud Run (`scripts/auth/setup-envoy.sh`, 6/6 tests): valid
+   token passes with the client JWT intact; expired/missing → 401,
+   wrong-aud → 403 (Envoy's taxonomy). Cost vs library: ≈ +3 ms p50 warm
+   (up to ~12 ms cooler), ≈ +0.65 s extra instance startup — numbers that
+   back §7.3's library-default recommendation for a mostly-Go/Java estate,
+   while proving the sidecar is viable where polyglot pressure wins.
 7. **[VERIFY]** Preventive controls: which of the §7.5 postures can org
    policy enforce vs audit-only?
 8. **[VERIFY]** Edge deny-list (§7.7 tier 1): lookup mechanism in the

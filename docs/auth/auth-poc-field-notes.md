@@ -141,8 +141,62 @@ combined-header pattern VM-side before Apigee was even provisioned.
 | 2b perimeter + tenant DNS/route propagation | < 10 min |
 | `auth/setup.sh` (first run, 2 image builds) | ~4 min |
 
+## Sidecar variant (§10 item 6, issue #39) — second live session
+
+`scripts/auth/setup-envoy.sh` deploys `cr-auth-echo-envoy`: an Envoy
+`jwt_authn` ingress container in front of the same echo app (middleware off,
+`APP_PORT=8081`), plus Apigee proxy `/auth-echo-envoy` with the identical
+combined-header target. 6/6 tests pass. Corrections found on the way:
+
+### 9. Cloud Build under the perimeter — two failure modes (fixed)
+
+- **Client side:** `gcloud builds submit` touches the Google-managed
+  `<project#>.cloudbuild-logs.googleusercontent.com` bucket, which lives in
+  a Google-owned project outside the perimeter → egress violation
+  (`RESOURCES_NOT_IN_SAME_SERVICE_PERIMETER` on `storage.buckets.get`).
+  Fix: `--default-buckets-behavior=regional-user-owned-bucket` at every
+  build site, plus `roles/storage.admin` for the build SA (gcloud's
+  pre-check names that role verbatim; objectCreator is not enough).
+- **Worker side:** Cloud Build's shared workers run *outside* the
+  perimeter, so with storage restricted the worker couldn't reach the now
+  in-project logs bucket ("Failure setting up GCS logging ... prohibited
+  by organization's policy"). Fix: admit the build SA through the
+  perimeter's ingress policy (production answer: private worker pools).
+- Earlier builds only succeeded because they pre-dated the perimeter — any
+  greenfield that applies 2b before its first build hits both immediately.
+
+### 10. Multi-container deploy shape (fixed)
+
+- Service-level flags must precede the first `--container` group (a
+  trailing `--quiet` is rejected as an unrecognized *container* flag).
+- A `--depends-on` dependency must declare a startup probe — the deploy is
+  rejected otherwise. TCP probe on the app port works.
+- Cloud Run injects `PORT` only into the ingress container; the app behind
+  Envoy needs its own port plumbing (`APP_PORT` in this PoC).
+
+### 11. Envoy rejection taxonomy differs across layers
+
+`jwt_authn`: expired → 401 "Jwt is expired"; missing → 401 "Jwt is
+missing"; **audience mismatch → 403** "Audiences in Jwt are not allowed".
+Apigee VerifyJWT and the library middleware both return 401 for all three.
+Anything consuming rejection codes across layers (alerting, client retry
+logic) must not assume 401 uniformly.
+
+### Sidecar vs library numbers (crude, N=15 via Apigee)
+
+| Path | p50 | p95 |
+| --- | --- | --- |
+| `/auth-echo-envoy` (Envoy hop, middleware off) | 22 ms | 48 ms |
+| `/auth-echo` (library in-process) | 19 ms | 49 ms |
+
+Envoy hop ≈ **+3 ms p50 warm** (a cooler earlier run showed +12 ms).
+Startup: system logs show the app container probe-ready then Envoy ready
+**~0.65 s later** — the sidecar's per-instance cold-start tax. Both numbers
+back §7.3's library-default recommendation; the sidecar is proven viable
+where polyglot pressure wins.
+
 ## Still open (issue #35)
 
-§10 items 6–8: sidecar/ingress-container variant, org-policy preventive
-controls, edge deny-list — plus the §8 leftovers above (isolated VerifyJWT
-cost, p99, cold/warm split, JWKS cache TTL, mirror stale-on-error).
+§10 items 7–8: org-policy preventive controls, edge deny-list — plus the
+§8 leftovers above (isolated VerifyJWT cost, p99, rigorous cold/warm split,
+JWKS cache TTL, mirror stale-on-error).
