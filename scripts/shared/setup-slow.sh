@@ -223,6 +223,44 @@ while true; do
   ELAPSED=$((ELAPSED + INTERVAL))
 done
 
+# The org can report state=ACTIVE while the creation LRO is still finishing —
+# observed live on a greenfield project: instance create then fails with
+# FAILED_PRECONDITION "the resource is locked by another operation ...
+# organization is being created by operation". Wait until no org-level
+# operation is in flight before proceeding. (Also harmlessly waits out any
+# in-flight instance op on a resumed run.)
+echo ""
+echo "Verifying no org-level operations are still in flight..."
+TIMEOUT=1800
+INTERVAL=30
+ELAPSED=0
+while true; do
+  if (( ELAPSED > 0 && ELAPSED % 1800 == 0 )); then
+    TOKEN="$(gcloud auth print-access-token)"
+  fi
+
+  PENDING="$(curl -s \
+    -H "Authorization: Bearer ${TOKEN}" \
+    "${APIGEE_API}/organizations/${PROJECT_ID}/operations" \
+    | python3 -c "
+import sys, json
+ops = json.load(sys.stdin).get('operations', [])
+print(' '.join(o['name'] for o in ops if not o.get('done')))" 2>/dev/null || true)"
+
+  if [[ -z "${PENDING}" ]]; then
+    echo "No in-flight org operations."
+    break
+  fi
+  if (( ELAPSED >= TIMEOUT )); then
+    echo "ERROR: Timed out after ${TIMEOUT}s waiting for org operations to finish:"
+    echo "  ${PENDING}"
+    exit 1
+  fi
+  echo "  In flight: ${PENDING} (${ELAPSED}s elapsed, checking every ${INTERVAL}s)..."
+  sleep "${INTERVAL}"
+  ELAPSED=$((ELAPSED + INTERVAL))
+done
+
 # ============================================================
 # Step 6: Create Apigee runtime instance
 # ============================================================
