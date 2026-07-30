@@ -63,10 +63,10 @@ fi
 # ============================================================
 echo ""
 echo "--- Step 2: Deploy ${AUTH_ECHO_ENVOY_SERVICE} ---"
-if resource_exists gcloud run services describe "${AUTH_ECHO_ENVOY_SERVICE}" \
-    --region="${REGION}" --project="${PROJECT_ID}"; then
-  echo "Service '${AUTH_ECHO_ENVOY_SERVICE}' already exists, skipping."
-else
+# gcloud run deploy is create-or-update: always run it so topology/sizing
+# changes in this script propagate as a new revision on re-run (the earlier
+# skip-if-exists silently ignored config drift).
+if true; then
   # Envoy is the ingress container (--port); the app sits on ENVOY_APP_PORT
   # (Cloud Run injects PORT only into the ingress container).
   #
@@ -78,6 +78,10 @@ else
   # /healthz route, so the instance only accepts traffic once the full path
   # works. APP_START_DELAY (optional env, seconds) makes the app emulate a
   # heavy framework for cold-start experiments.
+  # Envoy is sized down (ENVOY_CPU/ENVOY_MEMORY, default 0.25 vCPU/128Mi):
+  # per-container defaults are 1 vCPU/512Mi, which silently DOUBLES the
+  # instance footprint vs the single-container library variant. Envoy with
+  # one static cluster + jwt_authn idles at a few tens of MB.
   # Same IAM posture as the library variant: closed + custom audience.
   gcloud run deploy "${AUTH_ECHO_ENVOY_SERVICE}" \
     --region="${REGION}" \
@@ -92,6 +96,8 @@ else
     --container=envoy \
     --image="${ENVOY_IMAGE_URL}" \
     --port=8080 \
+    --cpu="${ENVOY_CPU:-0.25}" \
+    --memory="${ENVOY_MEMORY:-128Mi}" \
     --set-env-vars="^@^JWT_ISSUER=${JWT_ISSUER}@JWT_AUDIENCE=${JWT_AUDIENCE}@JWKS_JSON=${JWKS_JSON}@APP_PORT=${ENVOY_APP_PORT}" \
     --startup-probe=httpGet.path=/healthz,httpGet.port=8080,periodSeconds=1,failureThreshold=60 \
     --container=app \

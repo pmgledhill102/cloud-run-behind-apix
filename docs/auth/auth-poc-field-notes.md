@@ -189,11 +189,44 @@ logic) must not assume 401 uniformly.
 | `/auth-echo-envoy` (Envoy hop, middleware off) | 22 ms | 48 ms |
 | `/auth-echo` (library in-process) | 19 ms | 49 ms |
 
-Envoy hop ≈ **+3 ms p50 warm** (a cooler earlier run showed +12 ms).
-Startup: system logs show the app container probe-ready then Envoy ready
-**~0.65 s later** — the sidecar's per-instance cold-start tax. Both numbers
-back §7.3's library-default recommendation; the sidecar is proven viable
-where polyglot pressure wins.
+Envoy hop ≈ **+3 ms p50 warm** at 1 vCPU (a cooler run showed +12 ms; at
+0.25 vCPU ≈ +7 ms — mild throttling cost on the RS256 verify).
+
+### 12. Cold start: the +0.65s is the topology's, not the sidecar's
+
+The first deployment used `--depends-on=app`, which *serializes* startup
+(Cloud Run then also requires a startup probe on the dependency): app
+probe-ready → +0.645 s → Envoy ready. Rebuilt with **parallel starts** —
+no `depends-on`; instead Envoy's startup probe traverses the proxy to the
+app via a JWT-exempt `/healthz`, so readiness still gates on the full path.
+With the app emulating a heavy framework (`APP_START_DELAY=3`):
+
+| T+ | Event (from system + stdout logs, one instance) |
+| --- | --- |
+| 0.00 s | instance starts, both containers launch |
+| 0.40 s | app container up, starts its 3 s "framework boot" |
+| 3.40 s | app listening |
+| 4.37 s | Envoy through-proxy probe green → instance ready |
+
+Envoy's ~0.6 s init ran entirely inside the app's boot window: the
+sidecar's marginal cold-start cost drops from a guaranteed +0.65 s
+(sequential) to probe-cadence quantization (≤1 s at `periodSeconds=1`).
+For any app slower than Envoy itself, the cold-start tax is ≈ **zero**.
+
+### 13. Resource footprint: untuned sidecar doubles the instance
+
+Per-container defaults are 1 vCPU / 512 Mi — so the two-container service
+silently allocated 2 vCPU / 1 GiB vs the library variant's 1 / 512 Mi.
+Sized down (`ENVOY_CPU=0.25`, `ENVOY_MEMORY=128Mi`, accepted by the API
+with concurrency still 80 — the sub-vCPU ⇒ concurrency-1 rule did not bind
+for this shape), the instance runs 1.25 vCPU / 384 Mi total: *lighter in
+memory than the untuned library default*. The §5 "second container's
+memory/CPU" cost is real but fully tunable; the trap is the default.
+
+Net: both per-request and cold-start numbers back §7.3's library-default
+recommendation only weakly once tuned — the honest summary is "library
+wins on simplicity; a tuned parallel-start sidecar costs ~7 ms p50 and
+~zero cold start."
 
 ## Still open (issue #35)
 
