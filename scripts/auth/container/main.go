@@ -23,6 +23,9 @@
 //	JWT_MODE     — "off" disables the middleware validation (the sidecar
 //	               variant: Envoy jwt_authn enforces instead, the app
 //	               trusts it); anything else = enforce (default)
+//	APP_START_DELAY — seconds to sleep before listening (default 0);
+//	               emulates a heavy app's startup so the sidecar cold-start
+//	               experiments can measure parallel vs sequential topology
 package main
 
 import (
@@ -221,6 +224,12 @@ func main() {
 	wantIss := os.Getenv("EXPECTED_ISS")
 	wantAud := os.Getenv("EXPECTED_AUD")
 	jwtOff := os.Getenv("JWT_MODE") == "off"
+	if d := os.Getenv("APP_START_DELAY"); d != "" {
+		if secs, err := time.ParseDuration(d + "s"); err == nil && secs > 0 {
+			fmt.Printf("APP_START_DELAY: sleeping %s before listen\n", secs)
+			time.Sleep(secs)
+		}
+	}
 	ks := loadKeys()
 	hostname, _ := os.Hostname()
 

@@ -37,6 +37,12 @@ static_resources:
                   local_jwks:
                     inline_string: '${JWKS_JSON}'
               rules:
+              # /healthz is JWT-exempt (rules are first-match): it exists so
+              # the ingress container's startup probe can traverse the proxy
+              # to the app, gating instance readiness on BOTH containers while
+              # they start in parallel. PoC shortcut — the echo app answers
+              # any path; production would pin this to a dedicated handler.
+              - match: {path: "/healthz"}
               - match: {prefix: "/"}
                 requires: {provider_name: poc-idp}
           - name: envoy.filters.http.router

@@ -68,11 +68,17 @@ if resource_exists gcloud run services describe "${AUTH_ECHO_ENVOY_SERVICE}" \
   echo "Service '${AUTH_ECHO_ENVOY_SERVICE}' already exists, skipping."
 else
   # Envoy is the ingress container (--port); the app sits on ENVOY_APP_PORT
-  # (Cloud Run injects PORT only into the ingress container). --depends-on
-  # starts the app before Envoy so the first request doesn't race the
-  # upstream — and Cloud Run requires the depended-on container to declare a
-  # startup probe (deploy is rejected without one, found live). Same IAM
-  # posture as the library variant: closed + custom audience.
+  # (Cloud Run injects PORT only into the ingress container).
+  #
+  # PARALLEL topology: no --depends-on, so both containers start at T0 and
+  # the sidecar's startup cost is max(app, envoy) rather than app + envoy —
+  # an earlier sequential (--depends-on) run measured Envoy as a flat
+  # +0.65s AFTER the app was ready. Readiness is still gated on both:
+  # Envoy's startup probe traverses the proxy to the app via the JWT-exempt
+  # /healthz route, so the instance only accepts traffic once the full path
+  # works. APP_START_DELAY (optional env, seconds) makes the app emulate a
+  # heavy framework for cold-start experiments.
+  # Same IAM posture as the library variant: closed + custom audience.
   gcloud run deploy "${AUTH_ECHO_ENVOY_SERVICE}" \
     --region="${REGION}" \
     --ingress=internal \
@@ -87,11 +93,10 @@ else
     --image="${ENVOY_IMAGE_URL}" \
     --port=8080 \
     --set-env-vars="^@^JWT_ISSUER=${JWT_ISSUER}@JWT_AUDIENCE=${JWT_AUDIENCE}@JWKS_JSON=${JWKS_JSON}@APP_PORT=${ENVOY_APP_PORT}" \
-    --depends-on=app \
+    --startup-probe=httpGet.path=/healthz,httpGet.port=8080,periodSeconds=1,failureThreshold=60 \
     --container=app \
     --image="${AUTH_ECHO_IMAGE_URL}" \
-    --set-env-vars="^@^APP_PORT=${ENVOY_APP_PORT}@JWT_MODE=off@EXPECTED_ISS=${JWT_ISSUER}@EXPECTED_AUD=${JWT_AUDIENCE}@JWKS_JSON=${JWKS_JSON}" \
-    --startup-probe=tcpSocket.port="${ENVOY_APP_PORT}",periodSeconds=1,failureThreshold=20
+    --set-env-vars="^@^APP_PORT=${ENVOY_APP_PORT}@JWT_MODE=off@EXPECTED_ISS=${JWT_ISSUER}@EXPECTED_AUD=${JWT_AUDIENCE}@JWKS_JSON=${JWKS_JSON}@APP_START_DELAY=${APP_START_DELAY:-0}"
   echo "Service '${AUTH_ECHO_ENVOY_SERVICE}' deployed."
 fi
 AUTH_ECHO_ENVOY_URL="$(gcloud run services describe "${AUTH_ECHO_ENVOY_SERVICE}" \
