@@ -1,10 +1,13 @@
 # AuthN/AuthZ Enforcement: External-Issuer JWTs with Apigee + Cloud Run
 
-**Status: paper design, PoC in progress.** This document works out *where*
-token checks (signature, expiry, issuer, audience, scopes, fine-grained
-authorization) should be enforced when the API platform is
+**Status: PoC executed 2026-07-30 — §10 items 1–5 verified live** (greenfield
+project, option 2b perimeter enforced; 8/8 assertions pass). This document
+works out *where* token checks (signature, expiry, issuer, audience, scopes,
+fine-grained authorization) should be enforced when the API platform is
 Apigee → PGA → Cloud Run rather than GKE + Istio. Claims marked
-**[VERIFY]** are unproven — they are the PoC's target list.
+**[VERIFY]** are unproven; claims marked **[VERIFIED]** were proven in the
+live run — see [auth-poc-field-notes.md](auth-poc-field-notes.md) for the
+full run log, failures and corrections.
 [`scripts/auth/`](../../scripts/auth/README.md) builds the §9 baseline and
 exercises §10 items 1–5 (see its README for the mapping).
 
@@ -81,8 +84,12 @@ JWT is checked).
 `Authorization` by default — clobbering the client JWT. Cloud Run accepts the
 Google token in `X-Serverless-Authorization` for exactly this case, and
 Apigee's `<HeaderName>` element points the minted token there, leaving the
-client JWT untouched in `Authorization`. **[VERIFY]** — highest-priority PoC
-item; the whole combined design rests on it.
+client JWT untouched in `Authorization`. **[VERIFIED]** — the bundle deploys
+with `<HeaderName>` inside the target's `<Authentication>` block, Cloud Run
+IAM accepts the Google token from `X-Serverless-Authorization`, the client
+JWT arrives intact in `Authorization`, and (a bonus beyond the design's
+minimum) Cloud Run forwards `X-Serverless-Authorization` through to the
+container rather than stripping it.
 
 ## 3. Threat model
 
@@ -149,8 +156,9 @@ container starts or bills) validates the Google ID token in
   per service, Apigee service agent needs `tokenCreator` on the SA. At 1000
   services this is automation territory, not console territory. **Custom
   audiences** (`--add-custom-audiences`) let every TargetEndpoint use one
-  fixed audience string instead of per-service URLs — worth **[VERIFY]**
-  as a scale simplification.
+  fixed audience string instead of per-service URLs — **[VERIFIED]** as a
+  scale simplification: the flag deploys cleanly and an Apigee-minted token
+  with the fixed-string audience is accepted end-to-end.
 
 ### 4.3 Network layer — ingress + VPC-SC (outer ring only)
 
@@ -260,8 +268,10 @@ Residual risk after (1): a caller who can impersonate the Apigee proxy SA
 concentrates the review surface onto **IAM grants on one SA** (or a few,
 per environment) — auditable, alertable, and far smaller than "anything in
 the perimeter". Optionally segment proxy SAs per domain so a compromise
-doesn't unlock all 1000 services. **[VERIFY]** the 403-before-container
-behaviour and its audit-log signature from an in-perimeter VM.
+doesn't unlock all 1000 services. **[VERIFIED]** the 403-before-container
+behaviour from an in-perimeter VM: no token → 403, valid *client* JWT →
+401, both served by the Cloud Run front end with no container instance
+started; signature in §7.6.
 
 ## 7. Operating this at ~1000 services
 
@@ -364,7 +374,12 @@ Mitigations, in rough order of preference:
   which breaks the availability coupling (2). Cost: a new critical
   dependency with an owner, SLO, and monitoring — but a ~static-file
   service with aggressive caching is about the easiest SLO on the
-  platform. **[VERIFY]** as part of the PoC.
+  platform. **Partially [VERIFIED]**: an `ingress=internal` mirror is
+  reachable in-perimeter over PGA (VM) and by the Apigee runtime (via the
+  tenant's peered DNS → restricted VIP), but a *no-VPC-egress Cloud Run
+  consumer* cannot reach it — its fetch egresses to the public frontend
+  and 404s in ~75–100 ms (fail-fast). Mirror consumers therefore need VPC
+  egress, or the push/env-fallback pattern below.
 - **Push distribution** — publish the JWKS into Secret Manager and have
   services resolve it as a secret reference at instance start: the
   per-instance fetch goes to Google infrastructure instead of the issuer,
@@ -420,7 +435,7 @@ verification that reality matches:
 | Failure | Where it appears |
 |---|---|
 | Bad/expired/out-of-scope JWT | Apigee: 401/403 in analytics + policy fault variables; alert on rate spikes (credential-stuffing signal) |
-| Direct-call attempt (T3) | Cloud Run request log: 403, `severity=WARNING`, no container instance started; IAM denial in audit logs **[VERIFY]** exact signature |
+| Direct-call attempt (T3) | Cloud Run request log: 403, no container instance started. **[VERIFIED]** exact signature: `run.googleapis.com%2Frequests` log, `httpRequest.status=403`, textPayload "The request was not authenticated ... Empty Authorization header value" (401 variant when a non-Google bearer token is presented). No Admin Activity audit entry — detection is a log-based metric on the request log |
 | Service-side validation failure while Apigee passed it | Service logs — should be **near-zero**; non-zero means skew between edge and service validation configs (alert) |
 | JWKS refresh failures | Apigee policy faults / middleware logs — leading indicator of a looming fail-closed event |
 
@@ -487,10 +502,10 @@ in **shared-flow regressions multiplying across the fleet**.
 
 | Stage | Work done | Expected warm cost |
 |---|---|---|
-| Apigee shared flow: `VerifyJWT` | RS256 signature verify + claim checks, JWKS from MP cache | ~1–5 ms policy execution **[VERIFY]** |
+| Apigee shared flow: `VerifyJWT` | RS256 signature verify + claim checks, JWKS from MP cache | ~1–5 ms policy execution **[VERIFY]** (not isolated by the PoC: the flow hook applies VerifyJWT to the baseline path too, so the measured delta excludes it; end-to-end p50 with VerifyJWT was 24–25 ms VM→Apigee→Cloud Run) |
 | Scope → operation check | flow-variable comparison (or cached KVM read) | negligible |
 | Deny-list lookup (§7.7 tier 1, if adopted) | local KVM/cache read | ~ms — the `ExternalCallout` variant adds a network RTT per request, which is why lookup mechanism is a **[VERIFY]** item |
-| Google ID token mint | Apigee caches minted tokens until near expiry — amortised ≈ 0; first request per target/SA pays an IAM round trip **[VERIFY]** cache behaviour | ≈ 0 amortised |
+| Google ID token mint | Apigee caches minted tokens until near expiry — amortised ≈ 0; first request per target/SA pays an IAM round trip. **[VERIFIED]** consistent with ≈ 0 amortised: mint+IAM+middleware added ~1 ms at p50 over the VerifyJWT-only path (N=15, warm) | ≈ 0 amortised |
 | Cloud Run IAM check | Google-side at the front end, before the container | negligible (platform claim — not separately measurable) |
 | Service middleware revalidation | in-process signature verify, JWKS already in memory | tens–hundreds of µs |
 
@@ -576,21 +591,29 @@ Service: middleware re-validates JWT (defence in depth),
 
 ## 10. Open questions / PoC target list
 
-1. **[VERIFY]** `X-Serverless-Authorization` + `Authorization` combined
-   pattern end-to-end (Google token accepted, client JWT arrives intact).
-2. **[VERIFY]** Direct PGA call from an in-perimeter VM → 403 before
-   container start; capture the audit-log signature for detection.
-3. **[VERIFY]** `VerifyJWT` shared flow via env flow hook: rejects expired
-   / wrong-`aud` / missing-scope tokens; benchmark the auth tax per §8
-   (p50/p95/p99, warm and cold measured separately, with/without the flow
-   hook); Google-token mint caching; JWKS fetch + cache behaviour through
-   the egress allow-list.
-4. **[VERIFY]** JWKS distribution (§7.4): cold-start fetch latency from a
-   Cloud Run instance; behaviour when the JWKS endpoint is unreachable at
-   instance start (fail-closed confirmation); mirror prototype with
-   stale-on-error semantics.
-5. **[VERIFY]** Custom audiences (`--add-custom-audiences`) to collapse
-   per-service audience plumbing to one string.
+1. **[VERIFIED]** `X-Serverless-Authorization` + `Authorization` combined
+   pattern end-to-end: Google token accepted from the custom header, client
+   JWT arrived intact, and the custom header was forwarded to the container.
+2. **[VERIFIED]** Direct PGA call from an in-perimeter VM → 403 (no token)
+   / 401 (client JWT) before container start; signature captured in §7.6
+   (platform request log, not audit log).
+3. **[VERIFIED]** (core) `VerifyJWT` shared flow via env flow hook: default
+   `Source` reads the `Authorization` Bearer token; rejects expired
+   (`steps.jwt.TokenExpired`), wrong-`aud` (`steps.jwt.InvalidClaim`) and
+   missing (`steps.jwt.FailedToResolveVariable`) tokens with 401 at the
+   edge. Crude latency (N=15): full path p50 25 ms vs VerifyJWT-only
+   p50 24 ms — mint+IAM+middleware ≈ 1 ms at p50. Still open from this
+   item: isolated VerifyJWT cost, p99, cold/warm split, JWKS cache TTL.
+   Live corrections found: flow hook ID is `PreProxyFlowHook` (exact
+   casing), and shared flows need an INTERMEDIATE (not BASE) environment.
+4. **[VERIFIED]** (partial, per §7.4) JWKS distribution: Apigee fetches the
+   mirror's JWKS through the tenant peered DNS → restricted VIP; a
+   no-VPC-egress Cloud Run consumer gets a fast 404 from the public
+   frontend (~75–100 ms) and must use env/push fallback — which the PoC
+   exercises (`jwks_source:"env"`, fail-closed if neither loads). Still
+   open: mirror stale-on-error prototype.
+5. **[VERIFIED]** Custom audiences (`--add-custom-audiences`) collapse
+   per-service audience plumbing to one fixed string, end-to-end.
 6. **[VERIFY]** Sidecar (ingress-container Envoy `jwt_authn`) variant:
    works on Cloud Run? cold-start and latency cost vs library?
 7. **[VERIFY]** Preventive controls: which of the §7.5 postures can org
