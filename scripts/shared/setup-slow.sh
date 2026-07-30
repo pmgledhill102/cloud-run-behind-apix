@@ -402,8 +402,31 @@ ENV_HTTP="$(curl -s -o /dev/null -w '%{http_code}' \
   -H "Authorization: Bearer ${TOKEN}" \
   "${APIGEE_API}/organizations/${PROJECT_ID}/environments/${APIGEE_ENV}")"
 
+# Env type INTERMEDIATE: shared flows + flow hooks ("extensible proxies") are
+# rejected on a BASE environment (found live: INVALID_DESTINATION_ENVIRONMENT
+# deploying the auth PoC shared flow — PAYG defaults to BASE when type is
+# omitted). INTERMEDIATE bills higher than BASE, but the auth PoC needs it.
 if [[ "${ENV_HTTP}" == "200" ]]; then
-  echo "Environment '${APIGEE_ENV}' already exists, skipping."
+  ENV_TYPE="$(curl -s \
+    -H "Authorization: Bearer ${TOKEN}" \
+    "${APIGEE_API}/organizations/${PROJECT_ID}/environments/${APIGEE_ENV}" \
+    | python3 -c "import sys,json; print(json.load(sys.stdin).get('type',''))" 2>/dev/null || true)"
+  if [[ "${ENV_TYPE}" == "BASE" ]]; then
+    echo "Environment '${APIGEE_ENV}' exists but is BASE — upgrading to INTERMEDIATE..."
+    PATCH_RESPONSE="$(curl -s -X PATCH \
+      -H "Authorization: Bearer ${TOKEN}" \
+      -H "Content-Type: application/json" \
+      "${APIGEE_API}/organizations/${PROJECT_ID}/environments/${APIGEE_ENV}?updateMask=type" \
+      -d '{"type": "INTERMEDIATE"}')"
+    if echo "${PATCH_RESPONSE}" | grep -q '"error"'; then
+      echo "ERROR upgrading environment type:"
+      echo "${PATCH_RESPONSE}" | python3 -m json.tool 2>/dev/null || echo "${PATCH_RESPONSE}"
+      exit 1
+    fi
+    echo "Environment '${APIGEE_ENV}' upgraded to INTERMEDIATE."
+  else
+    echo "Environment '${APIGEE_ENV}' already exists (type: ${ENV_TYPE:-unknown}), skipping."
+  fi
 else
   ENV_RESPONSE="$(curl -s -X POST \
     -H "Authorization: Bearer ${TOKEN}" \
@@ -412,7 +435,8 @@ else
     -d "{
       \"name\": \"${APIGEE_ENV}\",
       \"displayName\": \"Test environment\",
-      \"description\": \"PoC test environment\"
+      \"description\": \"PoC test environment\",
+      \"type\": \"INTERMEDIATE\"
     }")"
 
   if echo "${ENV_RESPONSE}" | grep -q '"error"'; then
