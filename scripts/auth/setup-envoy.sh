@@ -35,9 +35,12 @@ echo "--- Step 1: Build images ---"
 # JWT_MODE support added for it. Existing cr-auth-echo keeps running its
 # deploy-time-pinned digest, so rebuilding :latest is safe.
 echo "Rebuilding auth-echo (APP_PORT/JWT_MODE support)..."
+# regional-user-owned-bucket: keep the logs bucket in-project — the
+# Google-managed one is outside the VPC-SC perimeter (see setup-base.sh).
 gcloud builds submit \
   --region="${BUILD_REGION}" \
   --gcs-source-staging-dir="gs://${CLOUDBUILD_BUCKET}/source" \
+  --default-buckets-behavior=regional-user-owned-bucket \
   --tag "${AUTH_ECHO_IMAGE_URL}" \
   "${SCRIPT_DIR}/container" \
   --project="${PROJECT_ID}"
@@ -49,6 +52,7 @@ else
   gcloud builds submit \
     --region="${BUILD_REGION}" \
     --gcs-source-staging-dir="gs://${CLOUDBUILD_BUCKET}/source" \
+    --default-buckets-behavior=regional-user-owned-bucket \
     --tag "${ENVOY_IMAGE_URL}" \
     "${SCRIPT_DIR}/envoy" \
     --project="${PROJECT_ID}"

@@ -56,9 +56,12 @@ build_image() {
     echo "Image '${img}' already exists, skipping build."
   else
     echo "Building ${name} via Cloud Build (region: ${BUILD_REGION})..."
+    # regional-user-owned-bucket: keep the logs bucket in-project — the
+    # Google-managed one is outside the VPC-SC perimeter (see setup-base.sh).
     gcloud builds submit \
       --region="${BUILD_REGION}" \
       --gcs-source-staging-dir="gs://${CLOUDBUILD_BUCKET}/source" \
+      --default-buckets-behavior=regional-user-owned-bucket \
       --tag "${img}" \
       "${src}" \
       --project="${PROJECT_ID}"

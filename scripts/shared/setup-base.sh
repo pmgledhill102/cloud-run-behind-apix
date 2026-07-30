@@ -57,9 +57,14 @@ else
       --project="${PROJECT_ID}"
     echo "Cloud Build staging bucket 'gs://${CLOUDBUILD_BUCKET}' created."
   fi
+  # regional-user-owned-bucket keeps the build's LOGS bucket in this project:
+  # the default Google-managed cloudbuild-logs bucket lives outside any
+  # VPC-SC perimeter and trips an egress violation
+  # (RESOURCES_NOT_IN_SAME_SERVICE_PERIMETER, found live with option2b up).
   gcloud builds submit \
     --region="${BUILD_REGION}" \
     --gcs-source-staging-dir="gs://${CLOUDBUILD_BUCKET}/source" \
+    --default-buckets-behavior=regional-user-owned-bucket \
     --tag "${IMAGE_URL}" \
     "${SHARED_DIR}/container" \
     --project="${PROJECT_ID}"
