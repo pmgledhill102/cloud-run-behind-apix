@@ -191,10 +191,12 @@ fi
 # the image. Grant the minimum needed.
 echo ""
 echo "--- Granting default compute SA Cloud Build roles ---"
-# objectCreator: with --default-buckets-behavior=regional-user-owned-bucket
-# (VPC-SC), build logs write to an in-project bucket the build SA must be
-# able to create objects in.
-for CB_ROLE in roles/storage.objectViewer roles/storage.objectCreator roles/logging.logWriter roles/artifactregistry.writer; do
+# storage.admin: with --default-buckets-behavior=regional-user-owned-bucket
+# (required under VPC-SC), gcloud pre-checks that the build SA can access
+# the in-project regional logs bucket and demands roles/storage.admin
+# verbatim (FAILED_PRECONDITION found live; objectCreator was not enough —
+# the SA must also get/create the bucket).
+for CB_ROLE in roles/storage.admin roles/logging.logWriter roles/artifactregistry.writer; do
   retry_iam "grant ${CB_ROLE} to default compute SA" \
     gcloud projects add-iam-policy-binding "${PROJECT_ID}" \
     --member="serviceAccount:${COMPUTE_SA}" \
