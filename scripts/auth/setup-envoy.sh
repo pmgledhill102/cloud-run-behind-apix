@@ -81,6 +81,7 @@ else
     --no-allow-unauthenticated \
     --add-custom-audiences="${GOOGLE_CUSTOM_AUDIENCE}" \
     --project="${PROJECT_ID}" \
+    --quiet \
     --container=envoy \
     --image="${ENVOY_IMAGE_URL}" \
     --port=8080 \
@@ -88,8 +89,7 @@ else
     --depends-on=app \
     --container=app \
     --image="${AUTH_ECHO_IMAGE_URL}" \
-    --set-env-vars="^@^APP_PORT=${ENVOY_APP_PORT}@JWT_MODE=off@EXPECTED_ISS=${JWT_ISSUER}@EXPECTED_AUD=${JWT_AUDIENCE}@JWKS_JSON=${JWKS_JSON}" \
-    --quiet
+    --set-env-vars="^@^APP_PORT=${ENVOY_APP_PORT}@JWT_MODE=off@EXPECTED_ISS=${JWT_ISSUER}@EXPECTED_AUD=${JWT_AUDIENCE}@JWKS_JSON=${JWKS_JSON}"
   echo "Service '${AUTH_ECHO_ENVOY_SERVICE}' deployed."
 fi
 AUTH_ECHO_ENVOY_URL="$(gcloud run services describe "${AUTH_ECHO_ENVOY_SERVICE}" \
