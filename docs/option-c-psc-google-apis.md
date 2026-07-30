@@ -29,7 +29,7 @@ Private Service Connect (PSC) endpoints for Google APIs assign a concrete intern
 
 ## 2. Architecture Diagram
 
-![Option C Architecture](diagrams/option-c-architecture.drawio.svg)
+![Option C Architecture](diagrams/option-c-architecture.svg)
 
 ---
 

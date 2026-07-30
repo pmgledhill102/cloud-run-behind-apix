@@ -20,7 +20,7 @@ This option places a regional **Internal Application Load Balancer** (ILB) with 
 
 ## 2. Architecture Diagram
 
-![Option A Architecture](diagrams/option-a-architecture.drawio.svg)
+![Option A Architecture](diagrams/option-a-architecture.svg)
 
 ---
 

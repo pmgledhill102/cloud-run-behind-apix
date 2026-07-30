@@ -8,11 +8,12 @@ Apigee → PGA → Cloud Run rather than GKE + Istio. Claims marked
 [`scripts/auth/`](../../scripts/auth/README.md) builds the §9 baseline and
 exercises §10 items 1–5 (see its README for the mapping).
 
-**Diagrams:**
-[enforcement layers](../diagrams/auth-enforcement-layers.svg)
-([drawio](../diagrams/auth-enforcement-layers.drawio)) ·
-[PoC architecture](../diagrams/auth-poc-architecture.svg)
-([drawio](../diagrams/auth-poc-architecture.drawio))
+![Auth enforcement layers](../diagrams/auth-enforcement-layers.svg)
+
+![Auth PoC architecture](../diagrams/auth-poc-architecture.svg)
+
+(Sources: [auth-enforcement-layers.drawio](../diagrams/auth-enforcement-layers.drawio),
+[auth-poc-architecture.drawio](../diagrams/auth-poc-architecture.drawio))
 
 **Scope and assumptions:**
 
