@@ -97,8 +97,37 @@ else
     --filter="title=${POLICY_TITLE}" 2>/dev/null | head -1 || true)"
   POLICY_ID="${POLICY_ID##*/}"
 
+  # A policy found by title may be stale: scoped access policies survive
+  # deletion of the sandbox project they were scoped to (org-level resource).
+  # Observed live: setup "succeeded" against a stale policy whose perimeter
+  # enclosed the old project number — nothing was enforced on this project.
   if [[ -n "${POLICY_ID}" ]]; then
-    echo "Access policy '${POLICY_TITLE}' already exists (${POLICY_ID}), skipping."
+    POLICY_SCOPES="$(gcloud access-context-manager policies describe "${POLICY_ID}" \
+      --billing-project="${PROJECT_ID}" --format='value(scopes)' 2>/dev/null || true)"
+    if echo "${POLICY_SCOPES}" | grep -q "projects/${PROJECT_NUMBER}"; then
+      echo "Access policy '${POLICY_TITLE}' already exists (${POLICY_ID}), scope OK."
+    else
+      echo "Access policy '${POLICY_TITLE}' (${POLICY_ID}) is scoped to"
+      echo "'${POLICY_SCOPES:-<none>}', not projects/${PROJECT_NUMBER} — stale from an"
+      echo "earlier sandbox. Deleting stale perimeter + policy and recreating..."
+      if resource_exists gcloud access-context-manager perimeters describe \
+          "${PERIMETER_NAME}" --policy="${POLICY_ID}" --billing-project="${PROJECT_ID}"; then
+        gcloud access-context-manager perimeters delete "${PERIMETER_NAME}" \
+          --policy="${POLICY_ID}" \
+          --billing-project="${PROJECT_ID}" \
+          --quiet
+        echo "Stale perimeter deleted."
+      fi
+      gcloud access-context-manager policies delete "${POLICY_ID}" \
+        --billing-project="${PROJECT_ID}" \
+        --quiet
+      echo "Stale policy deleted."
+      POLICY_ID=""
+    fi
+  fi
+
+  if [[ -n "${POLICY_ID}" ]]; then
+    : # policy exists and is correctly scoped
   else
     echo "Creating scoped access policy '${POLICY_TITLE}'..."
     # Scoped (not org-default) so it cannot collide with, or affect, any
@@ -199,9 +228,14 @@ else
   echo "Route 'restricted-vip' (199.36.153.4/30 → default-internet-gateway) created."
 fi
 
+# `peerings list` returns network rows with a nested peerings[] list —
+# value(name) yields the VPC's own name and a network~ filter never matches
+# (observed live: export-custom-routes silently skipped). Flatten to address
+# the peering itself.
 PEERING_NAME="$(gcloud compute networks peerings list \
   --network="${APIGEE_NETWORK}" --project="${PROJECT_ID}" \
-  --format='value(name)' --filter='network~servicenetworking' 2>/dev/null || true)"
+  --flatten="peerings[]" --format='value(peerings.name)' \
+  --filter='peerings.network~servicenetworking' 2>/dev/null || true)"
 if [[ -n "${PEERING_NAME}" ]]; then
   gcloud compute networks peerings update "${PEERING_NAME}" \
     --network="${APIGEE_NETWORK}" \
@@ -267,7 +301,19 @@ YAMLEOF
 
 if resource_exists gcloud access-context-manager perimeters describe \
     "${PERIMETER_NAME}" --policy="${POLICY_ID}" --billing-project="${PROJECT_ID}"; then
-  echo "Perimeter '${PERIMETER_NAME}' already exists — ensuring egress allow-list..."
+  echo "Perimeter '${PERIMETER_NAME}' already exists — ensuring project + egress allow-list..."
+  # Belt and braces: an existing perimeter may predate this project (stale
+  # reuse) — make sure this project is actually inside it.
+  PERIM_RESOURCES="$(gcloud access-context-manager perimeters describe \
+    "${PERIMETER_NAME}" --policy="${POLICY_ID}" --billing-project="${PROJECT_ID}" \
+    --format='value(status.resources)' 2>/dev/null || true)"
+  if ! echo "${PERIM_RESOURCES}" | grep -q "projects/${PROJECT_NUMBER}"; then
+    gcloud access-context-manager perimeters update "${PERIMETER_NAME}" \
+      --policy="${POLICY_ID}" \
+      --add-resources="projects/${PROJECT_NUMBER}" \
+      --billing-project="${PROJECT_ID}"
+    echo "Added projects/${PROJECT_NUMBER} to perimeter resources."
+  fi
   gcloud access-context-manager perimeters update "${PERIMETER_NAME}" \
     --policy="${POLICY_ID}" \
     --set-egress-policies="${EGRESS_FILE}" \

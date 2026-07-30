@@ -63,6 +63,8 @@ Not covered (follow-ups): item 6 (sidecar/ingress-container variant), item 7
 - **JWKS fetch by auth-echo**: `cr-idp-mock` is `ingress=internal`; whether
   a non-VPC-egress Cloud Run service can reach it is itself a finding — the
   container logs which source (`url` fetch vs `env` fallback) won, and
-  `jwks_source` appears in every echo response.
+  `jwks_source` appears in every echo response. **Answered live**: it can't —
+  the fetch 404s at the public frontend in ~75–100 ms and the env fallback
+  wins (see `docs/auth/auth-poc-field-notes.md`).
 - Diagrams: `docs/diagrams/auth-enforcement-layers.drawio` (concept) and
   `docs/diagrams/auth-poc-architecture.drawio` (this build).

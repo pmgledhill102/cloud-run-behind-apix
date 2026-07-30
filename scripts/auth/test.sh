@@ -144,7 +144,11 @@ verdict "${OK}" "a valid client JWT means nothing to Cloud Run IAM — still blo
 # tests), so this succeeds HERE — in the target design the invoker grant is
 # per-service to the proxy SA only, and this call would 403. The control is
 # invoker hygiene, not the platform (design doc §6 residual risk).
-T4_GOOGLE="$(ssh_curl_auth "${AUTH_ECHO_URL}" "-s --max-time 10 -o /dev/null -w '%{http_code}' -H 'Authorization: Bearer ${JWT_VALID}' ${AUTH_ECHO_URL}/" 2>/dev/null || true)"
+# The Google token rides X-Serverless-Authorization (not via ssh_curl_auth,
+# which would put it in Authorization and collide with the client JWT there):
+# IAM validates it from that header while the middleware still sees the
+# client JWT — the combined-header pattern, minted VM-side.
+T4_GOOGLE="$(ssh_cmd "ID_TOKEN=\$(curl -sf -H 'Metadata-Flavor: Google' 'http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/identity?audience=${AUTH_ECHO_URL}') && curl -s --max-time 10 -o /dev/null -w '%{http_code}' -H \"X-Serverless-Authorization: Bearer \$ID_TOKEN\" -H 'Authorization: Bearer ${JWT_VALID}' ${AUTH_ECHO_URL}/" 2>/dev/null || true)"
 echo "  INFO: Google ID token from VM SA: HTTP ${T4_GOOGLE:-n/a}"
 echo "        (succeeds here because the PoC project grants run.invoker broadly;"
 echo "         per-service invoker grants close this in the real design)"

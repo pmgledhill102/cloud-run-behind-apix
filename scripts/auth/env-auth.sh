@@ -19,7 +19,10 @@ IDP_MOCK_IMAGE_URL="${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO_NAME}/idp-mock
 # --- Apigee ---
 AUTH_PROXY_NAME="cr-auth-jwt"          # proxy with BasePath /auth-echo
 AUTH_SHAREDFLOW="auth-verify"          # VerifyJWT shared flow, attached via flow hook
-AUTH_FLOWHOOK="PreProxyFlowhook"       # env-level hook — applies to ALL proxies in the env
+# Hook ID casing matters: the API accepts only PreProxyFlowHook /
+# PreTargetFlowHook / PostTargetFlowHook / PostProxyFlowHook (capital H —
+# "PreProxyFlowhook" is rejected with INVALID_ARGUMENT, found live).
+AUTH_FLOWHOOK="PreProxyFlowHook"       # env-level hook — applies to ALL proxies in the env
 
 # --- Token model (docs/auth/jwt-enforcement-design.md §2) ---
 # Client JWT (the in-house issuer's token):

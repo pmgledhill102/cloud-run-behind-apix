@@ -120,6 +120,18 @@ gcloud run services update SERVICE_NAME \
   --region=REGION
 ```
 
+**Caveat (found live, greenfield run 2026-07-30):** `internal` qualifies for
+traffic that *arrives via the restricted VIP* — the VM-over-PGA path. The
+**Apigee tenant project** is a different story: out of the box it resolves
+`run.app` via public DNS and egresses via its own default internet route, so
+Apigee southbound hits the *public* Cloud Run frontend and gets a **404** for
+`ingress=internal` services. Apigee → internal-ingress Cloud Run needs the
+tenant DNS/route plumbing from
+[`scripts/option2b/`](../scripts/option2b/setup.sh) (peered DNS domain for
+`run.app.`, restricted-VIP route with custom-route export, VPC-SC enabled on
+the servicenetworking peering) — even if you don't want the perimeter itself.
+See [auth/auth-poc-field-notes.md](auth/auth-poc-field-notes.md).
+
 ### IAM Invoker Permission
 
 Grant the Apigee service identity permission to invoke the Cloud Run service:

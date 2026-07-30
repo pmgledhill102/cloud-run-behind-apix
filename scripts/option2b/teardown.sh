@@ -136,9 +136,12 @@ else
   echo "Route 'restricted-vip' does not exist, skipping."
 fi
 
+# Flattened form — `peerings list` returns network rows with nested peerings[]
+# (see setup.sh Step 4c).
 PEERING_NAME="$(gcloud compute networks peerings list \
   --network="${APIGEE_NETWORK}" --project="${PROJECT_ID}" \
-  --format='value(name)' --filter='network~servicenetworking' 2>/dev/null || true)"
+  --flatten="peerings[]" --format='value(peerings.name)' \
+  --filter='peerings.network~servicenetworking' 2>/dev/null || true)"
 if [[ -n "${PEERING_NAME}" ]]; then
   gcloud compute networks peerings update "${PEERING_NAME}" \
     --network="${APIGEE_NETWORK}" \

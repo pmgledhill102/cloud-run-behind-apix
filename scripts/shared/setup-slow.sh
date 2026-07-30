@@ -105,9 +105,13 @@ fi
 echo ""
 echo "--- Step 4: VPC peering to Google Service Networking ---"
 
+# Flattened form — `peerings list` returns network rows with a nested
+# peerings[] list; value(name) yields the VPC's own name and a network~
+# filter never matches, which silently misroutes this into the create path.
 EXISTING_PEERING="$(gcloud compute networks peerings list \
   --network="${APIGEE_NETWORK}" --project="${PROJECT_ID}" \
-  --format='value(name)' --filter='network~servicenetworking' 2>/dev/null || true)"
+  --flatten="peerings[]" --format='value(peerings.name)' \
+  --filter='peerings.network~servicenetworking' 2>/dev/null || true)"
 
 if [[ -n "${EXISTING_PEERING}" ]]; then
   echo "VPC peering already exists. Updating to include both ranges..."
@@ -219,6 +223,44 @@ while true; do
     exit 1
   fi
   echo "  State: ${STATE} (${ELAPSED}s elapsed, checking every ${INTERVAL}s)..."
+  sleep "${INTERVAL}"
+  ELAPSED=$((ELAPSED + INTERVAL))
+done
+
+# The org can report state=ACTIVE while the creation LRO is still finishing —
+# observed live on a greenfield project: instance create then fails with
+# FAILED_PRECONDITION "the resource is locked by another operation ...
+# organization is being created by operation". Wait until no org-level
+# operation is in flight before proceeding. (Also harmlessly waits out any
+# in-flight instance op on a resumed run.)
+echo ""
+echo "Verifying no org-level operations are still in flight..."
+TIMEOUT=1800
+INTERVAL=30
+ELAPSED=0
+while true; do
+  if (( ELAPSED > 0 && ELAPSED % 1800 == 0 )); then
+    TOKEN="$(gcloud auth print-access-token)"
+  fi
+
+  PENDING="$(curl -s \
+    -H "Authorization: Bearer ${TOKEN}" \
+    "${APIGEE_API}/organizations/${PROJECT_ID}/operations" \
+    | python3 -c "
+import sys, json
+ops = json.load(sys.stdin).get('operations', [])
+print(' '.join(o['name'] for o in ops if not o.get('done')))" 2>/dev/null || true)"
+
+  if [[ -z "${PENDING}" ]]; then
+    echo "No in-flight org operations."
+    break
+  fi
+  if (( ELAPSED >= TIMEOUT )); then
+    echo "ERROR: Timed out after ${TIMEOUT}s waiting for org operations to finish:"
+    echo "  ${PENDING}"
+    exit 1
+  fi
+  echo "  In flight: ${PENDING} (${ELAPSED}s elapsed, checking every ${INTERVAL}s)..."
   sleep "${INTERVAL}"
   ELAPSED=$((ELAPSED + INTERVAL))
 done
@@ -360,8 +402,53 @@ ENV_HTTP="$(curl -s -o /dev/null -w '%{http_code}' \
   -H "Authorization: Bearer ${TOKEN}" \
   "${APIGEE_API}/organizations/${PROJECT_ID}/environments/${APIGEE_ENV}")"
 
+# Env type INTERMEDIATE: shared flows + flow hooks ("extensible proxies") are
+# rejected on a BASE environment (found live: INVALID_DESTINATION_ENVIRONMENT
+# deploying the auth PoC shared flow — PAYG defaults to BASE when type is
+# omitted). INTERMEDIATE bills higher than BASE, but the auth PoC needs it.
 if [[ "${ENV_HTTP}" == "200" ]]; then
-  echo "Environment '${APIGEE_ENV}' already exists, skipping."
+  ENV_TYPE="$(curl -s \
+    -H "Authorization: Bearer ${TOKEN}" \
+    "${APIGEE_API}/organizations/${PROJECT_ID}/environments/${APIGEE_ENV}" \
+    | python3 -c "import sys,json; print(json.load(sys.stdin).get('type',''))" 2>/dev/null || true)"
+  if [[ "${ENV_TYPE}" == "BASE" ]]; then
+    echo "Environment '${APIGEE_ENV}' exists but is BASE — upgrading to INTERMEDIATE..."
+    PATCH_RESPONSE="$(curl -s -X PATCH \
+      -H "Authorization: Bearer ${TOKEN}" \
+      -H "Content-Type: application/json" \
+      "${APIGEE_API}/organizations/${PROJECT_ID}/environments/${APIGEE_ENV}?updateMask=type" \
+      -d '{"type": "INTERMEDIATE"}')"
+    if echo "${PATCH_RESPONSE}" | grep -q '"error"'; then
+      echo "ERROR upgrading environment type:"
+      echo "${PATCH_RESPONSE}" | python3 -m json.tool 2>/dev/null || echo "${PATCH_RESPONSE}"
+      exit 1
+    fi
+    # The type change is an LRO (the env is re-provisioned on the runtime,
+    # observed ~minutes). Deploying a shared flow before it lands still fails
+    # with INVALID_DESTINATION_ENVIRONMENT — wait for the type to flip.
+    echo "Type change accepted — waiting for it to take effect..."
+    TYPE_TIMEOUT=900
+    TYPE_ELAPSED=0
+    while true; do
+      ENV_TYPE="$(curl -s \
+        -H "Authorization: Bearer ${TOKEN}" \
+        "${APIGEE_API}/organizations/${PROJECT_ID}/environments/${APIGEE_ENV}" \
+        | python3 -c "import sys,json; print(json.load(sys.stdin).get('type',''))" 2>/dev/null || true)"
+      if [[ "${ENV_TYPE}" == "INTERMEDIATE" ]]; then
+        echo "Environment '${APIGEE_ENV}' upgraded to INTERMEDIATE."
+        break
+      fi
+      if (( TYPE_ELAPSED >= TYPE_TIMEOUT )); then
+        echo "ERROR: environment type still '${ENV_TYPE}' after ${TYPE_TIMEOUT}s."
+        exit 1
+      fi
+      echo "  type=${ENV_TYPE} (${TYPE_ELAPSED}s elapsed)..."
+      sleep 30
+      TYPE_ELAPSED=$((TYPE_ELAPSED + 30))
+    done
+  else
+    echo "Environment '${APIGEE_ENV}' already exists (type: ${ENV_TYPE:-unknown}), skipping."
+  fi
 else
   ENV_RESPONSE="$(curl -s -X POST \
     -H "Authorization: Bearer ${TOKEN}" \
@@ -370,7 +457,8 @@ else
     -d "{
       \"name\": \"${APIGEE_ENV}\",
       \"displayName\": \"Test environment\",
-      \"description\": \"PoC test environment\"
+      \"description\": \"PoC test environment\",
+      \"type\": \"INTERMEDIATE\"
     }")"
 
   if echo "${ENV_RESPONSE}" | grep -q '"error"'; then
