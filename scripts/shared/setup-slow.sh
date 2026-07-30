@@ -423,7 +423,29 @@ if [[ "${ENV_HTTP}" == "200" ]]; then
       echo "${PATCH_RESPONSE}" | python3 -m json.tool 2>/dev/null || echo "${PATCH_RESPONSE}"
       exit 1
     fi
-    echo "Environment '${APIGEE_ENV}' upgraded to INTERMEDIATE."
+    # The type change is an LRO (the env is re-provisioned on the runtime,
+    # observed ~minutes). Deploying a shared flow before it lands still fails
+    # with INVALID_DESTINATION_ENVIRONMENT — wait for the type to flip.
+    echo "Type change accepted — waiting for it to take effect..."
+    TYPE_TIMEOUT=900
+    TYPE_ELAPSED=0
+    while true; do
+      ENV_TYPE="$(curl -s \
+        -H "Authorization: Bearer ${TOKEN}" \
+        "${APIGEE_API}/organizations/${PROJECT_ID}/environments/${APIGEE_ENV}" \
+        | python3 -c "import sys,json; print(json.load(sys.stdin).get('type',''))" 2>/dev/null || true)"
+      if [[ "${ENV_TYPE}" == "INTERMEDIATE" ]]; then
+        echo "Environment '${APIGEE_ENV}' upgraded to INTERMEDIATE."
+        break
+      fi
+      if (( TYPE_ELAPSED >= TYPE_TIMEOUT )); then
+        echo "ERROR: environment type still '${ENV_TYPE}' after ${TYPE_TIMEOUT}s."
+        exit 1
+      fi
+      echo "  type=${ENV_TYPE} (${TYPE_ELAPSED}s elapsed)..."
+      sleep 30
+      TYPE_ELAPSED=$((TYPE_ELAPSED + 30))
+    done
   else
     echo "Environment '${APIGEE_ENV}' already exists (type: ${ENV_TYPE:-unknown}), skipping."
   fi
