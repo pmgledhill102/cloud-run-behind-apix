@@ -105,7 +105,7 @@ The `.github/workflows/drawio-export.yml` workflow auto-exports `.drawio` → `.
 
 ## Issue Tracking
 
-Uses Beads (`bd` CLI). See AGENTS.md.
+Uses GitHub Issues. See AGENTS.md.
 
 ## Session Close Protocol
 
