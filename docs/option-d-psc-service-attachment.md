@@ -19,7 +19,7 @@ This pattern is best when:
 
 ## 2. Architecture Diagram
 
-![Option D Architecture](diagrams/option-d-architecture.drawio.svg)
+![Option D Architecture](diagrams/option-d-architecture.svg)
 
 ---
 

@@ -14,7 +14,7 @@ This is the simplest and cheapest connectivity option. There is no per-service i
 
 ## 2. Architecture Diagram
 
-![Option B Architecture](diagrams/option-b-architecture.drawio.svg)
+![Option B Architecture](diagrams/option-b-architecture.svg)
 
 ---
 
