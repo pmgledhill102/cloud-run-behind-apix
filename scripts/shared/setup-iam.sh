@@ -46,6 +46,27 @@ else
   echo "Service account created."
 fi
 
+# --- IAM retry helper ---
+# Bindings against a just-created SA can hit a propagation race: describe
+# succeeds while the policy API still returns INVALID_ARGUMENT "Service
+# account ... does not exist" (observed live on a greenfield project). The
+# same applies to the default compute SA right after API enablement. Retry
+# with backoff; surface the last error if all attempts fail.
+retry_iam() {  # retry_iam <description> <command...>
+  local desc="$1"; shift
+  local attempt out
+  for attempt in 1 2 3 4 5 6; do
+    if out="$("$@" 2>&1)"; then
+      return 0
+    fi
+    echo "    ${desc}: attempt ${attempt}/6 failed — IAM may still be propagating, retrying in 10s..."
+    sleep 10
+  done
+  echo "ERROR: ${desc} failed after 6 attempts. Last error:"
+  echo "${out}"
+  return 1
+}
+
 # --- Bind IAM roles (superset of all options) ---
 echo ""
 echo "--- Binding IAM roles ---"
@@ -63,11 +84,12 @@ ROLES=(
 
 for role in "${ROLES[@]}"; do
   echo "  Binding ${role}..."
-  gcloud projects add-iam-policy-binding "${PROJECT_ID}" \
+  retry_iam "bind ${role} to ${SA_NAME}" \
+    gcloud projects add-iam-policy-binding "${PROJECT_ID}" \
     --member="serviceAccount:${SA_EMAIL}" \
     --role="${role}" \
     --condition=None \
-    --quiet >/dev/null
+    --quiet
 done
 echo "IAM roles bound."
 
@@ -75,11 +97,12 @@ echo "IAM roles bound."
 echo ""
 echo "--- Granting caller serviceAccountTokenCreator ---"
 CALLER_ACCOUNT="$(gcloud config get-value account 2>/dev/null)"
-gcloud iam service-accounts add-iam-policy-binding "${SA_EMAIL}" \
+retry_iam "grant tokenCreator on ${SA_NAME} to caller" \
+  gcloud iam service-accounts add-iam-policy-binding "${SA_EMAIL}" \
   --member="user:${CALLER_ACCOUNT}" \
   --role="roles/iam.serviceAccountTokenCreator" \
   --project="${PROJECT_ID}" \
-  --quiet >/dev/null
+  --quiet
 echo "Caller '${CALLER_ACCOUNT}' can now impersonate '${SA_EMAIL}'."
 
 # --- Grant caller permission to deploy proxies as the SA ---
@@ -88,11 +111,12 @@ echo "Caller '${CALLER_ACCOUNT}' can now impersonate '${SA_EMAIL}'."
 # deployment (roles/iam.serviceAccountUser); tokenCreator alone is not enough.
 echo ""
 echo "--- Granting caller serviceAccountUser ---"
-gcloud iam service-accounts add-iam-policy-binding "${SA_EMAIL}" \
+retry_iam "grant serviceAccountUser on ${SA_NAME} to caller" \
+  gcloud iam service-accounts add-iam-policy-binding "${SA_EMAIL}" \
   --member="user:${CALLER_ACCOUNT}" \
   --role="roles/iam.serviceAccountUser" \
   --project="${PROJECT_ID}" \
-  --quiet >/dev/null
+  --quiet
 echo "Caller '${CALLER_ACCOUNT}' can now deploy Apigee proxies as '${SA_EMAIL}'."
 
 # --- Grant Cloud Run Service Agent compute.networkUser ---
@@ -100,11 +124,12 @@ echo ""
 echo "--- Granting Cloud Run Service Agent roles/compute.networkUser ---"
 PROJECT_NUMBER="$(gcloud projects describe "${PROJECT_ID}" --format='value(projectNumber)')"
 CR_SA="service-${PROJECT_NUMBER}@serverless-robot-prod.iam.gserviceaccount.com"
-gcloud projects add-iam-policy-binding "${PROJECT_ID}" \
+retry_iam "grant compute.networkUser to Cloud Run service agent" \
+  gcloud projects add-iam-policy-binding "${PROJECT_ID}" \
   --member="serviceAccount:${CR_SA}" \
   --role="roles/compute.networkUser" \
   --condition=None \
-  --quiet >/dev/null
+  --quiet
 echo "Cloud Run Service Agent granted compute.networkUser."
 
 # --- Grant Apigee runtime SA Cloud Run invoker ---
@@ -130,11 +155,12 @@ fi
 echo ""
 echo "--- Granting default compute SA roles/run.invoker ---"
 COMPUTE_SA="${PROJECT_NUMBER}-compute@developer.gserviceaccount.com"
-gcloud projects add-iam-policy-binding "${PROJECT_ID}" \
+retry_iam "grant run.invoker to default compute SA" \
+  gcloud projects add-iam-policy-binding "${PROJECT_ID}" \
   --member="serviceAccount:${COMPUTE_SA}" \
   --role="roles/run.invoker" \
   --condition=None \
-  --quiet >/dev/null
+  --quiet
 echo "Default compute SA granted run.invoker (for test VM auth)."
 
 # --- Grant Apigee service agent tokenCreator on the PoC SA ---
@@ -166,11 +192,12 @@ fi
 echo ""
 echo "--- Granting default compute SA Cloud Build roles ---"
 for CB_ROLE in roles/storage.objectViewer roles/logging.logWriter roles/artifactregistry.writer; do
-  gcloud projects add-iam-policy-binding "${PROJECT_ID}" \
+  retry_iam "grant ${CB_ROLE} to default compute SA" \
+    gcloud projects add-iam-policy-binding "${PROJECT_ID}" \
     --member="serviceAccount:${COMPUTE_SA}" \
     --role="${CB_ROLE}" \
     --condition=None \
-    --quiet >/dev/null
+    --quiet
   echo "Default compute SA granted ${CB_ROLE}."
 done
 
