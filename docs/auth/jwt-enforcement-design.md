@@ -1,11 +1,18 @@
 # AuthN/AuthZ Enforcement: External-Issuer JWTs with Apigee + Cloud Run
 
-**Status: paper design.** This document works out *where* token checks
-(signature, expiry, issuer, audience, scopes, fine-grained authorization)
-should be enforced when the API platform is Apigee → PGA → Cloud Run rather
-than GKE + Istio. Claims marked **[VERIFY]** are unproven — they are the
-target list for a future PoC (tests will live in `scripts/auth/`, tracked
-separately).
+**Status: paper design, PoC in progress.** This document works out *where*
+token checks (signature, expiry, issuer, audience, scopes, fine-grained
+authorization) should be enforced when the API platform is
+Apigee → PGA → Cloud Run rather than GKE + Istio. Claims marked
+**[VERIFY]** are unproven — they are the PoC's target list.
+[`scripts/auth/`](../../scripts/auth/README.md) builds the §9 baseline and
+exercises §10 items 1–5 (see its README for the mapping).
+
+**Diagrams:**
+[enforcement layers](../diagrams/auth-enforcement-layers.svg)
+([drawio](../diagrams/auth-enforcement-layers.drawio)) ·
+[PoC architecture](../diagrams/auth-poc-architecture.svg)
+([drawio](../diagrams/auth-poc-architecture.drawio))
 
 **Scope and assumptions:**
 

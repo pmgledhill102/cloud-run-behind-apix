@@ -1,0 +1,150 @@
+<mxfile host="app.diagrams.net" modified="2026-07-30T09:00:00.000Z">
+  <diagram name="Auth PoC — Architecture" id="auth-poc">
+    <mxGraphModel dx="1422" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="900" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+
+        <!-- Title -->
+        <mxCell id="title" value="Auth PoC: JWT Enforcement Layers on Option 2b (PGA + VPC-SC)" style="text;html=1;fontSize=18;fontStyle=1;align=center;fontColor=#202124;" vertex="1" parent="1">
+          <mxGeometry x="200" y="10" width="1200" height="35" as="geometry"/>
+        </mxCell>
+        <mxCell id="subtitle" value="scripts/auth/{setup,test,teardown}.sh — mock external IdP, VerifyJWT shared flow via env flow hook, combined-header target auth, IAM-closed echo service" style="text;html=1;fontSize=11;align=center;fontColor=#5F6368;" vertex="1" parent="1">
+          <mxGeometry x="200" y="42" width="1200" height="20" as="geometry"/>
+        </mxCell>
+
+        <!-- ==================== APIGEE VPC ==================== -->
+        <mxCell id="vpc-apigee" value="Apigee VPC (option2 base — unchanged)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8F0FE;strokeColor=#4285F4;strokeWidth=2;verticalAlign=top;fontStyle=1;fontSize=14;fontColor=#1A73E8;arcSize=4;container=1;collapsible=0;spacingTop=5;" vertex="1" parent="1">
+          <mxGeometry x="40" y="120" width="440" height="420" as="geometry"/>
+        </mxCell>
+        <mxCell id="vm" value="vm-test" style="shape=mxgraph.gcp2.compute_engine;fillColor=#AECBFA;strokeColor=none;verticalLabelPosition=bottom;verticalAlign=top;align=center;fontSize=10;fontColor=#3C4043;fontStyle=1;" vertex="1" parent="vpc-apigee">
+          <mxGeometry x="186" y="45" width="68" height="53" as="geometry"/>
+        </mxCell>
+        <mxCell id="vm-desc" value="test.sh signs JWTs locally with the mock issuer&#39;s private key&#xa;(private key never enters the platform — mimics an external IdP)" style="text;fontSize=9;fontColor=#5F6368;align=center;" vertex="1" parent="vpc-apigee">
+          <mxGeometry x="20" y="125" width="400" height="30" as="geometry"/>
+        </mxCell>
+        <mxCell id="dns-zone" value="Private DNS zone: run.app" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#DADCE0;strokeWidth=1;dashed=1;dashPattern=5 5;verticalAlign=top;fontSize=10;fontColor=#5F6368;fontStyle=1;arcSize=6;container=1;collapsible=0;spacingTop=2;" vertex="1" parent="vpc-apigee">
+          <mxGeometry x="20" y="170" width="400" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="dns-record" value="*.run.app → 199.36.153.4/30 (restricted VIP)" style="text;fontSize=9;fontColor=#3C4043;align=center;" vertex="1" parent="dns-zone">
+          <mxGeometry x="20" y="28" width="360" height="24" as="geometry"/>
+        </mxCell>
+        <mxCell id="pga-flag" value="subnet: privateIpGoogleAccess = true" style="text;fontSize=9;fontColor=#0D652D;align=center;fontStyle=1;fillColor=#E8F5E9;rounded=1;strokeColor=#4CAF50;" vertex="1" parent="vpc-apigee">
+          <mxGeometry x="90" y="260" width="260" height="24" as="geometry"/>
+        </mxCell>
+        <mxCell id="perimeter-chip" value="VPC-SC perimeter (option2b, optional) — wide by design: NOT relied on as authorization" style="text;fontSize=8;fontColor=#9E9E9E;align=center;fontStyle=2;fillColor=#F5F5F5;rounded=1;strokeColor=#BDBDBD;dashed=1;whiteSpace=wrap;" vertex="1" parent="vpc-apigee">
+          <mxGeometry x="20" y="300" width="400" height="30" as="geometry"/>
+        </mxCell>
+        <mxCell id="t3-origin" value="Test 4 (T3): direct curl to cr-auth-echo&#39;s run.app URL — skips Apigee entirely" style="text;fontSize=9;fontColor=#C62828;align=center;fontStyle=1;fillColor=#FFEBEE;rounded=1;strokeColor=#F44336;whiteSpace=wrap;" vertex="1" parent="vpc-apigee">
+          <mxGeometry x="20" y="345" width="400" height="30" as="geometry"/>
+        </mxCell>
+
+        <!-- ==================== APIGEE X ==================== -->
+        <mxCell id="apigee-box" value="Apigee X (peered runtime)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FCE4EC;strokeColor=#E91E63;strokeWidth=2;verticalAlign=top;fontStyle=1;fontSize=14;fontColor=#C2185B;arcSize=4;container=1;collapsible=0;spacingTop=5;" vertex="1" parent="1">
+          <mxGeometry x="560" y="90" width="400" height="480" as="geometry"/>
+        </mxCell>
+        <mxCell id="hook-chip" value="PreProxyFlowhook → auth-verify (ALL proxies in env &#39;test&#39;)" style="text;fontSize=9;fontColor=#0D652D;align=center;fontStyle=1;fillColor=#E8F5E9;rounded=1;strokeColor=#4CAF50;" vertex="1" parent="apigee-box">
+          <mxGeometry x="20" y="35" width="360" height="24" as="geometry"/>
+        </mxCell>
+        <mxCell id="sf-box" value="Shared flow: auth-verify" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#DADCE0;strokeWidth=1;dashed=1;dashPattern=5 5;verticalAlign=top;fontSize=10;fontColor=#5F6368;fontStyle=1;arcSize=6;container=1;collapsible=0;spacingTop=2;" vertex="1" parent="apigee-box">
+          <mxGeometry x="20" y="70" width="360" height="120" as="geometry"/>
+        </mxCell>
+        <mxCell id="vj-policy" value="VerifyJWT (VJ-VerifyClientJWT):&#xa;· Algorithm RS256 (pinned)&#xa;· JWKS uri = cr-idp-mock/.well-known/jwks.json&#xa;· iss = https://idp.poc.internal · aud = api://apigee-poc" style="text;fontSize=9;fontColor=#3C4043;align=left;spacingLeft=8;verticalAlign=top;" vertex="1" parent="sf-box">
+          <mxGeometry x="10" y="25" width="340" height="85" as="geometry"/>
+        </mxCell>
+        <mxCell id="proxy-icon" value="proxy: cr-auth-jwt&#xa;BasePath /auth-echo" style="shape=mxgraph.gcp2.api_monetization;fillColor=#F8BBD0;strokeColor=none;verticalLabelPosition=bottom;verticalAlign=top;align=center;fontSize=10;fontColor=#3C4043;fontStyle=1;" vertex="1" parent="apigee-box">
+          <mxGeometry x="166" y="215" width="68" height="53" as="geometry"/>
+        </mxCell>
+        <mxCell id="target-chip" value="TargetEndpoint Authentication:&#xa;GoogleIDToken, Audience = &#39;apigee-poc-auth&#39; (CUSTOM — fixed string)&#xa;HeaderName = X-Serverless-Authorization (client JWT untouched)" style="text;fontSize=9;fontColor=#E65100;align=center;fontStyle=1;fillColor=#FFF3E0;rounded=1;strokeColor=#FB8C00;whiteSpace=wrap;" vertex="1" parent="apigee-box">
+          <mxGeometry x="20" y="305" width="360" height="54" as="geometry"/>
+        </mxCell>
+        <mxCell id="deploy-note" value="proxy deployed as apigee-poc SA (mints the Google ID token);&#xa;SA holds run.invoker on the target" style="text;fontSize=8;fontColor=#80868B;align=center;fontStyle=2;" vertex="1" parent="apigee-box">
+          <mxGeometry x="20" y="370" width="360" height="30" as="geometry"/>
+        </mxCell>
+        <mxCell id="hook-warning" value="⚠ while attached, /hello needs a JWT too — teardown detaches" style="text;fontSize=8;fontColor=#C62828;align=center;fontStyle=2;" vertex="1" parent="apigee-box">
+          <mxGeometry x="20" y="430" width="360" height="20" as="geometry"/>
+        </mxCell>
+
+        <!-- ==================== GOOGLE NETWORK ==================== -->
+        <mxCell id="google-net" value="Google network" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8F5E9;strokeColor=#4CAF50;strokeWidth=2;verticalAlign=top;fontStyle=1;fontSize=12;fontColor=#2E7D32;arcSize=4;container=1;collapsible=0;spacingTop=5;" vertex="1" parent="1">
+          <mxGeometry x="1020" y="250" width="170" height="140" as="geometry"/>
+        </mxCell>
+        <mxCell id="pga-icon" value="PGA restricted VIP&#xa;199.36.153.4/30" style="shape=mxgraph.gcp2.cloud_network;fillColor=#A5D6A7;strokeColor=none;verticalLabelPosition=bottom;verticalAlign=top;align=center;fontSize=9;fontColor=#3C4043;fontStyle=1;" vertex="1" parent="google-net">
+          <mxGeometry x="51" y="40" width="68" height="53" as="geometry"/>
+        </mxCell>
+
+        <!-- ==================== CLOUD RUN ==================== -->
+        <mxCell id="cr-box" value="Cloud Run" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E3F2FD;strokeColor=#1565C0;strokeWidth=2;verticalAlign=top;fontStyle=1;fontSize=14;fontColor=#1565C0;arcSize=4;container=1;collapsible=0;spacingTop=5;" vertex="1" parent="1">
+          <mxGeometry x="1250" y="90" width="320" height="560" as="geometry"/>
+        </mxCell>
+        <mxCell id="auth-echo" value="cr-auth-echo" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#DADCE0;strokeWidth=1;dashed=1;dashPattern=5 5;verticalAlign=top;fontSize=11;fontColor=#1565C0;fontStyle=1;arcSize=6;container=1;collapsible=0;spacingTop=2;" vertex="1" parent="cr-box">
+          <mxGeometry x="15" y="35" width="290" height="270" as="geometry"/>
+        </mxCell>
+        <mxCell id="auth-echo-icon" value="" style="shape=mxgraph.gcp2.cloud_run;fillColor=#AECBFA;strokeColor=none;verticalLabelPosition=bottom;verticalAlign=top;align=center;fontSize=10;fontColor=#3C4043;" vertex="1" parent="auth-echo">
+          <mxGeometry x="111" y="28" width="68" height="53" as="geometry"/>
+        </mxCell>
+        <mxCell id="auth-echo-flags" value="--no-allow-unauthenticated&#xa;--ingress=internal&#xa;--add-custom-audiences=apigee-poc-auth" style="text;fontSize=9;fontColor=#E65100;align=center;fontStyle=1;" vertex="1" parent="auth-echo">
+          <mxGeometry x="15" y="90" width="260" height="44" as="geometry"/>
+        </mxCell>
+        <mxCell id="auth-echo-mw" value="stdlib-Go JWT middleware:&#xa;RS256 (pinned) · exp/nbf · iss · aud&#xa;fail-closed if no JWKS at startup" style="text;fontSize=9;fontColor=#6A1B9A;align=center;fontStyle=1;fillColor=#F3E5F5;rounded=1;strokeColor=#9C27B0;whiteSpace=wrap;" vertex="1" parent="auth-echo">
+          <mxGeometry x="15" y="142" width="260" height="52" as="geometry"/>
+        </mxCell>
+        <mxCell id="auth-echo-resp" value="echoes: headers_seen (Authorization /&#xa;X-Serverless-Authorization), claims, jwks_source" style="text;fontSize=8;fontColor=#5F6368;align=center;fontStyle=2;" vertex="1" parent="auth-echo">
+          <mxGeometry x="15" y="205" width="260" height="30" as="geometry"/>
+        </mxCell>
+        <mxCell id="idp-mock" value="cr-idp-mock (JWKS mirror posture, §7.4)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#DADCE0;strokeWidth=1;dashed=1;dashPattern=5 5;verticalAlign=top;fontSize=11;fontColor=#4527A0;fontStyle=1;arcSize=6;container=1;collapsible=0;spacingTop=2;" vertex="1" parent="cr-box">
+          <mxGeometry x="15" y="330" width="290" height="200" as="geometry"/>
+        </mxCell>
+        <mxCell id="idp-mock-icon" value="" style="shape=mxgraph.gcp2.cloud_run;fillColor=#B39DDB;strokeColor=none;verticalLabelPosition=bottom;verticalAlign=top;align=center;fontSize=10;fontColor=#3C4043;" vertex="1" parent="idp-mock">
+          <mxGeometry x="111" y="28" width="68" height="53" as="geometry"/>
+        </mxCell>
+        <mxCell id="idp-mock-desc" value="serves /.well-known/jwks.json (public keys only)&#xa;--allow-unauthenticated + --ingress=internal&#xa;(a JWKS is public material; the network&#xa;boundary keeps it in-perimeter)" style="text;fontSize=9;fontColor=#5F6368;align=center;" vertex="1" parent="idp-mock">
+          <mxGeometry x="15" y="90" width="260" height="70" as="geometry"/>
+        </mxCell>
+
+        <!-- ==================== FLOW ARROWS ==================== -->
+        <mxCell id="flow1" value="" style="endArrow=classic;strokeColor=#9C27B0;strokeWidth=3;html=1;exitX=1;exitY=0.2;entryX=0;entryY=0.2;" edge="1" parent="1" source="vpc-apigee" target="apigee-box">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="flow1-label" value="&#10102; curl -H &#39;Host: api.internal.example.com&#39;&#xa;-H &#39;Authorization: Bearer client-JWT&#39; https://INSTANCE_IP/auth-echo" style="text;fontSize=9;fontColor=#6A1B9A;align=center;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="380" y="70" width="380" height="30" as="geometry"/>
+        </mxCell>
+        <mxCell id="flow2" value="" style="endArrow=classic;strokeColor=#673AB7;strokeWidth=1;dashed=1;dashPattern=4 4;html=1;exitX=1;exitY=0.85;entryX=0;entryY=0.85;" edge="1" parent="1" source="apigee-box" target="cr-box">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="flow2-label" value="&#10103; JWKS fetch (VerifyJWT, cached) — resolves&#xa;*.run.app via peered DNS → restricted VIP" style="text;fontSize=8;fontColor=#673AB7;align=center;fontStyle=2;" vertex="1" parent="1">
+          <mxGeometry x="970" y="560" width="270" height="30" as="geometry"/>
+        </mxCell>
+        <mxCell id="flow3" value="" style="endArrow=classic;strokeColor=#4CAF50;strokeWidth=3;html=1;exitX=1;exitY=0.45;entryX=0;entryY=0.5;" edge="1" parent="1" source="apigee-box" target="google-net">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="flow3-label" value="&#10104; two tokens:&#xa;Authorization + X-Serverless-Auth" style="text;fontSize=9;fontColor=#2E7D32;align=center;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="950" y="200" width="230" height="30" as="geometry"/>
+        </mxCell>
+        <mxCell id="flow4" value="" style="endArrow=classic;strokeColor=#1565C0;strokeWidth=3;html=1;exitX=1;exitY=0.5;entryX=0;entryY=0.3;" edge="1" parent="1" source="google-net" target="cr-box">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="flow4-label" value="&#10105; IAM: custom-audience&#xa;Google token + run.invoker" style="text;fontSize=9;fontColor=#1565C0;align=center;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="1180" y="410" width="180" height="30" as="geometry"/>
+        </mxCell>
+        <mxCell id="flow-t3" value="" style="endArrow=classic;strokeColor=#F44336;strokeWidth=2;dashed=1;dashPattern=8 4;html=1;exitX=0.5;exitY=1;entryX=0.3;entryY=1;edgeStyle=orthogonalEdgeStyle;" edge="1" parent="1" source="vpc-apigee" target="cr-box">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="260" y="700"/>
+              <mxPoint x="1346" y="700"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="flow-t3-label" value="&#10106; Test 4: direct PGA call → 403 at Cloud Run front end (no Google ID token — client JWT alone means nothing to IAM)" style="text;fontSize=9;fontColor=#C62828;align=center;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="400" y="675" width="700" height="20" as="geometry"/>
+        </mxCell>
+
+        <!-- ==================== KEY FINDINGS ==================== -->
+        <mxCell id="findings" value="Tests (→ design doc §10):  1 JWKS over PGA without Google token (item 4, partial)   2 valid JWT end-to-end — combined headers + custom audience (items 1, 5)   3 expired / wrong-aud / missing JWT → 401 at the edge via flow hook (item 3)   4 direct PGA bypass → 403 before the container (item 2)   5 latency /auth-echo vs /hello (item 3 / §8)&#xa;Not covered: sidecar variant (item 6), org-policy preventive controls (item 7), edge deny-list (item 8)" style="text;fontSize=10;fontColor=#3C4043;align=left;verticalAlign=top;fillColor=#FFF8E1;rounded=1;strokeColor=#F9A825;spacingLeft=10;spacingRight=10;spacingTop=6;spacingBottom=6;whiteSpace=wrap;" vertex="1" parent="1">
+          <mxGeometry x="40" y="750" width="1530" height="80" as="geometry"/>
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
