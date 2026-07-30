@@ -105,9 +105,13 @@ fi
 echo ""
 echo "--- Step 4: VPC peering to Google Service Networking ---"
 
+# Flattened form — `peerings list` returns network rows with a nested
+# peerings[] list; value(name) yields the VPC's own name and a network~
+# filter never matches, which silently misroutes this into the create path.
 EXISTING_PEERING="$(gcloud compute networks peerings list \
   --network="${APIGEE_NETWORK}" --project="${PROJECT_ID}" \
-  --format='value(name)' --filter='network~servicenetworking' 2>/dev/null || true)"
+  --flatten="peerings[]" --format='value(peerings.name)' \
+  --filter='peerings.network~servicenetworking' 2>/dev/null || true)"
 
 if [[ -n "${EXISTING_PEERING}" ]]; then
   echo "VPC peering already exists. Updating to include both ranges..."
