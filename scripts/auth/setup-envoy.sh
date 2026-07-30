@@ -70,8 +70,9 @@ else
   # Envoy is the ingress container (--port); the app sits on ENVOY_APP_PORT
   # (Cloud Run injects PORT only into the ingress container). --depends-on
   # starts the app before Envoy so the first request doesn't race the
-  # upstream. Same IAM posture as the library variant: closed + custom
-  # audience.
+  # upstream — and Cloud Run requires the depended-on container to declare a
+  # startup probe (deploy is rejected without one, found live). Same IAM
+  # posture as the library variant: closed + custom audience.
   gcloud run deploy "${AUTH_ECHO_ENVOY_SERVICE}" \
     --region="${REGION}" \
     --ingress=internal \
@@ -89,7 +90,8 @@ else
     --depends-on=app \
     --container=app \
     --image="${AUTH_ECHO_IMAGE_URL}" \
-    --set-env-vars="^@^APP_PORT=${ENVOY_APP_PORT}@JWT_MODE=off@EXPECTED_ISS=${JWT_ISSUER}@EXPECTED_AUD=${JWT_AUDIENCE}@JWKS_JSON=${JWKS_JSON}"
+    --set-env-vars="^@^APP_PORT=${ENVOY_APP_PORT}@JWT_MODE=off@EXPECTED_ISS=${JWT_ISSUER}@EXPECTED_AUD=${JWT_AUDIENCE}@JWKS_JSON=${JWKS_JSON}" \
+    --startup-probe=tcpSocket.port="${ENVOY_APP_PORT}",periodSeconds=1,failureThreshold=20
   echo "Service '${AUTH_ECHO_ENVOY_SERVICE}' deployed."
 fi
 AUTH_ECHO_ENVOY_URL="$(gcloud run services describe "${AUTH_ECHO_ENVOY_SERVICE}" \
