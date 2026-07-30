@@ -96,17 +96,23 @@ echo "  valid:     HTTP ${CODE}"
 OK=false; [[ "${CODE}" == "200" ]] && OK=true
 verdict "${OK}" "valid client JWT passes Envoy (control)"
 
-for CASE in "expired:${JWT_EXPIRED}" "wrong-aud:${JWT_WRONG_AUD}" "missing:"; do
+# Envoy's rejection taxonomy differs from Apigee VerifyJWT and the library
+# (both 401 across the board): jwt_authn returns 401 Unauthenticated for
+# expired/missing tokens but 403 Forbidden for an audience mismatch
+# ("Audiences in Jwt are not allowed") — found live.
+for CASE in "expired:401:${JWT_EXPIRED}" "wrong-aud:403:${JWT_WRONG_AUD}" "missing:401:"; do
   LABEL="${CASE%%:*}"
-  CASE_JWT="${CASE#*:}"
+  REST="${CASE#*:}"
+  WANT="${REST%%:*}"
+  CASE_JWT="${REST#*:}"
   EXTRA=""
   [[ -n "${CASE_JWT}" ]] && EXTRA="-H 'Authorization: Bearer ${CASE_JWT}'"
   E2_OUT="$(e2_call "${EXTRA}")"
   CODE="$(echo "${E2_OUT}" | head -1)"
   BODY="$(echo "${E2_OUT}" | tail -n +2)"
   echo "  ${LABEL}: HTTP ${CODE}  (${BODY})"
-  OK=false; [[ "${CODE}" == "401" ]] && OK=true
-  verdict "${OK}" "${LABEL} token rejected 401 by the Envoy ingress container"
+  OK=false; [[ "${CODE}" == "${WANT}" ]] && OK=true
+  verdict "${OK}" "${LABEL} token rejected ${WANT} by the Envoy ingress container"
 done
 echo ""
 
