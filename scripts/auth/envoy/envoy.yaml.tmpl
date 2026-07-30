@@ -1,0 +1,64 @@
+# Envoy config template — rendered by entrypoint.sh via envsubst.
+#
+# jwt_authn provider mirrors the VerifyJWT policy + middleware checks:
+# RS256 signature vs the inline JWKS, iss, aud; exp/nbf are always checked.
+# Token is read from "Authorization: Bearer" (Envoy's default extraction) —
+# X-Serverless-Authorization passes through untouched for Cloud Run IAM.
+# forward: true keeps the Authorization header for the app container so the
+# echo can still prove the combined-header pattern.
+static_resources:
+  listeners:
+  - name: ingress
+    address:
+      socket_address: {address: 0.0.0.0, port_value: ${PORT}}
+    filter_chains:
+    - filters:
+      - name: envoy.filters.network.http_connection_manager
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+          stat_prefix: ingress_http
+          route_config:
+            name: local_route
+            virtual_hosts:
+            - name: app
+              domains: ["*"]
+              routes:
+              - match: {prefix: "/"}
+                route: {cluster: app}
+          http_filters:
+          - name: envoy.filters.http.jwt_authn
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.jwt_authn.v3.JwtAuthentication
+              providers:
+                poc-idp:
+                  issuer: ${JWT_ISSUER}
+                  audiences: ["${JWT_AUDIENCE}"]
+                  forward: true
+                  local_jwks:
+                    inline_string: '${JWKS_JSON}'
+              rules:
+              # /healthz is JWT-exempt (rules are first-match): it exists so
+              # the ingress container's startup probe can traverse the proxy
+              # to the app, gating instance readiness on BOTH containers while
+              # they start in parallel. PoC shortcut — the echo app answers
+              # any path; production would pin this to a dedicated handler.
+              - match: {path: "/healthz"}
+              - match: {prefix: "/"}
+                requires: {provider_name: poc-idp}
+          - name: envoy.filters.http.router
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+  clusters:
+  - name: app
+    connect_timeout: 5s
+    type: STATIC
+    load_assignment:
+      cluster_name: app
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address: {address: 127.0.0.1, port_value: ${APP_PORT}}
+admin:
+  address:
+    socket_address: {address: 127.0.0.1, port_value: 9901}

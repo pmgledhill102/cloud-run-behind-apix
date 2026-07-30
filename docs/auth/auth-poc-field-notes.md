@@ -141,8 +141,95 @@ combined-header pattern VM-side before Apigee was even provisioned.
 | 2b perimeter + tenant DNS/route propagation | < 10 min |
 | `auth/setup.sh` (first run, 2 image builds) | ~4 min |
 
+## Sidecar variant (§10 item 6, issue #39) — second live session
+
+`scripts/auth/setup-envoy.sh` deploys `cr-auth-echo-envoy`: an Envoy
+`jwt_authn` ingress container in front of the same echo app (middleware off,
+`APP_PORT=8081`), plus Apigee proxy `/auth-echo-envoy` with the identical
+combined-header target. 6/6 tests pass. Corrections found on the way:
+
+### 9. Cloud Build under the perimeter — two failure modes (fixed)
+
+- **Client side:** `gcloud builds submit` touches the Google-managed
+  `<project#>.cloudbuild-logs.googleusercontent.com` bucket, which lives in
+  a Google-owned project outside the perimeter → egress violation
+  (`RESOURCES_NOT_IN_SAME_SERVICE_PERIMETER` on `storage.buckets.get`).
+  Fix: `--default-buckets-behavior=regional-user-owned-bucket` at every
+  build site, plus `roles/storage.admin` for the build SA (gcloud's
+  pre-check names that role verbatim; objectCreator is not enough).
+- **Worker side:** Cloud Build's shared workers run *outside* the
+  perimeter, so with storage restricted the worker couldn't reach the now
+  in-project logs bucket ("Failure setting up GCS logging ... prohibited
+  by organization's policy"). Fix: admit the build SA through the
+  perimeter's ingress policy (production answer: private worker pools).
+- Earlier builds only succeeded because they pre-dated the perimeter — any
+  greenfield that applies 2b before its first build hits both immediately.
+
+### 10. Multi-container deploy shape (fixed)
+
+- Service-level flags must precede the first `--container` group (a
+  trailing `--quiet` is rejected as an unrecognized *container* flag).
+- A `--depends-on` dependency must declare a startup probe — the deploy is
+  rejected otherwise. TCP probe on the app port works.
+- Cloud Run injects `PORT` only into the ingress container; the app behind
+  Envoy needs its own port plumbing (`APP_PORT` in this PoC).
+
+### 11. Envoy rejection taxonomy differs across layers
+
+`jwt_authn`: expired → 401 "Jwt is expired"; missing → 401 "Jwt is
+missing"; **audience mismatch → 403** "Audiences in Jwt are not allowed".
+Apigee VerifyJWT and the library middleware both return 401 for all three.
+Anything consuming rejection codes across layers (alerting, client retry
+logic) must not assume 401 uniformly.
+
+### Sidecar vs library numbers (crude, N=15 via Apigee)
+
+| Path | p50 | p95 |
+| --- | --- | --- |
+| `/auth-echo-envoy` (Envoy hop, middleware off) | 22 ms | 48 ms |
+| `/auth-echo` (library in-process) | 19 ms | 49 ms |
+
+Envoy hop ≈ **+3 ms p50 warm** at 1 vCPU (a cooler run showed +12 ms; at
+0.25 vCPU ≈ +7 ms — mild throttling cost on the RS256 verify).
+
+### 12. Cold start: the +0.65s is the topology's, not the sidecar's
+
+The first deployment used `--depends-on=app`, which *serializes* startup
+(Cloud Run then also requires a startup probe on the dependency): app
+probe-ready → +0.645 s → Envoy ready. Rebuilt with **parallel starts** —
+no `depends-on`; instead Envoy's startup probe traverses the proxy to the
+app via a JWT-exempt `/healthz`, so readiness still gates on the full path.
+With the app emulating a heavy framework (`APP_START_DELAY=3`):
+
+| T+ | Event (from system + stdout logs, one instance) |
+| --- | --- |
+| 0.00 s | instance starts, both containers launch |
+| 0.40 s | app container up, starts its 3 s "framework boot" |
+| 3.40 s | app listening |
+| 4.37 s | Envoy through-proxy probe green → instance ready |
+
+Envoy's ~0.6 s init ran entirely inside the app's boot window: the
+sidecar's marginal cold-start cost drops from a guaranteed +0.65 s
+(sequential) to probe-cadence quantization (≤1 s at `periodSeconds=1`).
+For any app slower than Envoy itself, the cold-start tax is ≈ **zero**.
+
+### 13. Resource footprint: untuned sidecar doubles the instance
+
+Per-container defaults are 1 vCPU / 512 Mi — so the two-container service
+silently allocated 2 vCPU / 1 GiB vs the library variant's 1 / 512 Mi.
+Sized down (`ENVOY_CPU=0.25`, `ENVOY_MEMORY=128Mi`, accepted by the API
+with concurrency still 80 — the sub-vCPU ⇒ concurrency-1 rule did not bind
+for this shape), the instance runs 1.25 vCPU / 384 Mi total: *lighter in
+memory than the untuned library default*. The §5 "second container's
+memory/CPU" cost is real but fully tunable; the trap is the default.
+
+Net: both per-request and cold-start numbers back §7.3's library-default
+recommendation only weakly once tuned — the honest summary is "library
+wins on simplicity; a tuned parallel-start sidecar costs ~7 ms p50 and
+~zero cold start."
+
 ## Still open (issue #35)
 
-§10 items 6–8: sidecar/ingress-container variant, org-policy preventive
-controls, edge deny-list — plus the §8 leftovers above (isolated VerifyJWT
-cost, p99, cold/warm split, JWKS cache TTL, mirror stale-on-error).
+§10 items 7–8: org-policy preventive controls, edge deny-list — plus the
+§8 leftovers above (isolated VerifyJWT cost, p99, rigorous cold/warm split,
+JWKS cache TTL, mirror stale-on-error).

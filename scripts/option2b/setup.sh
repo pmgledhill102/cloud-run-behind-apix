@@ -299,6 +299,29 @@ cat > "${EGRESS_FILE}" << YAMLEOF
     - projects/${ALLOWED_EGRESS_PROJECT_NUMBER}
 YAMLEOF
 
+# Ingress: the caller (laptop gcloud, admin continuity) plus the project's
+# build SA — Cloud Build's shared workers run OUTSIDE the perimeter, so with
+# storage restricted the worker's access to the in-project regional logs
+# bucket needs an explicit ingress allowance (found live: build FAILURE,
+# "Failure setting up GCS logging ... prohibited by organization's policy").
+# The production-grade alternative is a private worker pool inside the
+# perimeter.
+CALLER_ACCOUNT="$(gcloud config get-value account 2>/dev/null)"
+INGRESS_FILE="$(mktemp)"
+cat > "${INGRESS_FILE}" << YAMLEOF
+- ingressFrom:
+    identities:
+    - user:${CALLER_ACCOUNT}
+    - serviceAccount:${PROJECT_NUMBER}-compute@developer.gserviceaccount.com
+    sources:
+    - accessLevel: '*'
+  ingressTo:
+    operations:
+    - serviceName: '*'
+    resources:
+    - '*'
+YAMLEOF
+
 if resource_exists gcloud access-context-manager perimeters describe \
     "${PERIMETER_NAME}" --policy="${POLICY_ID}" --billing-project="${PROJECT_ID}"; then
   echo "Perimeter '${PERIMETER_NAME}' already exists — ensuring project + egress allow-list..."
@@ -316,30 +339,16 @@ if resource_exists gcloud access-context-manager perimeters describe \
   fi
   gcloud access-context-manager perimeters update "${PERIMETER_NAME}" \
     --policy="${POLICY_ID}" \
+    --set-ingress-policies="${INGRESS_FILE}" \
     --set-egress-policies="${EGRESS_FILE}" \
     --billing-project="${PROJECT_ID}"
-  echo "Egress allow-list applied: projects/${ALLOWED_EGRESS_PROJECT_NUMBER} (run.routes.invoke)."
+  echo "Ingress (caller + build SA) and egress allow-list applied."
 else
-  CALLER_ACCOUNT="$(gcloud config get-value account 2>/dev/null)"
   echo "Creating perimeter '${PERIMETER_NAME}'..."
   echo "  Resources:  projects/${PROJECT_NUMBER}"
   echo "  Restricted: ${RESTRICTED_SERVICES}"
-  echo "  Ingress:    ${CALLER_ACCOUNT} allowed from any source (admin continuity)"
+  echo "  Ingress:    ${CALLER_ACCOUNT} + build SA allowed from any source"
   echo "  Egress:     projects/${ALLOWED_EGRESS_PROJECT_NUMBER} allowed (run.routes.invoke)"
-
-  INGRESS_FILE="$(mktemp)"
-  cat > "${INGRESS_FILE}" << YAMLEOF
-- ingressFrom:
-    identities:
-    - user:${CALLER_ACCOUNT}
-    sources:
-    - accessLevel: '*'
-  ingressTo:
-    operations:
-    - serviceName: '*'
-    resources:
-    - '*'
-YAMLEOF
 
   gcloud access-context-manager perimeters create "${PERIMETER_NAME}" \
     --policy="${POLICY_ID}" \
@@ -350,10 +359,9 @@ YAMLEOF
     --egress-policies="${EGRESS_FILE}" \
     --billing-project="${PROJECT_ID}"
 
-  rm -f "${INGRESS_FILE}"
-  echo "Perimeter '${PERIMETER_NAME}' created (ENFORCED, with egress allow-list)."
+  echo "Perimeter '${PERIMETER_NAME}' created (ENFORCED, with ingress + egress allow-lists)."
 fi
-rm -f "${EGRESS_FILE}"
+rm -f "${EGRESS_FILE}" "${INGRESS_FILE}"
 
 # ============================================================
 # Summary

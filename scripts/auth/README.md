@@ -29,6 +29,12 @@ cr-idp-mock:  JWKS endpoint (allow-unauth + ingress=internal — §7.4 mirror po
 ./scripts/auth/setup.sh      # ~3-4 min first run (2 image builds), ~30s after
 ./scripts/auth/test.sh
 ./scripts/auth/teardown.sh
+
+# Sidecar variant (§10 item 6): Envoy jwt_authn ingress container
+# in front of the same app (middleware off) — run setup.sh first:
+./scripts/auth/setup-envoy.sh
+./scripts/auth/test-envoy.sh
+./scripts/auth/teardown-envoy.sh
 ```
 
 **Warning:** setup attaches the shared flow via the env-level flow hook, so
