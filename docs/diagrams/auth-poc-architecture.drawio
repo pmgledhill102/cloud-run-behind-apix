@@ -140,7 +140,7 @@
         </mxCell>
 
         <!-- ==================== KEY FINDINGS ==================== -->
-        <mxCell id="findings" value="Tests (→ design doc §10):  1 JWKS over PGA without Google token (item 4, partial)   2 valid JWT end-to-end — combined headers + custom audience (items 1, 5)   3 expired / wrong-aud / missing JWT → 401 at the edge via flow hook (item 3)   4 direct PGA bypass → 403 before the container (item 2)   5 latency /auth-echo vs /hello (item 3 / §8)&#xa;Not covered: sidecar variant (item 6), org-policy preventive controls (item 7), edge deny-list (item 8)" style="text;fontSize=10;fontColor=#3C4043;align=left;verticalAlign=top;fillColor=#FFF8E1;rounded=1;strokeColor=#F9A825;spacingLeft=10;spacingRight=10;spacingTop=6;spacingBottom=6;whiteSpace=wrap;" vertex="1" parent="1">
+        <mxCell id="findings" value="Tests (→ design doc §10):  1 JWKS over PGA without Google token (item 4, partial)   2 valid JWT end-to-end — combined headers + custom audience (items 1, 5)   3 expired / wrong-aud / missing JWT → 401 at the edge via flow hook (item 3)   4 direct PGA bypass → 403 before the container (item 2)   5 latency /auth-echo vs /hello (item 3 / §8)&#xa;Item 6 (sidecar variant) covered separately: setup-envoy.sh / cr-auth-echo-envoy — see envoy-sidecar-{sequence,headers}.drawio. Not covered: org-policy preventive controls (item 7), edge deny-list (item 8)" style="text;fontSize=10;fontColor=#3C4043;align=left;verticalAlign=top;fillColor=#FFF8E1;rounded=1;strokeColor=#F9A825;spacingLeft=10;spacingRight=10;spacingTop=6;spacingBottom=6;whiteSpace=wrap;" vertex="1" parent="1">
           <mxGeometry x="40" y="750" width="1530" height="80" as="geometry"/>
         </mxCell>
 

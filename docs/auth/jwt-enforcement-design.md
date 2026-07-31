@@ -344,8 +344,13 @@ performed full validation), the service-side layer is defence in depth plus
 claims extraction — not the primary gate. That weakens the case for paying
 the sidecar's per-request price and operational surface: **default
 recommendation is the library**, with the sidecar as the fallback if the
-estate is too polyglot for library coverage. Revisit if IAM closure cannot
-be guaranteed for some service class.
+estate is too polyglot for library coverage. The §10 item 6 measurements
+narrow the gap, though: a tuned parallel-start sidecar costs a few warm
+milliseconds and ≈ 0 marginal cold start, so the deciding costs are
+operational (image ownership, per-revision pinning, explicit sizing), not
+latency — polyglot pressure tips the balance toward the sidecar earlier
+than this section originally assumed. Revisit if IAM closure cannot be
+guaranteed for some service class.
 
 ### 7.4 JWKS distribution, fetch amplification, and key rotation
 
@@ -538,11 +543,15 @@ the thing that survives an issuer blip.
   cold start — the same request pays both. Eager fetch at startup and the
   internal mirror shrink this; it never disappears.
 - **First-call token mint** per target after an Apigee cache miss/expiry.
-- **Sidecar variant** (§4.5): a second container in every cold start, an
-  extra localhost hop on every request, and Envoy's memory footprint
-  (tens of MB) on every instance × the whole fleet. These are the
-  quantified reasons the library is the §7.3 default — **[VERIFY]**
-  actual numbers if the sidecar is pursued.
+- **Sidecar variant** (§4.5): **[VERIFIED]** the localhost hop costs
+  ≈ +3–7 ms p50 warm (higher figure at 0.25 vCPU — mild throttling on the
+  RS256 verify), and with parallel container starts the cold-start cost
+  measured ≈ 0 marginal — Envoy's ~0.6 s init overlaps the boot of any app
+  at least that slow (the +0.65 s first measured was the `--depends-on`
+  serialization, not the sidecar itself). What remains real fleet-wide is
+  the per-instance footprint (0.25 vCPU/128 Mi when sized explicitly;
+  per-container defaults silently double it) and the warm milliseconds —
+  cold start is no longer an argument against the sidecar.
 - p50 barely moves from any of this; **p99 is where the auth design shows
   up**, and it shows up on exactly the requests already paying cold-start
   cost. Benchmark cold and warm separately or the numbers will lie.
