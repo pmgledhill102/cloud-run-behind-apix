@@ -40,6 +40,7 @@ Cross-cutting docs:
 - `docs/path-routing-at-scale.md` — Paper design: URL hierarchy → Apigee → Cloud Run at ~50 domains / ~500 APIs (PoC extension plan in §9)
 - `docs/auth/jwt-enforcement-design.md` — Design: where to enforce authn/authz for external-issuer JWTs (Apigee shared flow vs Cloud Run IAM vs sidecar vs in-service middleware); §10 items 1–5 verified live
 - `docs/auth/auth-poc-field-notes.md` — Auth PoC live-run lessons: greenfield races, BASE-env limits, flow hook casing, JWKS reachability, 403 signatures
+- `docs/auth/envoy-sidecar-flow.md` — Envoy sidecar JWT flow explained three ways: sequence view, wire-level headers per hop, checkpoint/rejection tables (diagrams: `envoy-sidecar-{sequence,headers}.drawio`)
 
 ## PoC Scripts
 

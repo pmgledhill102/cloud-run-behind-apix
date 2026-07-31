@@ -215,6 +215,10 @@ languages.
   expired/missing but **403** for audience mismatch, where Apigee VerifyJWT
   and the library return 401 across the board.
 
+  The verified flow is documented hop-by-hop — sequence diagram, wire-level
+  headers with decoded example tokens, per-layer rejection matrix — in
+  [envoy-sidecar-flow.md](envoy-sidecar-flow.md).
+
 ### 4.6 Considered and rejected
 
 | Component | Why not |
