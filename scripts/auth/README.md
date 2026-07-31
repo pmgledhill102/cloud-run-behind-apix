@@ -59,9 +59,10 @@ setup, removed by teardown). The private key never leaves the local machine
 | 3 | Flow-hook shared flow rejects expired / wrong-aud / missing JWTs at the edge; latency | Tests 2, 3, 5 |
 | 4 (partial) | JWKS mirror posture reachable in-perimeter; cold-start fetch timing in auth-echo startup logs | Test 1 + logs |
 | 5 | Cloud Run custom audience — fixed-string `aud`, no per-service URL plumbing | Test 2 |
+| 6 | Sidecar variant: Envoy `jwt_authn` ingress container enforces (app middleware off), client JWT intact end-to-end; Envoy's 401/403 rejection taxonomy; latency vs library | Tests E1–E3 (`test-envoy.sh`) |
 
-Not covered (follow-ups): item 6 (sidecar/ingress-container variant), item 7
-(org-policy preventive controls — needs org perms), item 8 (edge deny-list).
+Not covered (follow-ups, tracked in #35): item 7 (org-policy preventive
+controls — needs org perms), item 8 (edge deny-list).
 
 ## Caveats
 
