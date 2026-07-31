@@ -37,6 +37,10 @@ cr-idp-mock:  JWKS endpoint (allow-unauth + ingress=internal — §7.4 mirror po
 ./scripts/auth/teardown-envoy.sh
 ```
 
+The sidecar variant's request path — headers at every hop, what each layer
+checks, rejection signatures — is walked through in
+[`docs/auth/envoy-sidecar-flow.md`](../../docs/auth/envoy-sidecar-flow.md).
+
 **Warning:** setup attaches the shared flow via the env-level flow hook, so
 **every** proxy in the env requires a valid JWT until teardown (that's the
 point — fleet-wide, structurally unskippable). The option2/3 `/hello` tests
@@ -72,5 +76,7 @@ Not covered (follow-ups): item 6 (sidecar/ingress-container variant), item 7
   `jwks_source` appears in every echo response. **Answered live**: it can't —
   the fetch 404s at the public frontend in ~75–100 ms and the env fallback
   wins (see `docs/auth/auth-poc-field-notes.md`).
-- Diagrams: `docs/diagrams/auth-enforcement-layers.drawio` (concept) and
-  `docs/diagrams/auth-poc-architecture.drawio` (this build).
+- Diagrams: `docs/diagrams/auth-enforcement-layers.drawio` (concept),
+  `docs/diagrams/auth-poc-architecture.drawio` (this build), and
+  `docs/diagrams/envoy-sidecar-{sequence,headers}.drawio` (sidecar-variant
+  request flow).

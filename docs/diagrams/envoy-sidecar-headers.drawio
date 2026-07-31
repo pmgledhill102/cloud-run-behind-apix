@@ -1,0 +1,172 @@
+<mxfile host="app.diagrams.net" modified="2026-07-31T09:00:00.000Z">
+  <diagram name="Envoy Sidecar JWT — Headers on the Wire" id="envoy-sidecar-headers">
+    <mxGraphModel dx="1422" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="900" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+
+        <mxCell id="title" value="Envoy Sidecar JWT Flow — What Is Actually on the Wire at Each Hop" style="text;html=1;fontSize=18;fontStyle=1;align=center;fontColor=#202124;" vertex="1" parent="1">
+          <mxGeometry x="200" y="8" width="1200" height="28" as="geometry"/>
+        </mxCell>
+        <mxCell id="subtitle" value="One request, four wire states (A–D). Purple = client JWT (Authorization) &#183; orange = Google ID token (X-Serverless-Authorization). Checkpoints below show what happens between states." style="text;html=1;fontSize=10;align=center;fontColor=#5F6368;" vertex="1" parent="1">
+          <mxGeometry x="150" y="34" width="1300" height="18" as="geometry"/>
+        </mxCell>
+
+        <!-- ==================== WIRE STATE CARDS ==================== -->
+        <mxCell id="cardA" value="A &#8212; client &#8594; Apigee edge" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#4285F4;strokeWidth=2;verticalAlign=top;fontStyle=1;fontSize=11;fontColor=#1A73E8;arcSize=6;container=1;collapsible=0;spacingTop=4;" vertex="1" parent="1">
+          <mxGeometry x="40" y="70" width="340" height="150" as="geometry"/>
+        </mxCell>
+        <mxCell id="cardA-l1" value="GET /auth-echo-envoy HTTP/1.1&#xa;Host: api.internal.example.com" style="text;fontSize=9;fontColor=#3C4043;align=left;fontFamily=Courier New;spacingLeft=8;" vertex="1" parent="cardA">
+          <mxGeometry x="8" y="28" width="324" height="32" as="geometry"/>
+        </mxCell>
+        <mxCell id="cardA-l2" value="Authorization: Bearer&#xa;eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6&#xa;InBvYy1rZXktMSJ9.eyJpc3MiOi&#8230;" style="text;fontSize=9;fontColor=#6A1B9A;align=left;fontFamily=Courier New;fontStyle=1;spacingLeft=8;" vertex="1" parent="cardA">
+          <mxGeometry x="8" y="64" width="324" height="46" as="geometry"/>
+        </mxCell>
+        <mxCell id="cardA-note" value="one token: the client JWT, signed on the VM&#xa;with the mock issuer&#39;s private key" style="text;fontSize=8;fontColor=#80868B;align=left;fontStyle=2;spacingLeft=8;" vertex="1" parent="cardA">
+          <mxGeometry x="8" y="114" width="324" height="28" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="cardB" value="B &#8212; Apigee &#8594; Cloud Run front end (via PGA restricted VIP)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#E91E63;strokeWidth=2;verticalAlign=top;fontStyle=1;fontSize=11;fontColor=#C2185B;arcSize=6;container=1;collapsible=0;spacingTop=4;" vertex="1" parent="1">
+          <mxGeometry x="450" y="70" width="360" height="180" as="geometry"/>
+        </mxCell>
+        <mxCell id="cardB-l1" value="GET / HTTP/2                &#8592; BasePath stripped&#xa;Host: cr-auth-echo-envoy-&#8230;.run.app" style="text;fontSize=9;fontColor=#3C4043;align=left;fontFamily=Courier New;spacingLeft=8;" vertex="1" parent="cardB">
+          <mxGeometry x="8" y="28" width="344" height="32" as="geometry"/>
+        </mxCell>
+        <mxCell id="cardB-l2" value="Authorization: Bearer eyJhbGciOiJSUzI1&#8230;&#xa;&#8592; BYTE-IDENTICAL to state A" style="text;fontSize=9;fontColor=#6A1B9A;align=left;fontFamily=Courier New;fontStyle=1;spacingLeft=8;" vertex="1" parent="cardB">
+          <mxGeometry x="8" y="64" width="344" height="32" as="geometry"/>
+        </mxCell>
+        <mxCell id="cardB-l3" value="X-Serverless-Authorization: Bearer&#xa;eyJhbGciOiJSUzI1NiIsImtpZCI6IjZmNzI1NDEw&#8230;&#xa;&#8592; NEW: Google ID token, aud apigee-poc-auth" style="text;fontSize=9;fontColor=#E65100;align=left;fontFamily=Courier New;fontStyle=1;spacingLeft=8;" vertex="1" parent="cardB">
+          <mxGeometry x="8" y="100" width="344" height="46" as="geometry"/>
+        </mxCell>
+        <mxCell id="cardB-note" value="two tokens now travel together, in separate headers&#xa;(HeaderName steers the mint away from Authorization)" style="text;fontSize=8;fontColor=#80868B;align=left;fontStyle=2;spacingLeft=8;" vertex="1" parent="cardB">
+          <mxGeometry x="8" y="148" width="344" height="28" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="cardC" value="C &#8212; front end &#8594; Envoy ingress container (:8080)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#4CAF50;strokeWidth=2;verticalAlign=top;fontStyle=1;fontSize=11;fontColor=#2E7D32;arcSize=6;container=1;collapsible=0;spacingTop=4;" vertex="1" parent="1">
+          <mxGeometry x="880" y="70" width="340" height="160" as="geometry"/>
+        </mxCell>
+        <mxCell id="cardC-l1" value="GET / HTTP/1.1" style="text;fontSize=9;fontColor=#3C4043;align=left;fontFamily=Courier New;spacingLeft=8;" vertex="1" parent="cardC">
+          <mxGeometry x="8" y="28" width="324" height="16" as="geometry"/>
+        </mxCell>
+        <mxCell id="cardC-l2" value="Authorization: Bearer eyJhbGciOiJSUzI1&#8230;" style="text;fontSize=9;fontColor=#6A1B9A;align=left;fontFamily=Courier New;fontStyle=1;spacingLeft=8;" vertex="1" parent="cardC">
+          <mxGeometry x="8" y="48" width="324" height="16" as="geometry"/>
+        </mxCell>
+        <mxCell id="cardC-l3" value="X-Serverless-Authorization: Bearer eyJh&#8230;&#xa;&#8592; consumed by IAM, but NOT stripped" style="text;fontSize=9;fontColor=#E65100;align=left;fontFamily=Courier New;fontStyle=1;spacingLeft=8;" vertex="1" parent="cardC">
+          <mxGeometry x="8" y="68" width="324" height="32" as="geometry"/>
+        </mxCell>
+        <mxCell id="cardC-note" value="headers unchanged &#8212; the state transition here is a&#xa;DECISION (IAM verdict), not a mutation; the workload&#xa;can observe the hop identity, not just trust it" style="text;fontSize=8;fontColor=#80868B;align=left;fontStyle=2;spacingLeft=8;" vertex="1" parent="cardC">
+          <mxGeometry x="8" y="104" width="324" height="42" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="cardD" value="D &#8212; Envoy &#8594; app (127.0.0.1:8081)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#FB8C00;strokeWidth=2;verticalAlign=top;fontStyle=1;fontSize=11;fontColor=#E65100;arcSize=6;container=1;collapsible=0;spacingTop=4;" vertex="1" parent="1">
+          <mxGeometry x="1290" y="70" width="280" height="160" as="geometry"/>
+        </mxCell>
+        <mxCell id="cardD-l1" value="GET / HTTP/1.1   (plain, in-instance)" style="text;fontSize=9;fontColor=#3C4043;align=left;fontFamily=Courier New;spacingLeft=8;" vertex="1" parent="cardD">
+          <mxGeometry x="8" y="28" width="264" height="16" as="geometry"/>
+        </mxCell>
+        <mxCell id="cardD-l2" value="Authorization: Bearer eyJhbGci&#8230;&#xa;&#8592; kept: forward: true" style="text;fontSize=9;fontColor=#6A1B9A;align=left;fontFamily=Courier New;fontStyle=1;spacingLeft=8;" vertex="1" parent="cardD">
+          <mxGeometry x="8" y="48" width="264" height="32" as="geometry"/>
+        </mxCell>
+        <mxCell id="cardD-l3" value="X-Serverless-Authorization: &#8230;&#xa;&#8592; passed through untouched" style="text;fontSize=9;fontColor=#E65100;align=left;fontFamily=Courier New;fontStyle=1;spacingLeft=8;" vertex="1" parent="cardD">
+          <mxGeometry x="8" y="84" width="264" height="32" as="geometry"/>
+        </mxCell>
+        <mxCell id="cardD-l4" value="x-request-id: 7f9c&#8230; (Envoy housekeeping)" style="text;fontSize=8;fontColor=#80868B;align=left;fontStyle=2;fontFamily=Courier New;spacingLeft=8;" vertex="1" parent="cardD">
+          <mxGeometry x="8" y="120" width="264" height="16" as="geometry"/>
+        </mxCell>
+
+        <!-- Arrows between cards -->
+        <mxCell id="arrAB" value="" style="endArrow=classic;strokeColor=#E91E63;strokeWidth=3;html=1;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry"><mxPoint x="380" y="145" as="sourcePoint"/><mxPoint x="450" y="145" as="targetPoint"/></mxGeometry>
+        </mxCell>
+        <mxCell id="arrBC" value="" style="endArrow=classic;strokeColor=#4CAF50;strokeWidth=3;html=1;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry"><mxPoint x="810" y="145" as="sourcePoint"/><mxPoint x="880" y="145" as="targetPoint"/></mxGeometry>
+        </mxCell>
+        <mxCell id="arrCD" value="" style="endArrow=classic;strokeColor=#FB8C00;strokeWidth=3;html=1;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry"><mxPoint x="1220" y="145" as="sourcePoint"/><mxPoint x="1290" y="145" as="targetPoint"/></mxGeometry>
+        </mxCell>
+
+        <!-- ==================== CHECKPOINT CALLOUTS ==================== -->
+        <mxCell id="cpApigee" value="APIGEE (turns state A into B)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FCE4EC;strokeColor=#E91E63;strokeWidth=2;verticalAlign=top;fontStyle=1;fontSize=11;fontColor=#C2185B;arcSize=6;container=1;collapsible=0;spacingTop=4;" vertex="1" parent="1">
+          <mxGeometry x="140" y="290" width="400" height="160" as="geometry"/>
+        </mxCell>
+        <mxCell id="cpApigee-checks" value="CHECKS (VerifyJWT via PreProxyFlowHook, before any proxy logic):&#xa;reads Authorization &#183; RS256 pinned &#183; sig vs cr-idp-mock JWKS (MP-cached)&#xa;&#183; exp/nbf &#183; iss = https://idp.poc.internal &#183; aud = api://apigee-poc&#xa;fail &#8594; 401 (steps.jwt.TokenExpired / InvalidClaim / FailedToResolveVariable)" style="text;fontSize=9;fontColor=#3C4043;align=left;spacingLeft=8;verticalAlign=top;" vertex="1" parent="cpApigee">
+          <mxGeometry x="8" y="24" width="384" height="66" as="geometry"/>
+        </mxCell>
+        <mxCell id="cpApigee-adds" value="ADDS / CHANGES: mints Google ID token (SA apigee-poc, custom aud,&#xa;cached ~1 h) into X-Serverless-Authorization &#183; strips BasePath &#183; rewrites Host&#xa;&#8212; Authorization is never touched" style="text;fontSize=9;fontColor=#0D652D;align=left;spacingLeft=8;verticalAlign=top;fontStyle=1;" vertex="1" parent="cpApigee">
+          <mxGeometry x="8" y="96" width="384" height="54" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="cpIam" value="CLOUD RUN IAM (gates B &#8594; C)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8F5E9;strokeColor=#4CAF50;strokeWidth=2;verticalAlign=top;fontStyle=1;fontSize=11;fontColor=#2E7D32;arcSize=6;container=1;collapsible=0;spacingTop=4;" vertex="1" parent="1">
+          <mxGeometry x="600" y="290" width="380" height="160" as="geometry"/>
+        </mxCell>
+        <mxCell id="cpIam-checks" value="CHECKS (before any container starts or bills):&#xa;reads X-Serverless-Authorization ONLY &#183; Google signature&#xa;&#183; aud = apigee-poc-auth (accepted via --add-custom-audiences)&#xa;&#183; principal apigee-poc has roles/run.invoker&#xa;fail &#8594; 403, no container ran (closes the T3 direct-bypass threat)" style="text;fontSize=9;fontColor=#3C4043;align=left;spacingLeft=8;verticalAlign=top;" vertex="1" parent="cpIam">
+          <mxGeometry x="8" y="24" width="364" height="84" as="geometry"/>
+        </mxCell>
+        <mxCell id="cpIam-adds" value="ADDS / CHANGES: nothing &#8212; both headers forwarded as-is.&#xa;The client JWT is opaque at this layer." style="text;fontSize=9;fontColor=#0D652D;align=left;spacingLeft=8;verticalAlign=top;fontStyle=1;" vertex="1" parent="cpIam">
+          <mxGeometry x="8" y="114" width="364" height="36" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="cpEnvoy" value="ENVOY jwt_authn (gates C &#8594; D)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F3E5F5;strokeColor=#9C27B0;strokeWidth=2;verticalAlign=top;fontStyle=1;fontSize=11;fontColor=#6A1B9A;arcSize=6;container=1;collapsible=0;spacingTop=4;" vertex="1" parent="1">
+          <mxGeometry x="1040" y="290" width="400" height="160" as="geometry"/>
+        </mxCell>
+        <mxCell id="cpEnvoy-checks" value="CHECKS (zero-trust re-validation of the client JWT):&#xa;reads Authorization ONLY (X-Serverless-Auth ignored) &#183; RS256 sig vs&#xa;INLINE JWKS (JWKS_JSON env &#8212; no runtime fetch, see &#167;7 of the flow doc)&#xa;&#183; iss &#183; aud &#183; exp/nbf &#183; /healthz exempt (startup-probe route)&#xa;fail &#8594; 401 &#39;Jwt is expired/missing&#39; BUT 403 &#39;Audiences&#8230;not allowed&#39;" style="text;fontSize=9;fontColor=#3C4043;align=left;spacingLeft=8;verticalAlign=top;" vertex="1" parent="cpEnvoy">
+          <mxGeometry x="8" y="24" width="384" height="84" as="geometry"/>
+        </mxCell>
+        <mxCell id="cpEnvoy-adds" value="ADDS / CHANGES: routes to 127.0.0.1:8081 &#183; keeps Authorization&#xa;(forward: true &#8212; default would strip it) &#183; adds x-request-id" style="text;fontSize=9;fontColor=#0D652D;align=left;spacingLeft=8;verticalAlign=top;fontStyle=1;" vertex="1" parent="cpEnvoy">
+          <mxGeometry x="8" y="114" width="384" height="36" as="geometry"/>
+        </mxCell>
+
+        <!-- connectors from arrows down to checkpoints -->
+        <mxCell id="conn1" value="" style="endArrow=none;dashed=1;dashPattern=3 3;strokeColor=#E91E63;strokeWidth=1;html=1;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry"><mxPoint x="415" y="155" as="sourcePoint"/><mxPoint x="340" y="290" as="targetPoint"/></mxGeometry>
+        </mxCell>
+        <mxCell id="conn2" value="" style="endArrow=none;dashed=1;dashPattern=3 3;strokeColor=#4CAF50;strokeWidth=1;html=1;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry"><mxPoint x="845" y="155" as="sourcePoint"/><mxPoint x="790" y="290" as="targetPoint"/></mxGeometry>
+        </mxCell>
+        <mxCell id="conn3" value="" style="endArrow=none;dashed=1;dashPattern=3 3;strokeColor=#9C27B0;strokeWidth=1;html=1;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry"><mxPoint x="1255" y="155" as="sourcePoint"/><mxPoint x="1240" y="290" as="targetPoint"/></mxGeometry>
+        </mxCell>
+
+        <!-- ==================== TOKEN DECODES + RESPONSE ==================== -->
+        <mxCell id="tokClient" value="The client JWT, decoded (rides Authorization end-to-end)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#9C27B0;strokeWidth=2;verticalAlign=top;fontStyle=1;fontSize=11;fontColor=#6A1B9A;arcSize=6;container=1;collapsible=0;spacingTop=4;" vertex="1" parent="1">
+          <mxGeometry x="40" y="490" width="480" height="290" as="geometry"/>
+        </mxCell>
+        <mxCell id="tokClient-hdr" value="header&#xa;{ &quot;alg&quot;: &quot;RS256&quot;,        &#8592; pinned by Apigee AND Envoy (no alg switching)&#xa;  &quot;typ&quot;: &quot;JWT&quot;,&#xa;  &quot;kid&quot;: &quot;poc-key-1&quot; }    &#8592; selects the key inside each JWKS" style="text;fontSize=9;fontColor=#3C4043;align=left;fontFamily=Courier New;spacingLeft=8;verticalAlign=top;" vertex="1" parent="tokClient">
+          <mxGeometry x="8" y="24" width="464" height="66" as="geometry"/>
+        </mxCell>
+        <mxCell id="tokClient-pl" value="payload&#xa;{ &quot;iss&quot;: &quot;https://idp.poc.internal&quot;,  &#8592; checked at Apigee + Envoy&#xa;  &quot;aud&quot;: &quot;api://apigee-poc&quot;,          &#8592; checked at Apigee + Envoy&#xa;  &quot;sub&quot;: &quot;test-user&quot;,                 &#8592; for the app&#39;s fine-grained authz&#xa;  &quot;scope&quot;: &quot;echo.read&quot;,               &#8592; (echoed only, in this PoC)&#xa;  &quot;iat&quot;: 1785436000,&#xa;  &quot;exp&quot;: 1785436300 }                 &#8592; iat + 5 min; exp/nbf checked twice" style="text;fontSize=9;fontColor=#3C4043;align=left;fontFamily=Courier New;spacingLeft=8;verticalAlign=top;" vertex="1" parent="tokClient">
+          <mxGeometry x="8" y="94" width="464" height="118" as="geometry"/>
+        </mxCell>
+        <mxCell id="tokClient-note" value="Signed on vm-test with the mock issuer&#39;s PRIVATE key (never enters the platform).&#xa;Verified twice against the matching PUBLIC key: Apigee via the cr-idp-mock JWKS URL,&#xa;Envoy via the same JWKS inlined at deploy time." style="text;fontSize=8;fontColor=#80868B;align=left;fontStyle=2;spacingLeft=8;verticalAlign=top;" vertex="1" parent="tokClient">
+          <mxGeometry x="8" y="218" width="464" height="60" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="tokGoogle" value="The Google ID token, decoded (rides X-Serverless-Authorization for one hop)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#FB8C00;strokeWidth=2;verticalAlign=top;fontStyle=1;fontSize=11;fontColor=#E65100;arcSize=6;container=1;collapsible=0;spacingTop=4;" vertex="1" parent="1">
+          <mxGeometry x="560" y="490" width="480" height="290" as="geometry"/>
+        </mxCell>
+        <mxCell id="tokGoogle-pl" value="payload&#xa;{ &quot;iss&quot;: &quot;https://accounts.google.com&quot;,&#xa;  &quot;aud&quot;: &quot;apigee-poc-auth&quot;,   &#8592; CUSTOM audience: one fixed string for&#xa;                                every target, not a per-service URL&#xa;  &quot;azp&quot;: &quot;1046&#8230;&quot;,&#xa;  &quot;email&quot;: &quot;apigee-poc@PROJECT_ID.iam.gserviceaccount.com&quot;,&#xa;                              &#8592; must hold roles/run.invoker&#xa;  &quot;email_verified&quot;: true,&#xa;  &quot;iat&quot;: 1785436010,&#xa;  &quot;exp&quot;: 1785439610 }         &#8592; ~1 h; Apigee caches the mint until&#xa;                                near expiry (&#8776; 0 amortised cost)" style="text;fontSize=9;fontColor=#3C4043;align=left;fontFamily=Courier New;spacingLeft=8;verticalAlign=top;" vertex="1" parent="tokGoogle">
+          <mxGeometry x="8" y="24" width="464" height="188" as="geometry"/>
+        </mxCell>
+        <mxCell id="tokGoogle-note" value="Answers &#39;is this hop from Apigee?&#39; &#8212; nothing about the end user. Minted by Apigee as&#xa;the proxy&#39;s deploy SA; verified ONLY by Cloud Run IAM. Envoy and the app never look at&#xa;it (it passes through, observable for audit)." style="text;fontSize=8;fontColor=#80868B;align=left;fontStyle=2;spacingLeft=8;verticalAlign=top;" vertex="1" parent="tokGoogle">
+          <mxGeometry x="8" y="218" width="464" height="60" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="respCard" value="The response (app &#8594; Envoy &#8594; front end &#8594; Apigee &#8594; client, 200)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#4CAF50;strokeWidth=2;verticalAlign=top;fontStyle=1;fontSize=11;fontColor=#2E7D32;arcSize=6;container=1;collapsible=0;spacingTop=4;" vertex="1" parent="1">
+          <mxGeometry x="1080" y="490" width="490" height="290" as="geometry"/>
+        </mxCell>
+        <mxCell id="respCard-body" value="{&#xa;  &quot;service&quot;: &quot;cr-auth-echo-envoy&quot;,&#xa;  &quot;headers_seen&quot;: {&#xa;    &quot;authorization&quot;: true,     &#8592; proves forward: true worked&#xa;    &quot;x_serverless_authorization&quot;: true&#xa;                               &#8592; proves Cloud Run forwarded&#xa;                                 the hop identity&#xa;  },&#xa;  &quot;jwt&quot;: { &quot;valid&quot;: true,&#xa;           &quot;mode&quot;: &quot;off (enforced by ingress container)&quot; },&#xa;                               &#8592; the app did NO JWT work&#xa;  &quot;jwks_source&quot;: &quot;env&quot;         &#8592; inline JWKS, not a URL fetch&#xa;}" style="text;fontSize=9;fontColor=#3C4043;align=left;fontFamily=Courier New;spacingLeft=8;verticalAlign=top;" vertex="1" parent="respCard">
+          <mxGeometry x="8" y="24" width="474" height="210" as="geometry"/>
+        </mxCell>
+        <mxCell id="respCard-note" value="test-envoy.sh E1 asserts on &#39;mode&#39;:&#39;off&#39; + &#39;authorization&#39;:true &#8212; together they prove&#xa;the sidecar (not the app) enforced, and the JWT still reached the app for authz." style="text;fontSize=8;fontColor=#80868B;align=left;fontStyle=2;spacingLeft=8;verticalAlign=top;" vertex="1" parent="respCard">
+          <mxGeometry x="8" y="238" width="474" height="40" as="geometry"/>
+        </mxCell>
+
+        <!-- Bottom takeaway -->
+        <mxCell id="takeaway" value="Takeaway: the request is MUTATED exactly once (Apigee adds the Google ID token + rewrites the request line); every other transition is a pass/fail decision on data already present. The client JWT is byte-identical from the client&#39;s curl all the way into the app container." style="text;fontSize=10;fontColor=#3C4043;align=left;verticalAlign=top;fillColor=#FFF8E1;rounded=1;strokeColor=#F9A825;spacingLeft=10;spacingRight=10;spacingTop=6;spacingBottom=6;whiteSpace=wrap;" vertex="1" parent="1">
+          <mxGeometry x="40" y="800" width="1530" height="46" as="geometry"/>
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
