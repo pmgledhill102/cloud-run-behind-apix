@@ -302,6 +302,76 @@ going to fix itself (§4).
   inside it — verified greenfield 2026-08-03 (63 min project-to-tested vs
   ~110 min serial).
 
+### The flap: enforcement arrival is not monotonic
+
+The propagation table treats "enforcement arrives" as a single event. It
+isn't. On 2026-08-03 we caught the transition mid-flight twice — with the
+instrumented probe loop, so the timelines below are logged observations,
+not reconstruction from memory. In both cases the perimeter's **state went
+BLOCKED, reverted to OPEN, then settled BLOCKED** — a probe that stopped
+at the first 403 would have declared victory during a window in which the
+perimeter was still intermittently wide open.
+
+**Case 1 — delete then recreate (worst case).** An existing enforcing
+perimeter was torn down and an equivalent one created ~1 minute later
+(verifying the #52 split on a non-greenfield project). The two propagation
+waves interleaved:
+
+| Wall clock | Observation |
+|---|---|
+| ~15:25 | old perimeter deleted (had been enforcing for ~5.5 h) |
+| ~15:26 | new perimeter created, API reports ENFORCED |
+| 15:30–15:32 | probe: **BLOCKED ×3 consecutive** — looked arrived |
+| 15:33–15:40 | test suite: **OPEN** — three 200s a minute apart |
+| ~15:55 | probe (`CONFIRM=5`): BLOCKED, stable from here on |
+
+Net: ~30 minutes of ambiguity in which *both* "it's enforcing" and "it's
+not enforcing" were observable minutes apart. Our first probe run
+confirmed ×3 and exited green at 15:32; the test suite then read the
+opposite. Without the timestamped probe logs this would have looked like a
+broken test, and this doc's older self would have said "propagation, wait
+30 minutes" — the truth was messier: it had *arrived and left again*.
+
+**Case 2 — clean greenfield creation (no prior perimeter, ever).** Same
+shape, which is the important part — flapping is not an artifact of
+delete/recreate interleaving:
+
+| Wall clock | Observation |
+|---|---|
+| 17:37 | perimeter created on a fresh project, API reports ENFORCED |
+| 17:39–17:55 | probe: OPEN throughout |
+| 18:00 | probe: **BLOCKED** (first confirmation) |
+| 18:01–18:15 | probe: **OPEN again** — confirmation counter reset |
+| 18:17–18:19 | probe: BLOCKED ×3 consecutive, stable from here on |
+
+Net: first flip at ~20 min, stable at ~40 min, with a reversion in
+between on a perimeter that had never existed before.
+
+**Reading it.** We can't see inside the control plane, but the shape is
+consistent with enforcement rolling out across multiple enforcement points
+that converge at different times: mid-window, consecutive requests hit
+differently-converged paths and get different answers. Caveats on the
+data: 60 s probe resolution, one probe target (the storage negative test),
+one VM vantage point, n=2 flap observations — enough to prove flapping
+happens, not enough to characterise its distribution.
+
+**What this changes in practice:**
+
+- A single 403 is not "enforced", and — worse for compliance — a
+  *confirmed streak* early in the window is still not "enforced for good".
+  If the perimeter is load-bearing for a change window, verify at the
+  point of need, not once at arrival.
+- `measure-propagation.sh`'s `CONFIRM` knob exists for this. `CONFIRM=3`
+  caught Case 2's reversion (counter reset); it was fooled in Case 1
+  (three greens inside a flap). After a delete/recreate, use `CONFIRM=5`.
+- Symmetrically, assume the mid-window perimeter provides only
+  **intermittent** protection: for real environments, treat the window
+  between create and stable-confirm as *unprotected* for planning
+  purposes.
+- Test suites should never anchor pass/fail on a single early negative
+  probe; re-run after a settle period before debugging (we lost a cycle to
+  exactly this in Case 1).
+
 ---
 
 ## 6. Operational gotchas that masqueraded as pattern failures

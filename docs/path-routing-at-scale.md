@@ -212,7 +212,12 @@ authentication *writes* the `Authorization` header — clobbering the client
 JWT. Cloud Run accepts the Google token in the **`X-Serverless-Authorization`**
 header for exactly this collision; Apigee's `<Authentication>` block can be
 pointed at it (`<HeaderName>`) so the client JWT keeps `Authorization`.
-**[VERIFY]** the combined-headers pattern live before relying on it.
+**[VERIFIED]** live by the auth PoC — client JWT arrived intact in
+`Authorization` with the Google ID token accepted from
+`X-Serverless-Authorization`, on 2026-07-30 and re-proven greenfield
+2026-08-03 (also reproduced outside Apigee via Envoy `gcp_authn`
+`token_header` in the mock stack): see
+[jwt-enforcement-design.md](auth/jwt-enforcement-design.md) §10 item 1.
 
 | | A: platform IAM | B: in-house JWT | A + B |
 |---|---|---|---|
