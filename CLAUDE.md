@@ -91,6 +91,7 @@ SERVICE_COUNT=20 ./scripts/option3/setup.sh
 - `scripts/option3/` — Option C: PSC Google APIs (PSC endpoint + DNS; `SERVICE_COUNT=20` for scaled)
 - `scripts/option4/` — Option D: PSC Service Attachment (workloads-vpc + ILB + SA + PSC + Apigee EA)
 - `scripts/auth/` — Auth PoC: JWT enforcement layers on option 2/2b (mock IdP + JWKS service, VerifyJWT shared flow via env flow hook, combined-header target auth, IAM-closed echo service in two peer variants deployed by one setup: Envoy jwt_authn sidecar + library middleware). **Note:** the flow hook makes every proxy in the env require a JWT until `auth/teardown.sh` runs
+- `scripts/mock-apigee/` — Mock-Apigee quick stack: Envoy gateway VM in a peered tenant-mock VPC stands in for the Apigee runtime (~2-3 min, no Apigee/VPC-SC required; needs setup-base + auth keypair/services). Inner loop only — confirm results on real Apigee before documenting
 
 **Note:** Options 1 & 4 both use workloads-vpc — don't run both simultaneously.
 

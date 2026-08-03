@@ -1,0 +1,150 @@
+# Mock-Apigee gateway config — rendered by entrypoint.sh via envsubst.
+#
+# Mirrors the real Apigee request path layer by layer:
+#   TLS :${GW_PORT}     = the runtime's TLS endpoint (self-signed, curl -k)
+#   jwt_authn           = VerifyJWT via the env flow hook: RS256 vs inline
+#                         JWKS, iss, aud (exp/nbf always checked); applies to
+#                         EVERY route except /healthz, same fleet-wide
+#                         semantics as the PreProxyFlowHook.
+#   gcp_authn           = GoogleIDToken target auth: fetches an ID token from
+#                         the VM metadata server (audience per upstream
+#                         cluster via typed_filter_metadata) and writes it to
+#                         X-Serverless-Authorization (token_header), leaving
+#                         the client JWT untouched in Authorization —
+#                         the combined-header pattern (design doc §2).
+#   routes              = the API proxies: BasePath prefix → Cloud Run
+#                         target, host rewritten to the run.app hostname.
+#
+# NOTE on rejection signatures: jwt_authn answers 401 (expired/missing) and
+# 403 (audience mismatch) with plain-text bodies — NOT Apigee's JSON
+# {"fault":...} taxonomy. Faithful flows, different error surface.
+static_resources:
+  listeners:
+  - name: ingress_https
+    address:
+      socket_address: {address: 0.0.0.0, port_value: ${GW_PORT}}
+    filter_chains:
+    - transport_socket:
+        name: envoy.transport_sockets.tls
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
+          common_tls_context:
+            tls_certificates:
+            - certificate_chain: {filename: /tmp/gw-cert.pem}
+              private_key: {filename: /tmp/gw-key.pem}
+      filters:
+      - name: envoy.filters.network.http_connection_manager
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+          stat_prefix: mock_apigee
+          route_config:
+            name: proxies
+            virtual_hosts:
+            - name: all
+              domains: ["*"]
+              routes:
+              # JWT-exempt liveness probe (jwt_authn rule below skips it)
+              - match: {path: "/healthz"}
+                direct_response: {status: 200, body: {inline_string: "ok"}}
+              # "API proxies": BasePath → Cloud Run target. auto_host_rewrite
+              # sets Host to the run.app hostname (required by the Cloud Run
+              # front end); prefix_rewrite mirrors Apigee's target URL of "/".
+              - match: {prefix: "/auth-echo"}
+                route:
+                  cluster: cr_auth_echo
+                  prefix_rewrite: "/"
+                  auto_host_rewrite: true
+              - match: {prefix: "/hello"}
+                route:
+                  cluster: cr_hello
+                  prefix_rewrite: "/"
+                  auto_host_rewrite: true
+          http_filters:
+          - name: envoy.filters.http.jwt_authn
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.jwt_authn.v3.JwtAuthentication
+              providers:
+                poc-idp:
+                  issuer: ${JWT_ISSUER}
+                  audiences: ["${JWT_AUDIENCE}"]
+                  forward: true
+                  local_jwks:
+                    inline_string: '${JWKS_JSON}'
+              rules:
+              # first-match: /healthz has no requirement (probe path), every
+              # other route requires a valid client JWT — the flow-hook
+              # "structurally unskippable" semantics.
+              - match: {path: "/healthz"}
+              - match: {prefix: "/"}
+                requires: {provider_name: poc-idp}
+          - name: envoy.filters.http.gcp_authn
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.gcp_authn.v3.GcpAuthnFilterConfig
+              cluster: metadata_server
+              timeout: 3s
+              cache_config:
+                cache_size: 10
+              token_header:
+                name: x-serverless-authorization
+                value_prefix: "Bearer "
+          - name: envoy.filters.http.router
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+  clusters:
+  - name: metadata_server
+    connect_timeout: 2s
+    type: STRICT_DNS
+    load_assignment:
+      cluster_name: metadata_server
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address: {address: metadata.google.internal, port_value: 80}
+  # Upstream Cloud Run targets: LOGICAL_DNS resolves the run.app hostname via
+  # the VM's resolver — the private run-app-mock zone bound to this VPC
+  # answers with the restricted VIP (199.36.153.4-7), so southbound traffic
+  # takes the PGA path exactly like the real tenant with a peered DNS domain.
+  - name: cr_auth_echo
+    connect_timeout: 5s
+    type: LOGICAL_DNS
+    load_assignment:
+      cluster_name: cr_auth_echo
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address: {address: ${AUTH_ECHO_HOST}, port_value: 443}
+    transport_socket:
+      name: envoy.transport_sockets.tls
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
+        sni: ${AUTH_ECHO_HOST}
+    metadata:
+      typed_filter_metadata:
+        envoy.filters.http.gcp_authn:
+          "@type": type.googleapis.com/envoy.extensions.filters.http.gcp_authn.v3.Audience
+          url: ${AUTH_ECHO_AUDIENCE}
+  - name: cr_hello
+    connect_timeout: 5s
+    type: LOGICAL_DNS
+    load_assignment:
+      cluster_name: cr_hello
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address: {address: ${HELLO_HOST}, port_value: 443}
+    transport_socket:
+      name: envoy.transport_sockets.tls
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
+        sni: ${HELLO_HOST}
+    metadata:
+      typed_filter_metadata:
+        envoy.filters.http.gcp_authn:
+          "@type": type.googleapis.com/envoy.extensions.filters.http.gcp_authn.v3.Audience
+          url: ${HELLO_AUDIENCE}
+admin:
+  address:
+    socket_address: {address: 127.0.0.1, port_value: 9901}
