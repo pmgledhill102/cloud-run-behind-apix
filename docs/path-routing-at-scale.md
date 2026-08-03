@@ -1,9 +1,13 @@
 # Path-Based Routing at Scale: URL Hierarchy → Apigee → Cloud Run
 
-**Status: paper design.** This maps the company URL hierarchy onto Apigee and
-Cloud Run constructs, works the scaling math at the target scale, and lists
-what a PoC extension must prove. Claims marked **[VERIFY]** are unproven —
-they are the PoC's target list, not established facts.
+**Status: paper design, structural routing claims now proven.** This maps
+the company URL hierarchy onto Apigee and Cloud Run constructs, works the
+scaling math at the target scale, and lists what a PoC extension must
+prove. Claims marked **[VERIFY]** are unproven — they are the PoC's target
+list, not established facts. §9 items 1–3 (most-specific match, live
+carve-out, base-path conflict) were **verified live on 2026-08-03** via
+[`scripts/path-routing/`](../scripts/path-routing/) — 8/8, evidence inline
+at each claim below.
 
 **Design point:** ~50 L1 domains, ~500 APIs, environment-per-lifecycle
 (Dev / Pre-Prod / Prod). Connectivity layer is Option B/2b (PGA via restricted
@@ -80,10 +84,16 @@ Two verified routing facts this design leans on (Apigee docs, with a
 documented `/catalog` vs `/catalog/cart` example):
 
 1. **Base paths must be unique within an environment group** — two proxies
-   cannot claim the same base path.
+   cannot claim the same base path. **[VERIFIED]** 2026-08-03: enforcement
+   is at *deploy* time, not import (see §8 for the exact error).
 2. **Nested base paths route by most-specific match** — `/payments` and
    `/payments/cards` can be *different proxies* and requests land correctly.
-   **[VERIFY]** in the PoC anyway: this is the load-bearing wall.
+   **[VERIFIED]** 2026-08-03 — this was the load-bearing wall, and it
+   holds: `/payments/cards/ping` answered by the nested proxy while
+   `/payments/ping` stayed on the parent (proven via per-proxy
+   `X-Served-By` response headers, not just target identity); deleting the
+   nested proxy re-routed its subtree to `/payments` ~20 s later (runtime
+   pickup of the undeploy — the deleted proxy keeps serving until then).
 
 ---
 
@@ -103,8 +113,13 @@ Candidate granularities at the target scale (50 L1, 500 APIs):
 SubDomain proxies only when revision contention demands it (§7). Because
 nested base paths coexist (fact 2 above), a split is **incremental**: carve
 `/payments/cards/issuing` out into its own proxy while `/payments/cards`
-keeps serving everything else — no big-bang migration. **[VERIFY]** the
-carve-out behaviour explicitly.
+keeps serving everything else — no big-bang migration. **[VERIFIED]**
+2026-08-03 under a 1-request/second probe: deploy the dedicated proxy,
+then remove the conditional route from the parent — 300 samples, **zero
+non-200s**, the `X-Served-By` handover happened between consecutive
+seconds. The sequencing matters: the new proxy was READY *before* the
+parent revision dropped the route, so most-specific match flipped traffic
+with no window in which neither owned the path.
 
 ---
 
@@ -307,7 +322,13 @@ So the failure sequence as the estate grows:
   CORS — mind the 75/env cap), and the naming standard (§below). Domain
   teams cannot break each other's routing: base-path uniqueness is enforced
   by Apigee at deploy time — a mis-scoped base path fails fast rather than
-  shadowing a sibling. **[VERIFY]** the failure mode.
+  shadowing a sibling. **[VERIFIED]** 2026-08-03: the *import* of a
+  conflicting proxy succeeds; the *deploy* fails with HTTP 400
+  `FAILED_PRECONDITION`, violation type `CONFLICTING_DEPLOYMENT`, naming
+  the existing deployment and the conflicting base path
+  (`Existing deployment of ".../apis/pr-payments-cards/revisions/1"
+  contains conflicting base paths: [/payments/cards]`). Nothing served the
+  duplicate at any point — no shadowing.
 - **The 50-revision retention** limit is a nudge: high-churn proxies need
   their revision history exported to the repo, which the repo-per-proxy
   model gives for free.
@@ -342,16 +363,23 @@ matching — every Apigee-semantics claim below (most-specific match,
 deploy-time conflicts, flow behaviour) must still be proven on real Apigee;
 the mock only de-risks the harness and the config shape around it.
 
-1. **Nested base-path routing** — deploy `payments` (base path `/payments`)
-   and `payments-cards` (`/payments/cards`) as separate proxies targeting
-   distinct `cr-hello` clones; prove most-specific-match, then delete the
-   nested proxy and prove fallback to `/payments`.
-2. **The carve-out** — start with `/payments/cards` serving
-   `/issuing/**` via flows; extract `/payments/cards/issuing` into its own
-   proxy live; prove no request disruption and no 404 window.
-3. **Base-path conflict** — attempt to deploy a second proxy claiming
-   `/payments/cards`; capture the exact deploy-time error for the field
-   notes.
+1. **Nested base-path routing** — ✅ **done 2026-08-03**
+   ([`scripts/path-routing/`](../scripts/path-routing/), 8/8): deployed
+   `pr-payments` (`/payments`) and `pr-payments-cards` (`/payments/cards`)
+   against distinct `cr-hello` clones; most-specific match proven via
+   `X-Served-By`; after deleting the nested proxy, its subtree fell back
+   to `/payments` in ~20 s (runtime undeploy pickup — the deleted proxy
+   keeps serving until then).
+2. **The carve-out** — ✅ **done 2026-08-03**: started with
+   `/payments/cards` serving `/issuing/**` via a conditional route;
+   deployed `/payments/cards/issuing` as its own proxy, then removed the
+   parent's route — 300 probe samples at 1/s, zero non-200s, single-second
+   `X-Served-By` handover. Order matters: dedicated proxy READY first,
+   then drop the parent route.
+3. **Base-path conflict** — ✅ **done 2026-08-03**: import succeeds,
+   deploy fails — HTTP 400 `FAILED_PRECONDITION`, violation type
+   `CONFLICTING_DEPLOYMENT`, naming the existing deployment and base path.
+   No shadowing at any point (§8 has the full error).
 4. **Branch fan-out** — one proxy with N conditional flows → N `cr-hello`
    clones (reuse the `SERVICE_COUNT` pattern from option-c-scaled); measure
    p50/p95 latency at N = 1, 10, 50, 100 flows.
