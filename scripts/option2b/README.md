@@ -23,7 +23,9 @@ VM ─────────────────│──► restricted VI
 
 | Script | Resources |
 |---|---|
-| `setup.sh` | ACM API, scoped access policy `apigee-poc-policy`, VPC-SC on the Apigee peering, `dns.peer` grant for the Apigee service agent, restricted-VIP static route + custom route export, peered DNS domain `run-app` (tenant resolves `run.app` via this VPC), enforced perimeter `apigee_poc_perimeter` (restricts `run.googleapis.com`, `storage.googleapis.com`; ingress rule admits the caller identity; **egress allow-list** admits Cloud Run in `ALLOWED_EGRESS_PROJECT_NUMBER` only; underscores because perimeter names disallow hyphens) |
+| `setup.sh` | Thin serial wrapper: `setup-early.sh` then `setup-finish.sh` — the original single-command flow |
+| `setup-early.sh` | Pre-Apigee phase (needs only `setup-base`): ACM API, scoped access policy `apigee-poc-policy`, restricted-VIP static route, enforced perimeter `apigee_poc_perimeter` (restricts `run.googleapis.com`, `storage.googleapis.com`; ingress rule admits the caller identity; **egress allow-list** admits Cloud Run in `ALLOWED_EGRESS_PROJECT_NUMBER` only; underscores because perimeter names disallow hyphens) |
+| `setup-finish.sh` | Post-Apigee phase (idempotent): VPC-SC on the Apigee servicenetworking peering, `dns.peer` grant for the Apigee service agent, custom route export on the peering, peered DNS domain `run-app` (tenant resolves `run.app` via this VPC), Apigee proxy target refresh (same update as `option2/setup.sh` — covers option2 having run before Apigee existed) |
 | `test.sh` | Perimeter status + positive/negative enforcement tests + Apigee E2E |
 | `measure-propagation.sh` | Probes the negative test every `INTERVAL` (60s) until the expected state arrives and reports elapsed time — `measure-propagation.sh blocked` after `setup.sh`, `measure-propagation.sh open` after `teardown.sh`. Pass the target: if the flip lands before the first probe (deletion has been near-instant), auto-detect would anchor on the wrong state |
 | `setup-external.sh` | Governance-test fixtures: two Apigee pass-through proxies (`/external-blocked` → `BLOCKED_RUN_URL`, `/external-allowed` → `ALLOWED_RUN_URL`, both from `shared/env.sh`). Drift-aware: retargets via a new revision if a URL changes |
@@ -57,10 +59,45 @@ VPC's `run-app-pga` zone → restricted VIP → its own restricted-VIP route
   existing policy instead: `ACCESS_POLICY_ID=<id> ./scripts/option2b/setup.sh`.
 - Apigee (`shared/setup-slow.sh`) optional — test 4 skips if absent.
 
+## Parallel workflow: hide propagation inside Apigee provisioning
+
+Perimeter enforcement after create is **highly variable — ~1 min to ~35 min
+observed** across runs (probe-measured ~35 min on the 2026-08-03 rebuild; ~1
+min on an earlier instrumented run — see
+[field notes §5](../../docs/option-b-vpcsc-field-notes.md)). Run serially
+after `setup-slow.sh`, that tail is pure wall-clock waste. Nothing in the
+perimeter half of option2b needs Apigee — so create the perimeter right after
+`setup-base.sh` and let propagation overlap the ~60-90 min Apigee window:
+
+```text
+setup-base → (setup-slow ∥ option2b/setup-early) → option2/setup
+           → option2b/setup-finish → option2b/test
+```
+
+Early enforcement is safe for the parallel `setup-slow` run: only `run` and
+`storage` are restricted (the Apigee provisioning APIs are unaffected), and
+Cloud Build image builds succeed under the enforced perimeter (the ingress
+rule admits the caller + build SA).
+
+```bash
+./scripts/shared/setup-base.sh          # ~5 min
+./scripts/shared/setup-slow.sh &        # ~60-90 min, in parallel with:
+./scripts/option2b/setup-early.sh       # perimeter — propagation clock starts
+
+# ...when setup-slow completes:
+./scripts/option2/setup.sh              # DNS zone (+ proxy target if Apigee up)
+./scripts/option2b/setup-finish.sh      # Apigee plumbing + proxy target refresh
+./scripts/option2b/test.sh
+```
+
+If `option2/setup.sh` runs before Apigee exists, its proxy-target update
+skips gracefully — `setup-finish.sh` re-runs the same update, so the end
+state is independent of that ordering.
+
 ## Run instructions
 
 ```bash
-./scripts/option2b/setup.sh                        # ~2-5 min (perimeter + egress allow-list)
+./scripts/option2b/setup.sh                        # setup-early + setup-finish
 ./scripts/option2b/measure-propagation.sh blocked  # optional: measure enforcement arrival
 ./scripts/option2b/test.sh                         # core perimeter validation
 
@@ -84,7 +121,7 @@ VPC's `run-app-pga` zone → restricted VIP → its own restricted-VIP route
   Side effect: re-running `shared/setup-base.sh`'s Cloud Build step while the
   perimeter is up works for the caller identity (ingress rule) but would fail
   for other identities.
-- **Apigee**: `setup.sh` enables VPC-SC on the servicenetworking peering
+- **Apigee**: `setup-finish.sh` enables VPC-SC on the servicenetworking peering
   (per the [Apigee VPC-SC docs](https://cloud.google.com/apigee/docs/api-platform/security/vpc-sc)),
   which places Apigee tenant-project southbound traffic inside the perimeter.
   Full production lockdown additionally maps `*.googleapis.com` to the

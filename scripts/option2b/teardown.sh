@@ -137,7 +137,7 @@ else
 fi
 
 # Flattened form — `peerings list` returns network rows with nested peerings[]
-# (see setup.sh Step 4c).
+# (see setup-finish.sh Step 3).
 PEERING_NAME="$(gcloud compute networks peerings list \
   --network="${APIGEE_NETWORK}" --project="${PROJECT_ID}" \
   --flatten="peerings[]" --format='value(peerings.name)' \

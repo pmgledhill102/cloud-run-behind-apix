@@ -5,7 +5,7 @@
 # Two out-of-perimeter Cloud Run services, opposite expectations:
 #   BLOCKED_RUN_URL — no egress rule        → perimeter must DENY it
 #   ALLOWED_RUN_URL — egress allow-listed   → perimeter must ADMIT it
-#     (the allow-list is applied by option2b/setup.sh Step 5:
+#     (the allow-list is applied by option2b/setup-early.sh Step 5:
 #      projects/<ALLOWED_EGRESS_PROJECT_NUMBER>, run.routes.invoke)
 #
 # Probes:
