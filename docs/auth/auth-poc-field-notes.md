@@ -229,6 +229,41 @@ recommendation only weakly once tuned — the honest summary is "library
 wins on simplicity; a tuned parallel-start sidecar costs ~7 ms p50 and
 ~zero cold start."
 
+## Merged-suite rebuilds (third live session, 2026-08-03)
+
+Two full rebuilds on fresh projects (one greenfield end-to-end via the
+option 2b parallel workflow from #52). Since #53 the sidecar deploys with
+the baseline and `test.sh` is one merged suite — **14 assertions** (the
+original 8 + E1–E3's 6); both rebuilds finished 14/14. New corrections:
+
+### 14. Fresh proxies 503 "no healthy upstream" for ~1 min (handled)
+
+First requests to a *just-deployed* Apigee proxy can return 503
+`no healthy upstream` (an Envoy signature from the managed tenant) for up
+to ~a minute while it warms the target cluster. It looks like a
+routing/DNS failure; it's neither. `test.sh` now absorbs it (`warm_proxy()`
+retries the first request per proxy path; `WARM_MAX_ATTEMPTS` overrides) —
+observed live: 5 attempts (~40 s) on one run, 1 on the next.
+
+### 15. Flow-hook attach takes ~1–2 min to bite — with NO error signal
+
+A freshly attached env flow hook (and its shared flow) can take ~1–2 min
+to become active while proxies already answer 200. During that window
+requests **pass through un-verified**: tests fail with pass-through
+behaviour (expired/missing tokens reach the target and come back 200/echo)
+and there is no 503 or fault to key off — the warm-up in correction 14
+cannot catch this, because 200 looks healthy. Observed live: 7/14 failures
+seconds after `setup.sh`, 14/14 two minutes later, nothing changed. Rule:
+after (re)attaching a flow hook, re-run the suite before debugging
+anything.
+
+### Greenfield timing addendum (apix3)
+
+Org + instance + env + proxy: **~52 min** (consistent with the first
+session's ~50 min combined); full stack to option2b-verified: **63 min**
+using the parallel workflow (vs ~110 min serial); auth setup ~3 min with
+all three image builds under the already-enforced perimeter.
+
 ## Still open (issue #35)
 
 §10 items 7–8: org-policy preventive controls, edge deny-list — plus the

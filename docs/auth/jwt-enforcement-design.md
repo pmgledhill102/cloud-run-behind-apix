@@ -3,7 +3,9 @@
 **Status: PoC executed live — §10 items 1–6 verified** (items 1–5 on
 2026-07-30, greenfield project, option 2b perimeter enforced, 8/8
 assertions; item 6 — the Envoy sidecar — in a follow-up live session,
-6/6). This document
+6/6; the merged 14-check suite re-verified end-to-end on a second
+greenfield project 2026-08-03, option 2b built via the parallel
+setup-early/finish workflow). This document
 works out *where* token checks (signature, expiry, issuer, audience, scopes,
 fine-grained authorization) should be enforced when the API platform is
 Apigee → PGA → Cloud Run rather than GKE + Istio. Claims marked

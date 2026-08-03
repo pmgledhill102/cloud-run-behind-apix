@@ -12,8 +12,9 @@ instead of in-process middleware — from three angles:
    and its rejection signature.
 
 Everything here is grounded in live-verified behaviour: 6/6 pass on the
-sidecar tests (E1–E3, part of the standard
-[`scripts/auth/test.sh`](../../scripts/auth/test.sh) suite), design doc
+sidecar tests (E1–E3, part of the standard 14-check
+[`scripts/auth/test.sh`](../../scripts/auth/test.sh) suite; re-verified
+greenfield 2026-08-03), design doc
 [§4.5 / §10 item 6](jwt-enforcement-design.md), and
 [field notes §9–11](auth-poc-field-notes.md). Where a value is a PoC stand-in
 (hostnames, key ids, timestamps) it is marked as such.

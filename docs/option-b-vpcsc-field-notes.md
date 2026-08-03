@@ -273,7 +273,7 @@ going to fix itself (§4).
 |---|---|---|
 | Apigee org creation | 30–50 min | ~40 min |
 | Apigee instance creation | 30–60 min | ~45 min |
-| VPC-SC perimeter **enforcement** after create | "a few minutes, up to 30" | **highly variable: ~1 minute on our one cleanly-instrumented run** (probe loop, 60s resolution: OPEN at +0s, BLOCKED at +1m03s, held). Earlier uninstrumented spot-checks on the *first-ever* perimeter suggested 10–30 min (and initially looked like hours, confounded by an auth expiry). Treat the documented 30 min as the planning envelope; do not design processes assuming either extreme |
+| VPC-SC perimeter **enforcement** after create | "a few minutes, up to 30" | **highly variable — three instrumented samples: ~1 min, ~35 min, and ~40 min** (probe loop, 60s resolution; creation-to-enforcement, probe-start gaps added). The 2026-08-03 greenfield sample also caught **flapping on a clean perimeter**: first BLOCKED at ~20 min, reverted to OPEN, stable from ~40 min — so require N consecutive confirmations (`CONFIRM=3+`) before trusting the state. Deleting-then-recreating a perimeter interleaves both propagation waves and flaps worse (BLOCKED×3 then OPEN again observed). Treat 30 min as the planning envelope, 40+ min as possible; do not design processes assuming either extreme |
 | VPC-SC perimeter deletion | similar | **near-instant in our one measured sample** — already OPEN at the first probe seconds after teardown finished. Asymmetry with creation (~30 min) noted; don't assume either direction's timing from the other |
 | IAM grant propagation | ~1–2 min | 1–2 min (a retry loop suffices) |
 | Peered DNS domain pickup by Apigee runtime | undocumented | minutes |
@@ -292,6 +292,15 @@ going to fix itself (§4).
   ([`measure-propagation.sh`](../scripts/option2b/measure-propagation.sh)).
   Manual spot-checks gave us "somewhere between 15 minutes and overnight";
   the loop gives a number.
+- Enforcement can **flap** mid-propagation (seen on a clean greenfield
+  perimeter, worse on delete-then-recreate) — one BLOCKED probe is not
+  arrival; require consecutive confirmations (`CONFIRM=3`, or `5` after a
+  delete/recreate).
+- Since the split (issue #52), creation-side propagation is **wall-clock
+  free**: `setup-early.sh` starts the clock during the ~60–90 min Apigee
+  provisioning window, and all three observed samples (1/35/40 min) fit
+  inside it — verified greenfield 2026-08-03 (63 min project-to-tested vs
+  ~110 min serial).
 
 ---
 
