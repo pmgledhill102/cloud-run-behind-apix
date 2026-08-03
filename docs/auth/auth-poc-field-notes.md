@@ -143,7 +143,8 @@ combined-header pattern VM-side before Apigee was even provisioned.
 
 ## Sidecar variant (§10 item 6, issue #39) — second live session
 
-`scripts/auth/setup-envoy.sh` deploys `cr-auth-echo-envoy`: an Envoy
+`scripts/auth/setup-envoy.sh` (since folded into `setup.sh` — the sidecar
+now deploys with the baseline) deploys `cr-auth-echo-envoy`: an Envoy
 `jwt_authn` ingress container in front of the same echo app (middleware off,
 `APP_PORT=8081`), plus Apigee proxy `/auth-echo-envoy` with the identical
 combined-header target. 6/6 tests pass. Corrections found on the way:

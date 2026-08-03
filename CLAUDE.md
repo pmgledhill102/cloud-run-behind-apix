@@ -38,7 +38,7 @@ Cross-cutting docs:
 - `docs/option-c-scaled.md` — 20-service PoC validating Option C linear scaling
 - `docs/option-b-vpcsc-field-notes.md` — Option 2b lessons learned: failures, propagation, audit logs
 - `docs/path-routing-at-scale.md` — Paper design: URL hierarchy → Apigee → Cloud Run at ~50 domains / ~500 APIs (PoC extension plan in §9)
-- `docs/auth/jwt-enforcement-design.md` — Design: where to enforce authn/authz for external-issuer JWTs (Apigee shared flow vs Cloud Run IAM vs sidecar vs in-service middleware); §10 items 1–5 verified live
+- `docs/auth/jwt-enforcement-design.md` — Design: where to enforce authn/authz for external-issuer JWTs (Apigee shared flow vs Cloud Run IAM vs sidecar vs in-service middleware); §10 items 1–6 verified live
 - `docs/auth/auth-poc-field-notes.md` — Auth PoC live-run lessons: greenfield races, BASE-env limits, flow hook casing, JWKS reachability, 403 signatures
 - `docs/auth/envoy-sidecar-flow.md` — Envoy sidecar JWT flow explained three ways: sequence view, wire-level headers per hop, checkpoint/rejection tables (diagrams: `envoy-sidecar-{sequence,headers}.drawio`)
 
@@ -90,7 +90,7 @@ SERVICE_COUNT=20 ./scripts/option3/setup.sh
 - `scripts/option2b/` — Option B + VPC-SC: enforced service perimeter on top of option2 (requires org-level `accesscontextmanager.policyAdmin`; run option2 first)
 - `scripts/option3/` — Option C: PSC Google APIs (PSC endpoint + DNS; `SERVICE_COUNT=20` for scaled)
 - `scripts/option4/` — Option D: PSC Service Attachment (workloads-vpc + ILB + SA + PSC + Apigee EA)
-- `scripts/auth/` — Auth PoC: JWT enforcement layers on option 2/2b (mock IdP + JWKS service, VerifyJWT shared flow via env flow hook, combined-header target auth, IAM-closed echo service). **Note:** the flow hook makes every proxy in the env require a JWT until `auth/teardown.sh` runs
+- `scripts/auth/` — Auth PoC: JWT enforcement layers on option 2/2b (mock IdP + JWKS service, VerifyJWT shared flow via env flow hook, combined-header target auth, IAM-closed echo service in two peer variants deployed by one setup: Envoy jwt_authn sidecar + library middleware). **Note:** the flow hook makes every proxy in the env require a JWT until `auth/teardown.sh` runs
 
 **Note:** Options 1 & 4 both use workloads-vpc — don't run both simultaneously.
 

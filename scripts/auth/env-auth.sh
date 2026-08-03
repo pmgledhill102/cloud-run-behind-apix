@@ -33,10 +33,11 @@ JWT_KID="poc-key-1"
 # fixed string instead of the per-service URL (§10 item 5):
 GOOGLE_CUSTOM_AUDIENCE="apigee-poc-auth"
 
-# --- Sidecar variant (§10 item 6, issue #39) ---
-# Multi-container service: Envoy jwt_authn ingress container in front of the
-# same echo app (middleware off). Envoy gets the JWKS inline via env — the
-# §7.4 finding rules out a run→run fetch of the internal-ingress mock IdP.
+# --- Envoy sidecar variant (§10 item 6) — deployed by setup.sh alongside
+# the library variant, as peers. Multi-container service: Envoy jwt_authn
+# ingress container in front of the same echo app (middleware off). Envoy
+# gets the JWKS inline via env — the §7.4 finding rules out a run→run fetch
+# of the internal-ingress mock IdP.
 AUTH_ECHO_ENVOY_SERVICE="cr-auth-echo-envoy"
 ENVOY_IMAGE_URL="${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO_NAME}/auth-envoy:latest"
 AUTH_ENVOY_PROXY_NAME="cr-auth-jwt-envoy"  # proxy with BasePath /auth-echo-envoy
