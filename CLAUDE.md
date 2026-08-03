@@ -69,6 +69,8 @@ Scripts are structured in three tiers for fast iteration:
 ./scripts/shared/setup-iam.sh
 ./scripts/shared/setup-base.sh      # ~5 min
 ./scripts/shared/setup-slow.sh      # ~60-90 min (can run in parallel)
+# option2b only: run option2b/setup-early.sh alongside setup-slow so perimeter
+# propagation (~1-35 min) overlaps it; option2b/setup-finish.sh after option2/setup.sh
 
 # Per option — fast and repeatable:
 ./scripts/option3/setup.sh           # ~1 min

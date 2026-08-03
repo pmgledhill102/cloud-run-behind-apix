@@ -42,7 +42,7 @@ if [[ -z "${SERVICE_URL}" ]]; then
   echo ""
   echo "  - 'Reauthentication failed'             → run: gcloud auth login"
   echo "  - 'prohibited by organization's policy' → the perimeter is blocking"
-  echo "    this caller; check the ingress rule (option2b/setup.sh Step 5)"
+  echo "    this caller; check the ingress rule (option2b/setup-early.sh Step 5)"
   echo "  - 'NOT_FOUND'                           → run shared/setup-base.sh"
   exit 1
 fi
@@ -201,7 +201,7 @@ if [[ "${RESULT4}" == "FAIL" ]]; then
   echo "  GoogleTokenGenerationFailure → missing tokenCreator/iamcredentials"
   echo "    (re-run shared/setup-iam.sh)"
   echo "  TARGET_CONNECT_TIMEOUT → tenant cannot resolve/route run.app to the"
-  echo "    restricted VIP; re-run option2b/setup.sh (steps 4b/4c) and allow"
+  echo "    restricted VIP; re-run option2b/setup-finish.sh (steps 2-4) and allow"
   echo "    time for DNS peering to take effect"
   echo ""
 fi
