@@ -332,7 +332,15 @@ Derive every name from the path hierarchy — the estate stays greppable:
 ## 9. PoC extension plan
 
 Build on the standing option 2b stack (perimeter enforced). Each item proves
-a **[VERIFY]** above; ordered so the cheap, structural proofs come first:
+a **[VERIFY]** above; ordered so the cheap, structural proofs come first.
+
+Iteration aid: [`scripts/mock-apigee/`](../scripts/mock-apigee/README.md)
+(issue #51) gives an Envoy gateway at ~£6/month for shaping the URL
+hierarchy, route tables, and test harness before paying for Apigee time.
+Note its limits here: Envoy route matching is **not** Apigee base-path
+matching — every Apigee-semantics claim below (most-specific match,
+deploy-time conflicts, flow behaviour) must still be proven on real Apigee;
+the mock only de-risks the harness and the config shape around it.
 
 1. **Nested base-path routing** — deploy `payments` (base path `/payments`)
    and `payments-cards` (`/payments/cards`) as separate proxies targeting

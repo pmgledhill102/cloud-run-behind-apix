@@ -89,7 +89,7 @@ SERVICE_COUNT=20 ./scripts/option3/setup.sh
 ### Options
 - `scripts/option1/` — Option A: ILB via VPN (workloads-vpc + VPN + ILB + DNS)
 - `scripts/option2/` — Option B: PGA (DNS zone only — simplest)
-- `scripts/option2b/` — Option B + VPC-SC: enforced service perimeter on top of option2 (requires org-level `accesscontextmanager.policyAdmin`; run option2 first)
+- `scripts/option2b/` — Option B + VPC-SC: enforced service perimeter on top of option2 (requires org-level `accesscontextmanager.policyAdmin`). Two phases: `setup-early.sh` needs only setup-base — run it in parallel with setup-slow so perimeter propagation (1–40 min observed) costs no wall clock; `setup-finish.sh` after Apigee + option2. `setup.sh` remains the serial wrapper
 - `scripts/option3/` — Option C: PSC Google APIs (PSC endpoint + DNS; `SERVICE_COUNT=20` for scaled)
 - `scripts/option4/` — Option D: PSC Service Attachment (workloads-vpc + ILB + SA + PSC + Apigee EA)
 - `scripts/auth/` — Auth PoC: JWT enforcement layers on option 2/2b (mock IdP + JWKS service, VerifyJWT shared flow via env flow hook, combined-header target auth, IAM-closed echo service in two peer variants deployed by one setup: Envoy jwt_authn sidecar + library middleware). **Note:** the flow hook makes every proxy in the env require a JWT until `auth/teardown.sh` runs
