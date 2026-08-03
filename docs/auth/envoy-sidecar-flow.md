@@ -11,8 +11,9 @@ instead of in-process middleware — from three angles:
 3. **Checkpoint tables** (§5–6): each layer's single question, its inputs,
    and its rejection signature.
 
-Everything here is grounded in live-verified behaviour: 6/6 pass on
-[`scripts/auth/test-envoy.sh`](../../scripts/auth/test-envoy.sh), design doc
+Everything here is grounded in live-verified behaviour: 6/6 pass on the
+sidecar tests (E1–E3, part of the standard
+[`scripts/auth/test.sh`](../../scripts/auth/test.sh) suite), design doc
 [§4.5 / §10 item 6](jwt-enforcement-design.md), and
 [field notes §9–11](auth-poc-field-notes.md). Where a value is a PoC stand-in
 (hostnames, key ids, timestamps) it is marked as such.
@@ -231,7 +232,7 @@ it means the app can still decode claims for fine-grained authorization
 }
 ```
 
-`200` all the way back. `test-envoy.sh` E1 asserts on `"mode":"off` and
+`200` all the way back. `test.sh` E1 asserts on `"mode":"off` and
 `"authorization":true` — together they prove the sidecar (not the app) did
 the enforcement and the JWT still reached the app.
 
@@ -253,7 +254,7 @@ can't push an invalid client JWT past layer 4.
 
 ## 6. Rejection matrix — the same bad tokens, layer by layer
 
-From the live test runs (`test.sh` Test 3–4, `test-envoy.sh` E2). "Direct"
+From the live test runs (`test.sh` Tests 3–4 and E2). "Direct"
 means bypassing Apigee with a valid Google ID token in
 `X-Serverless-Authorization`, so Cloud Run IAM is satisfied and Envoy is
 isolated as the deciding layer:
@@ -335,15 +336,14 @@ T0 ─────────────────────────�
 ## 9. Seeing it live
 
 ```bash
-./scripts/auth/setup.sh          # keypair, cr-idp-mock, shared flow + flow hook, library variant
-./scripts/auth/setup-envoy.sh    # cr-auth-echo-envoy (multi-container) + /auth-echo-envoy proxy
-./scripts/auth/test-envoy.sh     # E1 happy path · E2 Envoy-isolated rejections · E3 latency vs library
-./scripts/auth/teardown-envoy.sh # remove the sidecar variant (flow hook persists until auth/teardown.sh)
+./scripts/auth/setup.sh     # keypair, cr-idp-mock, shared flow + flow hook, BOTH variants
+./scripts/auth/test.sh      # Tests 1-5 plus E1 happy path · E2 Envoy-isolated rejections · E3 latency vs library
+./scripts/auth/teardown.sh  # remove both variants, shared flow, flow hook
 ```
 
 Key sources if you want to trace the config behind each hop:
 
 - Envoy filter chain and routes: [`scripts/auth/envoy/envoy.yaml.tmpl`](../../scripts/auth/envoy/envoy.yaml.tmpl)
-- Proxy bundle + target `Authentication` block: [`scripts/auth/setup-envoy.sh`](../../scripts/auth/setup-envoy.sh) step 3
-- `VerifyJWT` policy + flow hook attach: [`scripts/auth/setup.sh`](../../scripts/auth/setup.sh) step 5
+- Proxy bundle + target `Authentication` block: [`scripts/auth/setup.sh`](../../scripts/auth/setup.sh) `deploy_auth_proxy()`
+- `VerifyJWT` policy + flow hook attach: [`scripts/auth/setup.sh`](../../scripts/auth/setup.sh) step 6
 - App echo behaviour / `JWT_MODE=off`: [`scripts/auth/container/main.go`](../../scripts/auth/container/main.go)

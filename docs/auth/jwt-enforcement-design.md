@@ -1,15 +1,18 @@
 # AuthN/AuthZ Enforcement: External-Issuer JWTs with Apigee + Cloud Run
 
-**Status: PoC executed 2026-07-30 — §10 items 1–5 verified live** (greenfield
-project, option 2b perimeter enforced; 8/8 assertions pass). This document
+**Status: PoC executed live — §10 items 1–6 verified** (items 1–5 on
+2026-07-30, greenfield project, option 2b perimeter enforced, 8/8
+assertions; item 6 — the Envoy sidecar — in a follow-up live session,
+6/6). This document
 works out *where* token checks (signature, expiry, issuer, audience, scopes,
 fine-grained authorization) should be enforced when the API platform is
 Apigee → PGA → Cloud Run rather than GKE + Istio. Claims marked
 **[VERIFY]** are unproven; claims marked **[VERIFIED]** were proven in the
 live run — see [auth-poc-field-notes.md](auth-poc-field-notes.md) for the
 full run log, failures and corrections.
-[`scripts/auth/`](../../scripts/auth/README.md) builds the §9 baseline and
-exercises §10 items 1–5 (see its README for the mapping).
+[`scripts/auth/`](../../scripts/auth/README.md) builds the §9 baseline with
+both in-service variants side by side and exercises §10 items 1–6 (see its
+README for the mapping).
 
 ![Auth enforcement layers](../diagrams/auth-enforcement-layers.svg)
 
@@ -341,16 +344,17 @@ Consequences:
 
 Given Cloud Run IAM already guarantees requests came through Apigee (which
 performed full validation), the service-side layer is defence in depth plus
-claims extraction — not the primary gate. That weakens the case for paying
-the sidecar's per-request price and operational surface: **default
-recommendation is the library**, with the sidecar as the fallback if the
-estate is too polyglot for library coverage. The §10 item 6 measurements
-narrow the gap, though: a tuned parallel-start sidecar costs a few warm
-milliseconds and ≈ 0 marginal cold start, so the deciding costs are
+claims extraction — not the primary gate. The §10 item 6 measurements
+settled the latency question: a tuned parallel-start sidecar costs a few
+warm milliseconds and ≈ 0 marginal cold start, so the deciding costs are
 operational (image ownership, per-revision pinning, explicit sizing), not
-latency — polyglot pressure tips the balance toward the sidecar earlier
-than this section originally assumed. Revisit if IAM closure cannot be
-guaranteed for some service class.
+performance. **Default recommendation is the sidecar** — enforcement is
+language-independent, config-not-code, and one image to patch instead of N
+libraries — with the **library as a full-peer alternative** where the
+estate is effectively one or two languages with a strong shared framework
+(in-process, no proxy hop, no second container, simpler local dev). Both
+are production candidates; §9 shows the sidecar-first shape, and the PoC
+deploys and tests both side by side.
 
 ### 7.4 JWKS distribution, fetch amplification, and key rotation
 
@@ -599,17 +603,27 @@ Client ──JWT──► Apigee env (flow hook → auth shared flow)
 Cloud Run front end: IAM validates Google token            ← T3, T4
   (--no-allow-unauthenticated, invoker = proxy SA, ingress=internal)
                  ▼
-Service: middleware re-validates JWT (defence in depth),
-         extracts claims → fine-grained resource authz     ← T5 + row 5's
-         (the check nothing upstream can ever do)             deep half
+Envoy sidecar (ingress container): jwt_authn re-validates
+  the client JWT before app code runs                       ← T4/T5's
+  (defence in depth — config, not code)                        validation half
+                 ▼ localhost
+App container: extracts claims → fine-grained resource
+  authz (the check nothing upstream can ever do)            ← row 5's deep half
 ```
 
 - Apigee shared flow = the Istio `RequestAuthentication` + coarse
   `AuthorizationPolicy`, centrally patchable, structurally unskippable.
 - Cloud Run IAM = the reachability gate Istio got from mTLS — and the
   answer to "why can't someone just call it over PGA".
-- App middleware (library, not sidecar, by default) = fine-grained authz +
-  zero-trust revalidation.
+- Envoy sidecar (ingress container) = the primary in-service validation
+  layer: zero-trust re-check in the revision's traffic path,
+  language-independent, one image fleet-wide, no app-code changes.
+  **Full-peer alternative: the shared per-language library** (§4.4) —
+  in-process (no proxy hop, ≈ 3–7 ms cheaper at p50 warm, no second
+  container to size), at the cost of one implementation per language and
+  rebuild-to-patch. Both are production candidates; §7.3 gives the
+  deciding drivers.
+- Fine-grained resource authz stays in app code in either variant.
 - Everything service-side rides on fleet-redeploy automation and
   conformance auditing, which are part of the design, not ops detail.
 
@@ -638,18 +652,20 @@ Service: middleware re-validates JWT (defence in depth),
    open: mirror stale-on-error prototype.
 5. **[VERIFIED]** Custom audiences (`--add-custom-audiences`) collapse
    per-service audience plumbing to one fixed string, end-to-end.
-6. **[VERIFIED]** Sidecar (ingress-container Envoy `jwt_authn`) variant
-   works on Cloud Run (`scripts/auth/setup-envoy.sh`, 6/6 tests): valid
-   token passes with the client JWT intact; expired/missing → 401,
+6. **[VERIFIED]** Sidecar (ingress-container Envoy `jwt_authn`) works on
+   Cloud Run — since promoted to the §9 primary in-service layer, deployed
+   by the standard `scripts/auth/setup.sh` alongside the library peer and
+   exercised by the standard suite (`test.sh` E1–E3, 6/6 on the live run):
+   valid token passes with the client JWT intact; expired/missing → 401,
    wrong-aud → 403 (Envoy's taxonomy). Cost vs library, tuned: ≈ +3–7 ms
    p50 warm, ≈ 0 marginal cold start with parallel container starts (the
    +0.65 s first measured was the `--depends-on` topology, not the sidecar;
    a heavy-app emulation showed Envoy's init fully absorbed by the app's
    boot window), instance footprint +0.25 vCPU/128 Mi when sized (defaults
-   silently double it). Honest summary: library wins on simplicity and a
-   few warm milliseconds; a tuned parallel-start sidecar is otherwise
-   near-free, so polyglot pressure can win earlier than §7.3's default
-   assumed.
+   silently double it). These measurements are what flipped §7.3/§9 to
+   sidecar-first: the library keeps its in-process simplicity edge and
+   stays a full peer, but language-independence and config-not-code now
+   win by default.
 7. **[VERIFY]** Preventive controls: which of the §7.5 postures can org
    policy enforce vs audit-only?
 8. **[VERIFY]** Edge deny-list (§7.7 tier 1): lookup mechanism in the

@@ -2,7 +2,9 @@
 
 Working prototype of the recommended baseline from
 [`docs/auth/jwt-enforcement-design.md`](../../docs/auth/jwt-enforcement-design.md) (§9),
-built on top of Option 2/2b (PGA, optional VPC-SC perimeter).
+built on top of Option 2/2b (PGA, optional VPC-SC perimeter). One setup
+deploys **both in-service enforcement variants side by side, as peers**:
+the Envoy sidecar (the §9 primary) and the library middleware.
 
 ```
 VM (mints client JWTs, ← mock external IdP: private key stays local)
@@ -10,13 +12,16 @@ VM (mints client JWTs, ← mock external IdP: private key stays local)
  ▼
 Apigee env ── PreProxy FLOW HOOK → 'auth-verify' shared flow
  │             └─ VerifyJWT: RS256 (pinned), exp, iss, aud — JWKS from cr-idp-mock
- │  proxy 'cr-auth-jwt' (/auth-echo) target:
+ │  proxies 'cr-auth-jwt' (/auth-echo) + 'cr-auth-jwt-envoy' (/auth-echo-envoy),
+ │  identical targets:
  │    Google ID token (CUSTOM audience) → X-Serverless-Authorization
  │    client JWT untouched              → Authorization
  ▼
 PGA restricted VIP
  ▼
-cr-auth-echo: IAM-closed (--no-allow-unauthenticated) → JWT middleware → echo
+cr-auth-echo:       IAM-closed → in-process JWT middleware (library) → echo
+cr-auth-echo-envoy: IAM-closed → Envoy jwt_authn ingress container → echo
+                    (app middleware off — the sidecar variant, §9 primary)
 cr-idp-mock:  JWKS endpoint (allow-unauth + ingress=internal — §7.4 mirror posture)
 ```
 
@@ -26,19 +31,13 @@ cr-idp-mock:  JWKS endpoint (allow-unauth + ingress=internal — §7.4 mirror po
 # Prerequisites: shared/setup-iam.sh, shared/setup-base.sh, option2/setup.sh
 # (+ shared/setup-slow.sh for the Apigee parts; option2b optional)
 
-./scripts/auth/setup.sh      # ~3-4 min first run (2 image builds), ~30s after
-./scripts/auth/test.sh
-./scripts/auth/teardown.sh
-
-# Sidecar variant (§10 item 6): Envoy jwt_authn ingress container
-# in front of the same app (middleware off) — run setup.sh first:
-./scripts/auth/setup-envoy.sh
-./scripts/auth/test-envoy.sh
-./scripts/auth/teardown-envoy.sh
+./scripts/auth/setup.sh      # ~4-5 min first run (3 image builds), ~1-2 min after
+./scripts/auth/test.sh       # Tests 1-5 (shared layers + library) and E1-E3 (sidecar)
+./scripts/auth/teardown.sh   # removes both variants + shared flow + flow hook
 ```
 
-The sidecar variant's request path — headers at every hop, what each layer
-checks, rejection signatures — is walked through in
+The sidecar path — headers at every hop, what each layer checks, rejection
+signatures — is walked through in
 [`docs/auth/envoy-sidecar-flow.md`](../../docs/auth/envoy-sidecar-flow.md).
 
 **Warning:** setup attaches the shared flow via the env-level flow hook, so
@@ -59,13 +58,18 @@ setup, removed by teardown). The private key never leaves the local machine
 | 3 | Flow-hook shared flow rejects expired / wrong-aud / missing JWTs at the edge; latency | Tests 2, 3, 5 |
 | 4 (partial) | JWKS mirror posture reachable in-perimeter; cold-start fetch timing in auth-echo startup logs | Test 1 + logs |
 | 5 | Cloud Run custom audience — fixed-string `aud`, no per-service URL plumbing | Test 2 |
-| 6 | Sidecar variant: Envoy `jwt_authn` ingress container enforces (app middleware off), client JWT intact end-to-end; Envoy's 401/403 rejection taxonomy; latency vs library | Tests E1–E3 (`test-envoy.sh`) |
+| 6 | Envoy sidecar: `jwt_authn` ingress container enforces (app middleware off), client JWT intact end-to-end; Envoy's 401/403 rejection taxonomy; latency vs library | Tests E1–E3 |
 
 Not covered (follow-ups, tracked in #35): item 7 (org-policy preventive
 controls — needs org perms), item 8 (edge deny-list).
 
 ## Caveats
 
+- **First-request 503s**: freshly deployed Apigee proxies can return 503
+  `no healthy upstream` for a minute or two while the tenant warms the
+  target cluster (observed live 2026-08-03). `test.sh` absorbs this by
+  warming each proxy path with retries before any assertion runs
+  (`WARM_MAX_ATTEMPTS`, default 12 × 10s).
 - **Project-level `run.invoker`**: this PoC project grants invoker broadly
   (the VM's SA needs it for options 1–4 tests), so a direct call with a
   *Google* ID token succeeds here where the target design's per-service

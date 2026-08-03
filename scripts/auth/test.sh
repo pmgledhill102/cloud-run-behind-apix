@@ -1,13 +1,20 @@
 #!/usr/bin/env bash
 #
-# auth/test.sh — Verify the JWT enforcement layers
+# auth/test.sh — Verify the JWT enforcement layers, both variants
 #
 # Maps to docs/auth/jwt-enforcement-design.md §10:
-#   Test 1: JWKS reachable in-perimeter via PGA                (item 4, partial)
-#   Test 2: valid JWT via Apigee → 200, BOTH auth headers seen (items 1, 3, 5)
-#   Test 3: expired / wrong-aud / missing JWT → rejected at edge (item 2 of §5, item 3)
-#   Test 4: direct PGA call bypassing Apigee → 403 at Cloud Run front end (item 2)
-#   Test 5: crude latency comparison /auth-echo vs /hello       (item 3, partial §8)
+#   Test 1:  JWKS reachable in-perimeter via PGA                (item 4, partial)
+#   Test 2:  valid JWT via Apigee → 200, BOTH auth headers seen (items 1, 3, 5)
+#   Test 3:  expired / wrong-aud / missing JWT → rejected at edge (item 2 of §5, item 3)
+#   Test 4:  direct PGA call bypassing Apigee → 403 at Cloud Run front end (item 2)
+#   Test 5:  crude latency comparison /auth-echo vs /hello       (item 3, partial §8)
+#   Test E1: valid JWT via Apigee /auth-echo-envoy → 200, enforced by Envoy
+#            (app reports mode off), client JWT intact           (item 6)
+#   Test E2: Envoy edge rejection, isolated from Apigee: direct VM calls with
+#            a Google token in X-Serverless-Authorization + bad client JWTs (item 6)
+#   Test E3: latency comparison sidecar vs library               (item 6)
+#
+# One summary; a failure in either variant fails the suite.
 #
 set -euo pipefail
 
@@ -26,6 +33,13 @@ verdict() {  # verdict <ok-bool> <label>
   fi
 }
 
+percentiles() {  # reads time_total lines on stdin, prints p50/p95 in ms
+  sort -n | awk '{a[NR]=$1} END {
+    if (NR==0) { print "no samples"; exit }
+    p50=a[int(NR*0.5)+1]; p95=a[int(NR*0.95)]; if (NR<20) p95=a[NR];
+    printf "p50=%.0fms p95=%.0fms (n=%d)\n", p50*1000, p95*1000, NR }'
+}
+
 echo "=== Auth PoC tests — project: ${PROJECT_ID} ==="
 
 if [[ ! -f "${AUTH_PRIVATE_KEY}" ]]; then
@@ -35,18 +49,21 @@ fi
 
 AUTH_ECHO_URL="$(gcloud run services describe "${AUTH_ECHO_SERVICE}" \
   --region="${REGION}" --project="${PROJECT_ID}" --format='value(status.url)' 2>/dev/null || true)"
+ENVOY_URL="$(gcloud run services describe "${AUTH_ECHO_ENVOY_SERVICE}" \
+  --region="${REGION}" --project="${PROJECT_ID}" --format='value(status.url)' 2>/dev/null || true)"
 IDP_URL="$(gcloud run services describe "${IDP_MOCK_SERVICE}" \
   --region="${REGION}" --project="${PROJECT_ID}" --format='value(status.url)' 2>/dev/null || true)"
-if [[ -z "${AUTH_ECHO_URL}" || -z "${IDP_URL}" ]]; then
+if [[ -z "${AUTH_ECHO_URL}" || -z "${ENVOY_URL}" || -z "${IDP_URL}" ]]; then
   echo "ERROR: services not deployed — run ./scripts/auth/setup.sh first."
   exit 1
 fi
-echo "auth-echo: ${AUTH_ECHO_URL}"
-echo "idp-mock:  ${IDP_URL}"
+echo "auth-echo (library):       ${AUTH_ECHO_URL}"
+echo "auth-echo-envoy (sidecar): ${ENVOY_URL}"
+echo "idp-mock:                  ${IDP_URL}"
 
 INSTANCE_IP="$(apigee_instance_ip)"
 if [[ -z "${INSTANCE_IP}" ]]; then
-  echo "NOTE: Apigee not provisioned — tests 2, 3 and 5 will be skipped."
+  echo "NOTE: Apigee not provisioned — tests 2, 3, 5, E1 and E3 will be skipped."
 fi
 echo ""
 
@@ -56,6 +73,34 @@ JWT_EXPIRED="$(mint_jwt "${JWT_ISSUER}" "${JWT_AUDIENCE}" -3600)"
 JWT_WRONG_AUD="$(mint_jwt "${JWT_ISSUER}" "api://someone-else" 300)"
 echo "  valid / expired / wrong-aud minted."
 echo ""
+
+# ============================================================
+# Warm-up: tolerate 503 "no healthy upstream" on fresh proxies
+# ============================================================
+# Freshly deployed Apigee proxies can 503 for a minute or two while the
+# tenant warms the target cluster (observed live 2026-08-03). Absorb that
+# here — retry the first request per proxy path — so the tests below never
+# count a warming 503 as an enforcement failure.
+warm_proxy() {  # warm_proxy <base-path>
+  local path="$1" max_attempts="${WARM_MAX_ATTEMPTS:-12}" attempt out code
+  for attempt in $(seq 1 "${max_attempts}"); do
+    out="$(ssh_cmd "curl -sk --max-time 15 -o /tmp/auth-warm-body -w '%{http_code}' -H 'Host: ${APIGEE_ENV_GROUP_HOSTNAME}' -H 'Authorization: Bearer ${JWT_VALID}' https://${INSTANCE_IP}${path}; echo ''; head -c 80 /tmp/auth-warm-body" || true)"
+    code="$(echo "${out}" | head -1)"
+    if [[ "${code}" != "503" ]]; then
+      echo "  ${path}: HTTP ${code} after ${attempt} attempt(s) — ready"
+      return 0
+    fi
+    echo "  ${path}: HTTP 503 ($(echo "${out}" | tail -n +2)) — retrying in 10s (${attempt}/${max_attempts})"
+    sleep 10
+  done
+  echo "  WARNING: ${path} still 503 after ${max_attempts} attempts — tests will see it as-is"
+}
+if [[ -n "${INSTANCE_IP}" ]]; then
+  echo "Warming proxy paths (fresh deploys can 503 'no healthy upstream')..."
+  warm_proxy "/auth-echo"
+  warm_proxy "/auth-echo-envoy"
+  echo ""
+fi
 
 # ============================================================
 # Test 1: JWKS endpoint reachable in-perimeter via PGA
@@ -160,13 +205,8 @@ echo ""
 echo "=========================================="
 echo "  Test 5: Latency comparison (crude, N=15)"
 echo "=========================================="
+T5_AUTH=""
 if [[ -n "${INSTANCE_IP}" ]]; then
-  percentiles() {  # reads time_total lines on stdin, prints p50/p95 in ms
-    sort -n | awk '{a[NR]=$1} END {
-      if (NR==0) { print "no samples"; exit }
-      p50=a[int(NR*0.5)+1]; p95=a[int(NR*0.95)]; if (NR<20) p95=a[NR];
-      printf "p50=%.0fms p95=%.0fms (n=%d)\n", p50*1000, p95*1000, NR }'
-  }
   echo "--- /auth-echo: VerifyJWT + Google token mint + IAM + middleware ---"
   T5_AUTH="$(ssh_cmd "for i in \$(seq 1 15); do curl -sk --max-time 15 -o /dev/null -w '%{time_total}\n' -H 'Host: ${APIGEE_ENV_GROUP_HOSTNAME}' -H 'Authorization: Bearer ${JWT_VALID}' https://${INSTANCE_IP}/auth-echo; done" || true)"
   echo "  $(echo "${T5_AUTH}" | percentiles)"
@@ -178,6 +218,94 @@ if [[ -n "${INSTANCE_IP}" ]]; then
 else
   echo "  SKIPPED (no Apigee)"
 fi
+echo ""
+
+# ============================================================
+# Test E1: valid JWT via Apigee — Envoy enforces, app trusts
+# ============================================================
+echo "=========================================="
+echo "  Test E1: Valid JWT via Apigee → Envoy variant"
+echo "=========================================="
+if [[ -n "${INSTANCE_IP}" ]]; then
+  E1_OUT="$(ssh_cmd "curl -sk --max-time 20 -H 'Host: ${APIGEE_ENV_GROUP_HOSTNAME}' -H 'Authorization: Bearer ${JWT_VALID}' https://${INSTANCE_IP}/auth-echo-envoy" || true)"
+  echo "${E1_OUT}"
+  OK=false; echo "${E1_OUT}" | grep -q '"mode":"off' && OK=true
+  verdict "${OK}" "request passed Envoy jwt_authn; app middleware off (sidecar enforced)"
+  OK=false; echo "${E1_OUT}" | grep -q '"authorization":true' && OK=true
+  verdict "${OK}" "client JWT arrived intact in Authorization (forward: true)"
+else
+  echo "  SKIPPED (no Apigee)"
+fi
+echo ""
+
+# ============================================================
+# Test E2: Envoy rejection isolated from Apigee (direct calls)
+# ============================================================
+# The env flow hook would reject bad tokens at the Apigee edge before Envoy
+# ever saw them — so to prove ENVOY's enforcement we bypass Apigee: Google ID
+# token in X-Serverless-Authorization satisfies Cloud Run IAM (broad invoker
+# in this PoC project), leaving Envoy as the deciding layer.
+echo "=========================================="
+echo "  Test E2: Envoy edge rejection (direct, IAM satisfied)"
+echo "=========================================="
+e2_call() {  # e2_call <extra-curl-args> → "code body"
+  ssh_cmd "ID_TOKEN=\$(curl -sf -H 'Metadata-Flavor: Google' 'http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/identity?audience=${ENVOY_URL}') && curl -s --max-time 10 -o /tmp/e2-body -w '%{http_code}' -H \"X-Serverless-Authorization: Bearer \$ID_TOKEN\" $1 ${ENVOY_URL}/; echo ''; head -c 120 /tmp/e2-body" 2>/dev/null || true
+}
+
+E2_VALID="$(e2_call "-H 'Authorization: Bearer ${JWT_VALID}'")"
+CODE="$(echo "${E2_VALID}" | head -1)"
+echo "  valid:     HTTP ${CODE}"
+OK=false; [[ "${CODE}" == "200" ]] && OK=true
+verdict "${OK}" "valid client JWT passes Envoy (control)"
+
+# Envoy's rejection taxonomy differs from Apigee VerifyJWT and the library
+# (both 401 across the board): jwt_authn returns 401 Unauthenticated for
+# expired/missing tokens but 403 Forbidden for an audience mismatch
+# ("Audiences in Jwt are not allowed") — found live.
+for CASE in "expired:401:${JWT_EXPIRED}" "wrong-aud:403:${JWT_WRONG_AUD}" "missing:401:"; do
+  LABEL="${CASE%%:*}"
+  REST="${CASE#*:}"
+  WANT="${REST%%:*}"
+  CASE_JWT="${REST#*:}"
+  EXTRA=""
+  [[ -n "${CASE_JWT}" ]] && EXTRA="-H 'Authorization: Bearer ${CASE_JWT}'"
+  E2_OUT="$(e2_call "${EXTRA}")"
+  CODE="$(echo "${E2_OUT}" | head -1)"
+  BODY="$(echo "${E2_OUT}" | tail -n +2)"
+  echo "  ${LABEL}: HTTP ${CODE}  (${BODY})"
+  OK=false; [[ "${CODE}" == "${WANT}" ]] && OK=true
+  verdict "${OK}" "${LABEL} token rejected ${WANT} by the Envoy ingress container"
+done
+echo ""
+
+# ============================================================
+# Test E3: latency — sidecar vs library (both via Apigee)
+# ============================================================
+echo "=========================================="
+echo "  Test E3: Latency — sidecar vs library (crude, N=15)"
+echo "=========================================="
+if [[ -n "${INSTANCE_IP}" ]]; then
+  echo "--- /auth-echo-envoy: Envoy jwt_authn + hop to app (middleware off) ---"
+  E3_ENVOY="$(ssh_cmd "for i in \$(seq 1 15); do curl -sk --max-time 15 -o /dev/null -w '%{time_total}\n' -H 'Host: ${APIGEE_ENV_GROUP_HOSTNAME}' -H 'Authorization: Bearer ${JWT_VALID}' https://${INSTANCE_IP}/auth-echo-envoy; done" || true)"
+  echo "  $(echo "${E3_ENVOY}" | percentiles)"
+  echo "--- /auth-echo: library middleware in-process (samples from Test 5) ---"
+  echo "  $(echo "${T5_AUTH}" | percentiles)"
+  echo "  INFO: both paths share Apigee VerifyJWT (flow hook) + Google token mint +"
+  echo "        Cloud Run IAM; the delta isolates Envoy-hop vs in-process validation."
+else
+  echo "  SKIPPED (no Apigee)"
+fi
+echo ""
+
+# ============================================================
+# INFO: sidecar container startup signals (last 30 log lines)
+# ============================================================
+echo "=========================================="
+echo "  INFO: container startup signals (last 30 log lines)"
+echo "=========================================="
+gcloud run services logs read "${AUTH_ECHO_ENVOY_SERVICE}" \
+  --region="${REGION}" --project="${PROJECT_ID}" --limit=30 2>/dev/null \
+  | grep -Ei "listening|started|startup|probe|ready" | tail -6 || echo "  (no matching log lines)"
 echo ""
 
 # ============================================================
@@ -193,5 +321,6 @@ echo "          rejects, latency)      → Tests 2, 3, 5"
 echo "  item 4 (JWKS mirror, partial)  → Test 1 + auth-echo startup logs:"
 echo "    gcloud run services logs read ${AUTH_ECHO_SERVICE} --region=${REGION} --project=${PROJECT_ID} --limit=20 | grep JWKS"
 echo "  item 5 (custom audiences)      → Test 2"
-echo "Not covered: item 6 (sidecar), item 7 (org policy), item 8 (deny-list)."
+echo "  item 6 (Envoy sidecar)         → Tests E1, E2, E3"
+echo "Not covered: item 7 (org policy), item 8 (deny-list)."
 [[ "${FAIL}" -eq 0 ]]
