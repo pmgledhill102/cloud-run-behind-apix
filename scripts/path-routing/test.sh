@@ -134,7 +134,7 @@ ISSUING_URL="$(gcloud run services describe "${SVC_ISSUING}" --region="${REGION}
 
 echo "Starting ${PROBE_SECONDS}s probe loop (1/s) against /payments/cards/issuing/ping..."
 PROBE_FILE="$(mktemp)"
-ssh_cmd "for i in \$(seq 1 ${PROBE_SECONDS}); do printf '%s ' \"\$(date '+%H:%M:%S')\"; curl -sk --max-time 5 -D /tmp/pr-probe-h -o /dev/null -w '%{http_code}' -H 'Host: ${APIGEE_ENV_GROUP_HOSTNAME}' ${AUTH_HEADER} https://${INSTANCE_IP}/payments/cards/issuing/ping; printf ' '; grep -i '^x-served-by:' /tmp/pr-probe-h | tr -d '\r' | cut -d' ' -f2; echo ''; sleep 1; done" > "${PROBE_FILE}" 2>/dev/null &
+ssh_cmd "for i in \$(seq 1 ${PROBE_SECONDS}); do ts=\$(date '+%H:%M:%S'); code=\$(curl -sk --max-time 5 -D /tmp/pr-probe-h -o /dev/null -w '%{http_code}' -H 'Host: ${APIGEE_ENV_GROUP_HOSTNAME}' ${AUTH_HEADER} https://${INSTANCE_IP}/payments/cards/issuing/ping); hdr=\$(grep -i '^x-served-by:' /tmp/pr-probe-h | tr -d '\r\n' | cut -d' ' -f2); echo \"\$ts \$code \$hdr\"; sleep 1; done" > "${PROBE_FILE}" 2>/dev/null &
 PROBE_PID=$!
 sleep 5
 
@@ -158,8 +158,8 @@ rm -rf "${BUNDLE_DIR}"
 echo "Waiting for the probe window to close..."
 wait "${PROBE_PID}" || true
 
-TOTAL="$(wc -l < "${PROBE_FILE}" | tr -d ' ')"
-NON200="$(awk '$2 != 200' "${PROBE_FILE}" | wc -l | tr -d ' ')"
+TOTAL="$(grep -c . "${PROBE_FILE}" || true)"
+NON200="$(awk 'NF && $2 != "200"' "${PROBE_FILE}" | wc -l | tr -d ' ')"
 FIRST_NEW="$(awk -v p="${PROXY_ISSUING}" '$3 == p {print $1; exit}' "${PROBE_FILE}")"
 LAST_OLD="$(awk -v p="${PROXY_CARDS}" '$3 == p {print $1}' "${PROBE_FILE}" | tail -1)"
 echo "  probe samples: ${TOTAL}; non-200: ${NON200}"
@@ -167,7 +167,7 @@ echo "  last served by ${PROXY_CARDS}:    ${LAST_OLD:-none}"
 echo "  first served by ${PROXY_ISSUING}: ${FIRST_NEW:-never}"
 if [[ "${NON200}" != "0" ]]; then
   echo "  non-200 samples:"
-  awk '$2 != 200 {print "    " $0}' "${PROBE_FILE}"
+  awk 'NF && $2 != "200" {print "    " $0}' "${PROBE_FILE}"
 fi
 OK=false; [[ "${NON200}" == "0" && "${TOTAL}" -gt 100 ]] && OK=true
 verdict "${OK}" "no 404/5xx window during the carve-out (${TOTAL} samples at 1/s)"
@@ -183,7 +183,20 @@ echo "=========================================="
 echo "  Phase 4: Fallback — delete pr-payments-cards"
 echo "=========================================="
 undeploy_and_delete_proxy "${PROXY_CARDS}"
-sleep 20
+# Undeploys take a while to reach the runtime (the deleted proxy keeps
+# serving — observed >20s live). Poll for the flip, then assert.
+echo "Waiting for the undeploy to reach the runtime..."
+FLIPPED=false
+for i in $(seq 1 36); do
+  SERVED="$(call "/payments/cards/ping" | cut -d'|' -f2)"
+  if [[ "${SERVED}" == "${PROXY_PAYMENTS}" ]]; then
+    echo "  fallback active after ~$((i * 5))s."
+    FLIPPED=true
+    break
+  fi
+  sleep 5
+done
+[[ "${FLIPPED}" == "true" ]] || echo "  WARNING: still served by '${SERVED:-none}' after ~180s."
 check_route "/payments/cards/ping" "${PROXY_PAYMENTS}" "${SVC_PAYMENTS}" \
   "/payments/cards falls back to pr-payments after the nested proxy is deleted"
 check_route "/payments/cards/issuing/ping" "${PROXY_ISSUING}" "${SVC_ISSUING}" \
