@@ -16,6 +16,8 @@ This is the simplest and cheapest connectivity option. There is no per-service i
 
 ![Option B Architecture](diagrams/option-b-architecture.svg)
 
+(Source: [option-b-architecture.drawio](diagrams/option-b-architecture.drawio))
+
 ---
 
 ## 3. How It Works: VPC Peering Model

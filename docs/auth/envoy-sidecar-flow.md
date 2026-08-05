@@ -343,7 +343,7 @@ services, each of which the autoscaler has scaled independently.
 Two diagrams cover this, and they are meant to be read in order — the same
 snapshot at two zoom levels. Start with the shape:
 
-![Request fan-out — Apigee path-routes to 3 Cloud Run services, Envoy sidecar + app per instance](../diagrams/service-fanout-envoy.svg)
+![Request fan-out — Apigee path-routes to 3 Cloud Run services, Envoy sidecar + app per instance](../diagrams/fanout-services.svg)
 
 One client, one Apigee instance path-routing to three services, each
 autoscaled independently, every instance a two-container pod. That is the
@@ -352,7 +352,7 @@ whole mechanism, and for most conversations it is the diagram you want.
 The second adds the auth machinery and the numbers that follow from it —
 same nine instances, annotated:
 
-![Sidecar fan-out at scale — the same snapshot with tokens, sizing and headroom](../diagrams/sidecar-fanout-at-scale.svg)
+![Sidecar fan-out at scale — the same snapshot with tokens, sizing and headroom](../diagrams/fanout-at-scale.svg)
 
 Instance counts in both are illustrative (the PoC runs one service at
 `--max-instances=5`); the arithmetic they make visible is not:
@@ -396,5 +396,5 @@ Key sources if you want to trace the config behind each hop:
 - App echo behaviour / `JWT_MODE=off`: [`scripts/auth/container/main.go`](../../scripts/auth/container/main.go)
 - Diagram sources: [`envoy-sidecar-sequence.drawio`](../diagrams/envoy-sidecar-sequence.drawio),
   [`envoy-sidecar-headers.drawio`](../diagrams/envoy-sidecar-headers.drawio),
-  [`service-fanout-envoy.drawio`](../diagrams/service-fanout-envoy.drawio),
-  [`sidecar-fanout-at-scale.drawio`](../diagrams/sidecar-fanout-at-scale.drawio)
+  [`fanout-services.drawio`](../diagrams/fanout-services.drawio),
+  [`fanout-at-scale.drawio`](../diagrams/fanout-at-scale.drawio)

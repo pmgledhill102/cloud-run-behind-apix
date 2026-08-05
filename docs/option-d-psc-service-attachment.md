@@ -21,6 +21,8 @@ This pattern is best when:
 
 ![Option D Architecture](diagrams/option-d-architecture.svg)
 
+(Source: [option-d-architecture.drawio](diagrams/option-d-architecture.drawio))
+
 ---
 
 ## 3. How It Works: VPC Peering Model

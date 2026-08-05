@@ -22,6 +22,8 @@ This option places a regional **Internal Application Load Balancer** (ILB) with 
 
 ![Option A Architecture](diagrams/option-a-architecture.svg)
 
+(Source: [option-a-architecture.drawio](diagrams/option-a-architecture.drawio))
+
 ---
 
 ## 3. How It Works: VPC Peering Model

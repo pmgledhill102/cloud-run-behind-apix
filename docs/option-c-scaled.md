@@ -6,7 +6,9 @@ Option C scales linearly with zero infrastructure changes. The single PSC endpoi
 
 ## Architecture
 
-See [architecture diagram](diagrams/option-c-scaled.drawio).
+![Option C Scaled Architecture](diagrams/option-c-scaled.svg)
+
+(Source: [option-c-scaled.drawio](diagrams/option-c-scaled.drawio))
 
 Traffic flow is identical to single-service Option C:
 1. Apigee proxy sends request to `cr-svc-NN-abc-uc.a.run.app`

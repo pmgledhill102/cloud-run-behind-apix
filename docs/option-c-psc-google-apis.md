@@ -31,6 +31,8 @@ Private Service Connect (PSC) endpoints for Google APIs assign a concrete intern
 
 ![Option C Architecture](diagrams/option-c-architecture.svg)
 
+(Source: [option-c-architecture.drawio](diagrams/option-c-architecture.drawio))
+
 ---
 
 ## 3. How It Works: VPC Peering Model

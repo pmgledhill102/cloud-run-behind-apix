@@ -35,6 +35,8 @@ The PSC (non-peering) alternative is documented for reference in each option's d
 
 ![Architecture Overview](docs/diagrams/overview.svg)
 
+(Source: [overview.drawio](docs/diagrams/overview.drawio))
+
 ## Deep Dives
 
 | Option | Pattern | Doc | Diagram |

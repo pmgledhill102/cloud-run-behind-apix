@@ -40,7 +40,7 @@ Cross-cutting docs:
 - `docs/path-routing-at-scale.md` — Paper design: URL hierarchy → Apigee → Cloud Run at ~50 domains / ~500 APIs (PoC extension plan in §9; items 1–3 — most-specific match, live carve-out, base-path conflict — verified live 2026-08-03)
 - `docs/auth/jwt-enforcement-design.md` — Design: where to enforce authn/authz for external-issuer JWTs (Apigee shared flow vs Cloud Run IAM vs sidecar vs in-service middleware); §10 items 1–6 verified live
 - `docs/auth/auth-poc-field-notes.md` — Auth PoC live-run lessons: greenfield races, BASE-env limits, flow hook casing, JWKS reachability, 403 signatures
-- `docs/auth/envoy-sidecar-flow.md` — Envoy sidecar JWT flow explained three ways: sequence view, wire-level headers per hop, checkpoint/rejection tables; §8.1 is the fleet view — a diagram pair read in order, `service-fanout-envoy.drawio` (the shape: 1 client → 1 Apigee → 3 services → 9 two-container instances) then `sidecar-fanout-at-scale.drawio` (same snapshot annotated with tokens, sidecar sizing arithmetic and autoscaler headroom) (diagrams: `envoy-sidecar-{sequence,headers}.drawio`, `service-fanout-envoy.drawio`, `sidecar-fanout-at-scale.drawio`)
+- `docs/auth/envoy-sidecar-flow.md` — Envoy sidecar JWT flow explained three ways: sequence view, wire-level headers per hop, checkpoint/rejection tables; §8.1 is the fleet view — a diagram pair read in order, `fanout-services.drawio` (the shape: 1 client → 1 Apigee → 3 services → 9 two-container instances) then `fanout-at-scale.drawio` (same snapshot annotated with tokens, sidecar sizing arithmetic and autoscaler headroom) (diagrams: `envoy-sidecar-{sequence,headers}.drawio`, `fanout-services.drawio`, `fanout-at-scale.drawio`)
 
 ## PoC Scripts
 
@@ -109,14 +109,17 @@ SERVICE_COUNT=20 ./scripts/option3/setup.sh
 
 ## Diagrams
 
-All `.drawio` files in `docs/diagrams/` use:
-- `mxgraph.gcp2.*` shapes
-- Google Material color palette
+All `.drawio` files live in `docs/diagrams/`. Repo-wide conventions:
 - 1600x900 canvas
-- Container grouping for VPCs and subnets
-- Traffic flow arrows with numbered steps
+- Google Material color palette
+- kebab-case filename; `<diagram id>` matches the filename
+- every diagram is embedded in a doc as its `.svg`, with the `.drawio` linked alongside as the source
 
-The `.github/workflows/drawio-export.yml` workflow auto-exports `.drawio` → `.svg` on push to main.
+Two families differ in shape vocabulary, and that is deliberate:
+- **Architecture diagrams** (`overview`, `option-*`, `auth-poc-architecture`, `fanout-*`) — `mxgraph.gcp2.*` shapes, container grouping for VPCs/subnets, traffic flow arrows with numbered steps.
+- **Explainer diagrams** (`envoy-sidecar-sequence`, `envoy-sidecar-headers`, `auth-enforcement-layers`) — card/table layouts showing wire state or per-layer checks. No GCP iconography; numbered steps only where there is a sequence.
+
+The `.github/workflows/drawio-export.yml` workflow auto-exports `.drawio` → `.svg` on push to main — it is the sole author of the `.svg` files. A locally generated SVG will differ structurally (drawio-desktop renders gcp2 stencils as vector paths; the CI action embeds them as base64 PNGs) and will be overwritten on the next merge, so treat committed SVGs as CI output rather than something to hand-maintain.
 
 ## Issue Tracking
 
