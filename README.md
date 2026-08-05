@@ -33,16 +33,18 @@ The PSC (non-peering) alternative is documented for reference in each option's d
 
 ## Architecture Overview
 
-![Architecture Overview](docs/diagrams/overview.drawio.svg)
+![Architecture Overview](docs/diagrams/overview.svg)
+
+(Source: [overview.drawio](docs/diagrams/overview.drawio))
 
 ## Deep Dives
 
 | Option | Pattern | Doc | Diagram |
 |---|---|---|---|
-| **A** | Internal ALB + Serverless NEG via VPN | [docs/option-a-ilb-via-vpn.md](docs/option-a-ilb-via-vpn.md) | [diagram](docs/diagrams/option-a-architecture.drawio.svg) |
-| **B** | Private Google Access | [docs/option-b-pga.md](docs/option-b-pga.md) | [diagram](docs/diagrams/option-b-architecture.drawio.svg) |
-| **C** | PSC Endpoint for Google APIs | [docs/option-c-psc-google-apis.md](docs/option-c-psc-google-apis.md) | [diagram](docs/diagrams/option-c-architecture.drawio.svg) |
-| **D** | PSC Published Service | [docs/option-d-psc-service-attachment.md](docs/option-d-psc-service-attachment.md) | [diagram](docs/diagrams/option-d-architecture.drawio.svg) |
+| **A** | Internal ALB + Serverless NEG via VPN | [docs/option-a-ilb-via-vpn.md](docs/option-a-ilb-via-vpn.md) | [diagram](docs/diagrams/option-a-architecture.svg) |
+| **B** | Private Google Access | [docs/option-b-pga.md](docs/option-b-pga.md) | [diagram](docs/diagrams/option-b-architecture.svg) |
+| **C** | PSC Endpoint for Google APIs | [docs/option-c-psc-google-apis.md](docs/option-c-psc-google-apis.md) | [diagram](docs/diagrams/option-c-architecture.svg) |
+| **D** | PSC Published Service | [docs/option-d-psc-service-attachment.md](docs/option-d-psc-service-attachment.md) | [diagram](docs/diagrams/option-d-architecture.svg) |
 
 ### Cross-Cutting References
 

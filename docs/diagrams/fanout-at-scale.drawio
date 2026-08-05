@@ -1,0 +1,295 @@
+<mxfile host="app.diagrams.net" modified="2026-08-05T09:00:00.000Z">
+  <diagram name="Sidecar Fan-Out at Scale" id="fanout-at-scale">
+    <mxGraphModel dx="1422" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="900" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+
+        <!-- ==================== TITLE ==================== -->
+        <mxCell id="title" value="Request Fan-Out: 1 Client &#8594; 1 Apigee &#8594; 3 Cloud Run Services &#8594; 9 Instances &#8594; 9 Envoy Sidecars" style="text;html=1;fontSize=18;fontStyle=1;align=center;fontColor=#202124;" vertex="1" parent="1">
+          <mxGeometry x="200" y="10" width="1200" height="32" as="geometry"/>
+        </mxCell>
+        <mxCell id="subtitle" value="Every Cloud Run instance runs two containers &#8212; Envoy ingress (jwt_authn) in front of the app. Instance count is chosen by the autoscaler, so the size of the Envoy fleet is not something you deploy. Instance counts here are illustrative; the PoC runs at --max-instances=5." style="text;html=1;fontSize=11;align=center;fontColor=#5F6368;" vertex="1" parent="1">
+          <mxGeometry x="150" y="44" width="1300" height="20" as="geometry"/>
+        </mxCell>
+
+        <!-- ==================== CLIENT ==================== -->
+        <mxCell id="client" value="Client &#8212; one caller" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F1F3F4;strokeColor=#5F6368;strokeWidth=2;verticalAlign=top;fontStyle=1;fontSize=12;fontColor=#3C4043;arcSize=8;container=1;collapsible=0;spacingTop=4;" vertex="1" parent="1">
+          <mxGeometry x="620" y="74" width="360" height="58" as="geometry"/>
+        </mxCell>
+        <mxCell id="client-line" value="Authorization: Bearer &lt;client JWT&gt;  &#183;  Host: api.internal.example.com" style="text;fontSize=8;fontColor=#3C4043;align=center;fontFamily=Courier New;" vertex="1" parent="client">
+          <mxGeometry x="10" y="26" width="340" height="16" as="geometry"/>
+        </mxCell>
+        <mxCell id="client-note" value="one identity, one token &#8212; fan-out happens downstream" style="text;fontSize=8;fontColor=#80868B;align=center;fontStyle=2;" vertex="1" parent="client">
+          <mxGeometry x="10" y="42" width="340" height="14" as="geometry"/>
+        </mxCell>
+
+        <!-- ==================== APIGEE ==================== -->
+        <mxCell id="apigee" value="Apigee X &#8212; one runtime instance" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FCE4EC;strokeColor=#E91E63;strokeWidth=2;verticalAlign=top;fontStyle=1;fontSize=14;fontColor=#C2185B;arcSize=4;container=1;collapsible=0;spacingTop=5;" vertex="1" parent="1">
+          <mxGeometry x="380" y="178" width="840" height="136" as="geometry"/>
+        </mxCell>
+        <mxCell id="apigee-hook" value="PreProxyFlowhook &#8594; auth-verify shared flow: VerifyJWT (RS256 pinned, JWKS cached) &#8212; the client JWT is validated ONCE here" style="text;fontSize=9;fontColor=#0D652D;align=center;fontStyle=1;fillColor=#E8F5E9;rounded=1;strokeColor=#4CAF50;whiteSpace=wrap;" vertex="1" parent="apigee">
+          <mxGeometry x="20" y="26" width="800" height="22" as="geometry"/>
+        </mxCell>
+        <mxCell id="proxy-pay" value="proxy: cr-payments&#xa;BasePath /payments" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F8BBD0;strokeColor=#E91E63;strokeWidth=1;fontSize=9;fontColor=#3C4043;fontStyle=1;arcSize=10;" vertex="1" parent="apigee">
+          <mxGeometry x="20" y="56" width="250" height="32" as="geometry"/>
+        </mxCell>
+        <mxCell id="proxy-txn" value="proxy: cr-transactions&#xa;BasePath /transactions" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F8BBD0;strokeColor=#E91E63;strokeWidth=1;fontSize=9;fontColor=#3C4043;fontStyle=1;arcSize=10;" vertex="1" parent="apigee">
+          <mxGeometry x="295" y="56" width="250" height="32" as="geometry"/>
+        </mxCell>
+        <mxCell id="proxy-cust" value="proxy: cr-customer-details&#xa;BasePath /customer-details" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F8BBD0;strokeColor=#E91E63;strokeWidth=1;fontSize=9;fontColor=#3C4043;fontStyle=1;arcSize=10;" vertex="1" parent="apigee">
+          <mxGeometry x="570" y="56" width="250" height="32" as="geometry"/>
+        </mxCell>
+        <mxCell id="apigee-hop" value="per hop out: adds X-Serverless-Authorization (Google ID token, minted as the proxy deploy SA) &#183; egress via PGA restricted VIP 199.36.153.4/30 &#183; the client&#39;s Authorization header passes through untouched" style="text;fontSize=8;fontColor=#E65100;align=center;fontStyle=1;fillColor=#FFF3E0;rounded=1;strokeColor=#FB8C00;whiteSpace=wrap;" vertex="1" parent="apigee">
+          <mxGeometry x="20" y="96" width="800" height="28" as="geometry"/>
+        </mxCell>
+
+        <!-- ==================== SERVICE 1: PAYMENTS ==================== -->
+        <mxCell id="svc-pay" value="payments" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E3F2FD;strokeColor=#1565C0;strokeWidth=2;verticalAlign=top;fontStyle=1;fontSize=14;fontColor=#1565C0;arcSize=3;container=1;collapsible=0;spacingTop=5;" vertex="1" parent="1">
+          <mxGeometry x="40" y="384" width="460" height="436" as="geometry"/>
+        </mxCell>
+        <mxCell id="svc-pay-badge" value="3 instances &#8594; 3 Envoys" style="text;fontSize=8;fontColor=#6A1B9A;align=center;fontStyle=1;fillColor=#F3E5F5;rounded=1;strokeColor=#9C27B0;" vertex="1" parent="svc-pay">
+          <mxGeometry x="306" y="6" width="140" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="svc-pay-icon" value="" style="shape=mxgraph.gcp2.cloud_run;fillColor=#AECBFA;strokeColor=none;verticalLabelPosition=bottom;verticalAlign=top;align=center;" vertex="1" parent="svc-pay">
+          <mxGeometry x="14" y="28" width="54" height="42" as="geometry"/>
+        </mxCell>
+        <mxCell id="svc-pay-meta" value="cr-payments &#183; europe-west2&#xa;--no-allow-unauthenticated &#183; --ingress=internal&#xa;concurrency 80 &#183; min-instances 1 &#183; max-instances 100" style="text;fontSize=9;fontColor=#3C4043;align=left;verticalAlign=middle;" vertex="1" parent="svc-pay">
+          <mxGeometry x="78" y="28" width="368" height="42" as="geometry"/>
+        </mxCell>
+        <mxCell id="svc-pay-fe" value="Cloud Run front end &#183; IAM check, then the autoscaler picks an instance" style="text;fontSize=9;fontColor=#2E7D32;align=center;fontStyle=1;fillColor=#E8F5E9;rounded=1;strokeColor=#4CAF50;whiteSpace=wrap;" vertex="1" parent="svc-pay">
+          <mxGeometry x="20" y="78" width="420" height="24" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="p1" value="instance 1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#DADCE0;strokeWidth=1;verticalAlign=top;align=left;spacingLeft=8;fontSize=9;fontColor=#80868B;fontStyle=1;arcSize=8;container=1;collapsible=0;spacingTop=2;" vertex="1" parent="svc-pay">
+          <mxGeometry x="44" y="112" width="396" height="72" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1-envoy" value="Envoy sidecar :8080&#xa;jwt_authn &#183; 0.25 vCPU / 128 Mi" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F3E5F5;strokeColor=#9C27B0;strokeWidth=1;fontSize=8;fontColor=#6A1B9A;fontStyle=1;arcSize=10;" vertex="1" parent="p1">
+          <mxGeometry x="10" y="22" width="178" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1-arr" value="&#8594;" style="text;fontSize=12;fontColor=#5F6368;align=center;fontStyle=1;" vertex="1" parent="p1">
+          <mxGeometry x="188" y="32" width="20" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1-app" value="app container&#xa;127.0.0.1:8081" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8F0FE;strokeColor=#4285F4;strokeWidth=1;fontSize=8;fontColor=#1A73E8;fontStyle=1;arcSize=10;" vertex="1" parent="p1">
+          <mxGeometry x="208" y="22" width="178" height="40" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="p2" value="instance 2" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#DADCE0;strokeWidth=1;verticalAlign=top;align=left;spacingLeft=8;fontSize=9;fontColor=#80868B;fontStyle=1;arcSize=8;container=1;collapsible=0;spacingTop=2;" vertex="1" parent="svc-pay">
+          <mxGeometry x="44" y="192" width="396" height="72" as="geometry"/>
+        </mxCell>
+        <mxCell id="p2-envoy" value="Envoy sidecar :8080&#xa;jwt_authn &#183; 0.25 vCPU / 128 Mi" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F3E5F5;strokeColor=#9C27B0;strokeWidth=1;fontSize=8;fontColor=#6A1B9A;fontStyle=1;arcSize=10;" vertex="1" parent="p2">
+          <mxGeometry x="10" y="22" width="178" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="p2-arr" value="&#8594;" style="text;fontSize=12;fontColor=#5F6368;align=center;fontStyle=1;" vertex="1" parent="p2">
+          <mxGeometry x="188" y="32" width="20" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p2-app" value="app container&#xa;127.0.0.1:8081" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8F0FE;strokeColor=#4285F4;strokeWidth=1;fontSize=8;fontColor=#1A73E8;fontStyle=1;arcSize=10;" vertex="1" parent="p2">
+          <mxGeometry x="208" y="22" width="178" height="40" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="p3" value="instance 3" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#DADCE0;strokeWidth=1;verticalAlign=top;align=left;spacingLeft=8;fontSize=9;fontColor=#80868B;fontStyle=1;arcSize=8;container=1;collapsible=0;spacingTop=2;" vertex="1" parent="svc-pay">
+          <mxGeometry x="44" y="272" width="396" height="72" as="geometry"/>
+        </mxCell>
+        <mxCell id="p3-envoy" value="Envoy sidecar :8080&#xa;jwt_authn &#183; 0.25 vCPU / 128 Mi" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F3E5F5;strokeColor=#9C27B0;strokeWidth=1;fontSize=8;fontColor=#6A1B9A;fontStyle=1;arcSize=10;" vertex="1" parent="p3">
+          <mxGeometry x="10" y="22" width="178" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="p3-arr" value="&#8594;" style="text;fontSize=12;fontColor=#5F6368;align=center;fontStyle=1;" vertex="1" parent="p3">
+          <mxGeometry x="188" y="32" width="20" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p3-app" value="app container&#xa;127.0.0.1:8081" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8F0FE;strokeColor=#4285F4;strokeWidth=1;fontSize=8;fontColor=#1A73E8;fontStyle=1;arcSize=10;" vertex="1" parent="p3">
+          <mxGeometry x="208" y="22" width="178" height="40" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="p-ghost" value="instance 4 &#8212; not running yet&#xa;when the autoscaler adds it, it adds another Envoy with it" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FAFAFA;strokeColor=#BDBDBD;strokeWidth=1;dashed=1;dashPattern=6 4;fontSize=8;fontColor=#9E9E9E;fontStyle=2;arcSize=8;" vertex="1" parent="svc-pay">
+          <mxGeometry x="44" y="352" width="396" height="72" as="geometry"/>
+        </mxCell>
+
+        <!-- ==================== SERVICE 2: TRANSACTIONS ==================== -->
+        <mxCell id="svc-txn" value="transactions" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E3F2FD;strokeColor=#1565C0;strokeWidth=2;verticalAlign=top;fontStyle=1;fontSize=14;fontColor=#1565C0;arcSize=3;container=1;collapsible=0;spacingTop=5;" vertex="1" parent="1">
+          <mxGeometry x="570" y="384" width="460" height="436" as="geometry"/>
+        </mxCell>
+        <mxCell id="svc-txn-badge" value="4 instances &#8594; 4 Envoys" style="text;fontSize=8;fontColor=#6A1B9A;align=center;fontStyle=1;fillColor=#F3E5F5;rounded=1;strokeColor=#9C27B0;" vertex="1" parent="svc-txn">
+          <mxGeometry x="306" y="6" width="140" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="svc-txn-icon" value="" style="shape=mxgraph.gcp2.cloud_run;fillColor=#AECBFA;strokeColor=none;verticalLabelPosition=bottom;verticalAlign=top;align=center;" vertex="1" parent="svc-txn">
+          <mxGeometry x="14" y="28" width="54" height="42" as="geometry"/>
+        </mxCell>
+        <mxCell id="svc-txn-meta" value="cr-transactions &#183; europe-west2&#xa;--no-allow-unauthenticated &#183; --ingress=internal&#xa;concurrency 80 &#183; min-instances 1 &#183; max-instances 60" style="text;fontSize=9;fontColor=#3C4043;align=left;verticalAlign=middle;" vertex="1" parent="svc-txn">
+          <mxGeometry x="78" y="28" width="368" height="42" as="geometry"/>
+        </mxCell>
+        <mxCell id="svc-txn-fe" value="Cloud Run front end &#183; IAM check, then the autoscaler picks an instance" style="text;fontSize=9;fontColor=#2E7D32;align=center;fontStyle=1;fillColor=#E8F5E9;rounded=1;strokeColor=#4CAF50;whiteSpace=wrap;" vertex="1" parent="svc-txn">
+          <mxGeometry x="20" y="78" width="420" height="24" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="t1" value="instance 1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#DADCE0;strokeWidth=1;verticalAlign=top;align=left;spacingLeft=8;fontSize=9;fontColor=#80868B;fontStyle=1;arcSize=8;container=1;collapsible=0;spacingTop=2;" vertex="1" parent="svc-txn">
+          <mxGeometry x="44" y="112" width="396" height="72" as="geometry"/>
+        </mxCell>
+        <mxCell id="t1-envoy" value="Envoy sidecar :8080&#xa;jwt_authn &#183; 0.25 vCPU / 128 Mi" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F3E5F5;strokeColor=#9C27B0;strokeWidth=1;fontSize=8;fontColor=#6A1B9A;fontStyle=1;arcSize=10;" vertex="1" parent="t1">
+          <mxGeometry x="10" y="22" width="178" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="t1-arr" value="&#8594;" style="text;fontSize=12;fontColor=#5F6368;align=center;fontStyle=1;" vertex="1" parent="t1">
+          <mxGeometry x="188" y="32" width="20" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="t1-app" value="app container&#xa;127.0.0.1:8081" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8F0FE;strokeColor=#4285F4;strokeWidth=1;fontSize=8;fontColor=#1A73E8;fontStyle=1;arcSize=10;" vertex="1" parent="t1">
+          <mxGeometry x="208" y="22" width="178" height="40" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="t2" value="instance 2" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#DADCE0;strokeWidth=1;verticalAlign=top;align=left;spacingLeft=8;fontSize=9;fontColor=#80868B;fontStyle=1;arcSize=8;container=1;collapsible=0;spacingTop=2;" vertex="1" parent="svc-txn">
+          <mxGeometry x="44" y="192" width="396" height="72" as="geometry"/>
+        </mxCell>
+        <mxCell id="t2-envoy" value="Envoy sidecar :8080&#xa;jwt_authn &#183; 0.25 vCPU / 128 Mi" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F3E5F5;strokeColor=#9C27B0;strokeWidth=1;fontSize=8;fontColor=#6A1B9A;fontStyle=1;arcSize=10;" vertex="1" parent="t2">
+          <mxGeometry x="10" y="22" width="178" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="t2-arr" value="&#8594;" style="text;fontSize=12;fontColor=#5F6368;align=center;fontStyle=1;" vertex="1" parent="t2">
+          <mxGeometry x="188" y="32" width="20" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="t2-app" value="app container&#xa;127.0.0.1:8081" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8F0FE;strokeColor=#4285F4;strokeWidth=1;fontSize=8;fontColor=#1A73E8;fontStyle=1;arcSize=10;" vertex="1" parent="t2">
+          <mxGeometry x="208" y="22" width="178" height="40" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="t3" value="instance 3" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#DADCE0;strokeWidth=1;verticalAlign=top;align=left;spacingLeft=8;fontSize=9;fontColor=#80868B;fontStyle=1;arcSize=8;container=1;collapsible=0;spacingTop=2;" vertex="1" parent="svc-txn">
+          <mxGeometry x="44" y="272" width="396" height="72" as="geometry"/>
+        </mxCell>
+        <mxCell id="t3-envoy" value="Envoy sidecar :8080&#xa;jwt_authn &#183; 0.25 vCPU / 128 Mi" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F3E5F5;strokeColor=#9C27B0;strokeWidth=1;fontSize=8;fontColor=#6A1B9A;fontStyle=1;arcSize=10;" vertex="1" parent="t3">
+          <mxGeometry x="10" y="22" width="178" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="t3-arr" value="&#8594;" style="text;fontSize=12;fontColor=#5F6368;align=center;fontStyle=1;" vertex="1" parent="t3">
+          <mxGeometry x="188" y="32" width="20" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="t3-app" value="app container&#xa;127.0.0.1:8081" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8F0FE;strokeColor=#4285F4;strokeWidth=1;fontSize=8;fontColor=#1A73E8;fontStyle=1;arcSize=10;" vertex="1" parent="t3">
+          <mxGeometry x="208" y="22" width="178" height="40" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="t4" value="instance 4" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#DADCE0;strokeWidth=1;verticalAlign=top;align=left;spacingLeft=8;fontSize=9;fontColor=#80868B;fontStyle=1;arcSize=8;container=1;collapsible=0;spacingTop=2;" vertex="1" parent="svc-txn">
+          <mxGeometry x="44" y="352" width="396" height="72" as="geometry"/>
+        </mxCell>
+        <mxCell id="t4-envoy" value="Envoy sidecar :8080&#xa;jwt_authn &#183; 0.25 vCPU / 128 Mi" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F3E5F5;strokeColor=#9C27B0;strokeWidth=1;fontSize=8;fontColor=#6A1B9A;fontStyle=1;arcSize=10;" vertex="1" parent="t4">
+          <mxGeometry x="10" y="22" width="178" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="t4-arr" value="&#8594;" style="text;fontSize=12;fontColor=#5F6368;align=center;fontStyle=1;" vertex="1" parent="t4">
+          <mxGeometry x="188" y="32" width="20" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="t4-app" value="app container&#xa;127.0.0.1:8081" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8F0FE;strokeColor=#4285F4;strokeWidth=1;fontSize=8;fontColor=#1A73E8;fontStyle=1;arcSize=10;" vertex="1" parent="t4">
+          <mxGeometry x="208" y="22" width="178" height="40" as="geometry"/>
+        </mxCell>
+
+        <!-- ==================== SERVICE 3: CUSTOMER-DETAILS ==================== -->
+        <mxCell id="svc-cust" value="customer-details" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E3F2FD;strokeColor=#1565C0;strokeWidth=2;verticalAlign=top;fontStyle=1;fontSize=14;fontColor=#1565C0;arcSize=3;container=1;collapsible=0;spacingTop=5;" vertex="1" parent="1">
+          <mxGeometry x="1100" y="384" width="460" height="436" as="geometry"/>
+        </mxCell>
+        <mxCell id="svc-cust-badge" value="2 instances &#8594; 2 Envoys" style="text;fontSize=8;fontColor=#6A1B9A;align=center;fontStyle=1;fillColor=#F3E5F5;rounded=1;strokeColor=#9C27B0;" vertex="1" parent="svc-cust">
+          <mxGeometry x="306" y="6" width="140" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="svc-cust-icon" value="" style="shape=mxgraph.gcp2.cloud_run;fillColor=#AECBFA;strokeColor=none;verticalLabelPosition=bottom;verticalAlign=top;align=center;" vertex="1" parent="svc-cust">
+          <mxGeometry x="14" y="28" width="54" height="42" as="geometry"/>
+        </mxCell>
+        <mxCell id="svc-cust-meta" value="cr-customer-details &#183; europe-west2&#xa;--no-allow-unauthenticated &#183; --ingress=internal&#xa;concurrency 80 &#183; min-instances 0 &#183; max-instances 40" style="text;fontSize=9;fontColor=#3C4043;align=left;verticalAlign=middle;" vertex="1" parent="svc-cust">
+          <mxGeometry x="78" y="28" width="368" height="42" as="geometry"/>
+        </mxCell>
+        <mxCell id="svc-cust-fe" value="Cloud Run front end &#183; IAM check, then the autoscaler picks an instance" style="text;fontSize=9;fontColor=#2E7D32;align=center;fontStyle=1;fillColor=#E8F5E9;rounded=1;strokeColor=#4CAF50;whiteSpace=wrap;" vertex="1" parent="svc-cust">
+          <mxGeometry x="20" y="78" width="420" height="24" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="c1" value="instance 1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#DADCE0;strokeWidth=1;verticalAlign=top;align=left;spacingLeft=8;fontSize=9;fontColor=#80868B;fontStyle=1;arcSize=8;container=1;collapsible=0;spacingTop=2;" vertex="1" parent="svc-cust">
+          <mxGeometry x="44" y="112" width="396" height="72" as="geometry"/>
+        </mxCell>
+        <mxCell id="c1-envoy" value="Envoy sidecar :8080&#xa;jwt_authn &#183; 0.25 vCPU / 128 Mi" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F3E5F5;strokeColor=#9C27B0;strokeWidth=1;fontSize=8;fontColor=#6A1B9A;fontStyle=1;arcSize=10;" vertex="1" parent="c1">
+          <mxGeometry x="10" y="22" width="178" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="c1-arr" value="&#8594;" style="text;fontSize=12;fontColor=#5F6368;align=center;fontStyle=1;" vertex="1" parent="c1">
+          <mxGeometry x="188" y="32" width="20" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="c1-app" value="app container&#xa;127.0.0.1:8081" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8F0FE;strokeColor=#4285F4;strokeWidth=1;fontSize=8;fontColor=#1A73E8;fontStyle=1;arcSize=10;" vertex="1" parent="c1">
+          <mxGeometry x="208" y="22" width="178" height="40" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="c2" value="instance 2" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#DADCE0;strokeWidth=1;verticalAlign=top;align=left;spacingLeft=8;fontSize=9;fontColor=#80868B;fontStyle=1;arcSize=8;container=1;collapsible=0;spacingTop=2;" vertex="1" parent="svc-cust">
+          <mxGeometry x="44" y="192" width="396" height="72" as="geometry"/>
+        </mxCell>
+        <mxCell id="c2-envoy" value="Envoy sidecar :8080&#xa;jwt_authn &#183; 0.25 vCPU / 128 Mi" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F3E5F5;strokeColor=#9C27B0;strokeWidth=1;fontSize=8;fontColor=#6A1B9A;fontStyle=1;arcSize=10;" vertex="1" parent="c2">
+          <mxGeometry x="10" y="22" width="178" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="c2-arr" value="&#8594;" style="text;fontSize=12;fontColor=#5F6368;align=center;fontStyle=1;" vertex="1" parent="c2">
+          <mxGeometry x="188" y="32" width="20" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="c2-app" value="app container&#xa;127.0.0.1:8081" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8F0FE;strokeColor=#4285F4;strokeWidth=1;fontSize=8;fontColor=#1A73E8;fontStyle=1;arcSize=10;" vertex="1" parent="c2">
+          <mxGeometry x="208" y="22" width="178" height="40" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="c-ghost" value="instance 3 &#8212; not running yet&#xa;when the autoscaler adds it, it adds another Envoy with it" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FAFAFA;strokeColor=#BDBDBD;strokeWidth=1;dashed=1;dashPattern=6 4;fontSize=8;fontColor=#9E9E9E;fontStyle=2;arcSize=8;" vertex="1" parent="svc-cust">
+          <mxGeometry x="44" y="272" width="396" height="72" as="geometry"/>
+        </mxCell>
+        <mxCell id="c-scale0" value="min-instances 0 &#8594; this service can scale to zero: no instance, no Envoy, no cost. The first call after idle then pays cold start for BOTH containers &#8212; the startup probe traverses Envoy &#8594; app, so readiness gates on the full path (flow doc &#167;8).&#xa;Measured: parallel start, no --depends-on &#8594; marginal cost &#8776; 0; serialised was a flat +0.65 s." style="text;fontSize=8;fontColor=#E65100;align=left;verticalAlign=top;fillColor=#FFF3E0;rounded=1;strokeColor=#FB8C00;whiteSpace=wrap;spacingLeft=8;spacingRight=8;spacingTop=5;" vertex="1" parent="svc-cust">
+          <mxGeometry x="44" y="352" width="396" height="72" as="geometry"/>
+        </mxCell>
+
+        <!-- ==================== EDGES: CLIENT -> APIGEE ==================== -->
+        <mxCell id="e-client" value="1.  every request, one token" style="endArrow=classic;strokeColor=#5F6368;strokeWidth=3;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;fontSize=9;fontColor=#3C4043;fontStyle=1;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="client" target="apigee">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- ==================== EDGES: APIGEE -> SERVICES ==================== -->
+        <mxCell id="e-pay" value="2.  /payments" style="endArrow=classic;strokeColor=#E91E63;strokeWidth=3;html=1;exitX=0.15;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;fontSize=9;fontColor=#C2185B;fontStyle=1;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="apigee" target="svc-pay">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e-txn" value="2.  /transactions" style="endArrow=classic;strokeColor=#E91E63;strokeWidth=3;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;fontSize=9;fontColor=#C2185B;fontStyle=1;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="apigee" target="svc-txn">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e-cust" value="2.  /customer-details" style="endArrow=classic;strokeColor=#E91E63;strokeWidth=3;html=1;exitX=0.85;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;fontSize=9;fontColor=#C2185B;fontStyle=1;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="apigee" target="svc-cust">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="note-routing" value="Routing fan-out: one proxy per service &#8212; the BasePath decides which run.app host is dialled. One Apigee instance, three targets." style="text;fontSize=8;fontColor=#C2185B;align=left;verticalAlign=top;fontStyle=2;fillColor=#FFFFFF;rounded=1;strokeColor=#F8BBD0;whiteSpace=wrap;spacingLeft=6;spacingRight=6;spacingTop=4;" vertex="1" parent="1">
+          <mxGeometry x="40" y="326" width="300" height="36" as="geometry"/>
+        </mxCell>
+        <mxCell id="note-enforcement" value="Enforcement fan-out: the token is verified ONCE at Apigee, then AGAIN inside every Envoy below (zero-trust re-validation) &#8212; 1 + 9 verifications of the same JWT, at this instant." style="text;fontSize=8;fontColor=#6A1B9A;align=left;verticalAlign=top;fontStyle=2;fillColor=#FFFFFF;rounded=1;strokeColor=#E1BEE7;whiteSpace=wrap;spacingLeft=6;spacingRight=6;spacingTop=4;" vertex="1" parent="1">
+          <mxGeometry x="1290" y="316" width="270" height="46" as="geometry"/>
+        </mxCell>
+
+        <!-- ==================== EDGES: FRONT END -> INSTANCES (payments) ==================== -->
+        <mxCell id="e-p1" value="" style="endArrow=classic;strokeColor=#4CAF50;strokeWidth=2;html=1;edgeStyle=orthogonalEdgeStyle;rounded=1;exitX=0.024;exitY=1;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="svc-pay" source="svc-pay-fe" target="p1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e-p2" value="" style="endArrow=classic;strokeColor=#4CAF50;strokeWidth=2;html=1;edgeStyle=orthogonalEdgeStyle;rounded=1;exitX=0.024;exitY=1;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="svc-pay" source="svc-pay-fe" target="p2">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e-p3" value="" style="endArrow=classic;strokeColor=#4CAF50;strokeWidth=2;html=1;edgeStyle=orthogonalEdgeStyle;rounded=1;exitX=0.024;exitY=1;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="svc-pay" source="svc-pay-fe" target="p3">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e-pg" value="" style="endArrow=classic;strokeColor=#BDBDBD;strokeWidth=2;html=1;dashed=1;dashPattern=6 4;edgeStyle=orthogonalEdgeStyle;rounded=1;exitX=0.024;exitY=1;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="svc-pay" source="svc-pay-fe" target="p-ghost">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- ==================== EDGES: FRONT END -> INSTANCES (transactions) ==================== -->
+        <mxCell id="e-t1" value="" style="endArrow=classic;strokeColor=#4CAF50;strokeWidth=2;html=1;edgeStyle=orthogonalEdgeStyle;rounded=1;exitX=0.024;exitY=1;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="svc-txn" source="svc-txn-fe" target="t1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e-t2" value="" style="endArrow=classic;strokeColor=#4CAF50;strokeWidth=2;html=1;edgeStyle=orthogonalEdgeStyle;rounded=1;exitX=0.024;exitY=1;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="svc-txn" source="svc-txn-fe" target="t2">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e-t3" value="" style="endArrow=classic;strokeColor=#4CAF50;strokeWidth=2;html=1;edgeStyle=orthogonalEdgeStyle;rounded=1;exitX=0.024;exitY=1;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="svc-txn" source="svc-txn-fe" target="t3">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e-t4" value="" style="endArrow=classic;strokeColor=#4CAF50;strokeWidth=2;html=1;edgeStyle=orthogonalEdgeStyle;rounded=1;exitX=0.024;exitY=1;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="svc-txn" source="svc-txn-fe" target="t4">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- ==================== EDGES: FRONT END -> INSTANCES (customer-details) ==================== -->
+        <mxCell id="e-c1" value="" style="endArrow=classic;strokeColor=#4CAF50;strokeWidth=2;html=1;edgeStyle=orthogonalEdgeStyle;rounded=1;exitX=0.024;exitY=1;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="svc-cust" source="svc-cust-fe" target="c1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e-c2" value="" style="endArrow=classic;strokeColor=#4CAF50;strokeWidth=2;html=1;edgeStyle=orthogonalEdgeStyle;rounded=1;exitX=0.024;exitY=1;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="svc-cust" source="svc-cust-fe" target="c2">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e-cg" value="" style="endArrow=classic;strokeColor=#BDBDBD;strokeWidth=2;html=1;dashed=1;dashPattern=6 4;edgeStyle=orthogonalEdgeStyle;rounded=1;exitX=0.024;exitY=1;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="svc-cust" source="svc-cust-fe" target="c-ghost">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- ==================== FOOTER ==================== -->
+        <mxCell id="footer" value="Fleet arithmetic at this instant:  1 client &#183; 1 Apigee instance &#183; 3 services &#183; 9 instances &#183; 18 containers &#8212; and therefore 9 Envoy proxies, each holding its own config and its own copy of the JWKS.&#xa;Sized as the PoC does (0.25 vCPU / 128 Mi), the sidecar tier costs +2.25 vCPU / +1.1 GiB across the fleet; on per-container defaults (1 vCPU / 512 Mi) the same nine cost +9 vCPU / +4.5 GiB &#8212; size the sidecar explicitly.&#xa;Nobody deploys nine Envoys: the autoscaler does, per service, and the count moves with load. A config change (JWKS rotation, issuer/audience edit) reaches them only as a new revision on each service &#8212; there is no shared control plane, which is the trade against enforcing once at the Apigee edge." style="text;fontSize=10;fontColor=#3C4043;align=left;verticalAlign=top;fillColor=#FFF8E1;rounded=1;strokeColor=#F9A825;spacingLeft=10;spacingRight=10;spacingTop=6;spacingBottom=6;whiteSpace=wrap;" vertex="1" parent="1">
+          <mxGeometry x="40" y="832" width="1520" height="58" as="geometry"/>
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
