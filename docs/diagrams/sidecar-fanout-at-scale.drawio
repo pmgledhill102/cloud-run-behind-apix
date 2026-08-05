@@ -48,7 +48,7 @@
         <mxCell id="svc-pay" value="payments" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E3F2FD;strokeColor=#1565C0;strokeWidth=2;verticalAlign=top;fontStyle=1;fontSize=14;fontColor=#1565C0;arcSize=3;container=1;collapsible=0;spacingTop=5;" vertex="1" parent="1">
           <mxGeometry x="40" y="384" width="460" height="436" as="geometry"/>
         </mxCell>
-        <mxCell id="svc-pay-badge" value="4 instances &#8594; 4 Envoys" style="text;fontSize=8;fontColor=#6A1B9A;align=center;fontStyle=1;fillColor=#F3E5F5;rounded=1;strokeColor=#9C27B0;" vertex="1" parent="svc-pay">
+        <mxCell id="svc-pay-badge" value="3 instances &#8594; 3 Envoys" style="text;fontSize=8;fontColor=#6A1B9A;align=center;fontStyle=1;fillColor=#F3E5F5;rounded=1;strokeColor=#9C27B0;" vertex="1" parent="svc-pay">
           <mxGeometry x="306" y="6" width="140" height="20" as="geometry"/>
         </mxCell>
         <mxCell id="svc-pay-icon" value="" style="shape=mxgraph.gcp2.cloud_run;fillColor=#AECBFA;strokeColor=none;verticalLabelPosition=bottom;verticalAlign=top;align=center;" vertex="1" parent="svc-pay">
@@ -100,24 +100,15 @@
           <mxGeometry x="208" y="22" width="178" height="40" as="geometry"/>
         </mxCell>
 
-        <mxCell id="p4" value="instance 4" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#DADCE0;strokeWidth=1;verticalAlign=top;align=left;spacingLeft=8;fontSize=9;fontColor=#80868B;fontStyle=1;arcSize=8;container=1;collapsible=0;spacingTop=2;" vertex="1" parent="svc-pay">
+        <mxCell id="p-ghost" value="instance 4 &#8212; not running yet&#xa;when the autoscaler adds it, it adds another Envoy with it" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FAFAFA;strokeColor=#BDBDBD;strokeWidth=1;dashed=1;dashPattern=6 4;fontSize=8;fontColor=#9E9E9E;fontStyle=2;arcSize=8;" vertex="1" parent="svc-pay">
           <mxGeometry x="44" y="352" width="396" height="72" as="geometry"/>
-        </mxCell>
-        <mxCell id="p4-envoy" value="Envoy sidecar :8080&#xa;jwt_authn &#183; 0.25 vCPU / 128 Mi" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F3E5F5;strokeColor=#9C27B0;strokeWidth=1;fontSize=8;fontColor=#6A1B9A;fontStyle=1;arcSize=10;" vertex="1" parent="p4">
-          <mxGeometry x="10" y="22" width="178" height="40" as="geometry"/>
-        </mxCell>
-        <mxCell id="p4-arr" value="&#8594;" style="text;fontSize=12;fontColor=#5F6368;align=center;fontStyle=1;" vertex="1" parent="p4">
-          <mxGeometry x="188" y="32" width="20" height="20" as="geometry"/>
-        </mxCell>
-        <mxCell id="p4-app" value="app container&#xa;127.0.0.1:8081" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8F0FE;strokeColor=#4285F4;strokeWidth=1;fontSize=8;fontColor=#1A73E8;fontStyle=1;arcSize=10;" vertex="1" parent="p4">
-          <mxGeometry x="208" y="22" width="178" height="40" as="geometry"/>
         </mxCell>
 
         <!-- ==================== SERVICE 2: TRANSACTIONS ==================== -->
         <mxCell id="svc-txn" value="transactions" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E3F2FD;strokeColor=#1565C0;strokeWidth=2;verticalAlign=top;fontStyle=1;fontSize=14;fontColor=#1565C0;arcSize=3;container=1;collapsible=0;spacingTop=5;" vertex="1" parent="1">
           <mxGeometry x="570" y="384" width="460" height="436" as="geometry"/>
         </mxCell>
-        <mxCell id="svc-txn-badge" value="3 instances &#8594; 3 Envoys" style="text;fontSize=8;fontColor=#6A1B9A;align=center;fontStyle=1;fillColor=#F3E5F5;rounded=1;strokeColor=#9C27B0;" vertex="1" parent="svc-txn">
+        <mxCell id="svc-txn-badge" value="4 instances &#8594; 4 Envoys" style="text;fontSize=8;fontColor=#6A1B9A;align=center;fontStyle=1;fillColor=#F3E5F5;rounded=1;strokeColor=#9C27B0;" vertex="1" parent="svc-txn">
           <mxGeometry x="306" y="6" width="140" height="20" as="geometry"/>
         </mxCell>
         <mxCell id="svc-txn-icon" value="" style="shape=mxgraph.gcp2.cloud_run;fillColor=#AECBFA;strokeColor=none;verticalLabelPosition=bottom;verticalAlign=top;align=center;" vertex="1" parent="svc-txn">
@@ -169,8 +160,17 @@
           <mxGeometry x="208" y="22" width="178" height="40" as="geometry"/>
         </mxCell>
 
-        <mxCell id="t-ghost" value="instance 4 &#8212; not running yet&#xa;when the autoscaler adds it, it adds another Envoy with it" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FAFAFA;strokeColor=#BDBDBD;strokeWidth=1;dashed=1;dashPattern=6 4;fontSize=8;fontColor=#9E9E9E;fontStyle=2;arcSize=8;" vertex="1" parent="svc-txn">
+        <mxCell id="t4" value="instance 4" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#DADCE0;strokeWidth=1;verticalAlign=top;align=left;spacingLeft=8;fontSize=9;fontColor=#80868B;fontStyle=1;arcSize=8;container=1;collapsible=0;spacingTop=2;" vertex="1" parent="svc-txn">
           <mxGeometry x="44" y="352" width="396" height="72" as="geometry"/>
+        </mxCell>
+        <mxCell id="t4-envoy" value="Envoy sidecar :8080&#xa;jwt_authn &#183; 0.25 vCPU / 128 Mi" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F3E5F5;strokeColor=#9C27B0;strokeWidth=1;fontSize=8;fontColor=#6A1B9A;fontStyle=1;arcSize=10;" vertex="1" parent="t4">
+          <mxGeometry x="10" y="22" width="178" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="t4-arr" value="&#8594;" style="text;fontSize=12;fontColor=#5F6368;align=center;fontStyle=1;" vertex="1" parent="t4">
+          <mxGeometry x="188" y="32" width="20" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="t4-app" value="app container&#xa;127.0.0.1:8081" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8F0FE;strokeColor=#4285F4;strokeWidth=1;fontSize=8;fontColor=#1A73E8;fontStyle=1;arcSize=10;" vertex="1" parent="t4">
+          <mxGeometry x="208" y="22" width="178" height="40" as="geometry"/>
         </mxCell>
 
         <!-- ==================== SERVICE 3: CUSTOMER-DETAILS ==================== -->
@@ -255,7 +255,7 @@
         <mxCell id="e-p3" value="" style="endArrow=classic;strokeColor=#4CAF50;strokeWidth=2;html=1;edgeStyle=orthogonalEdgeStyle;rounded=1;exitX=0.024;exitY=1;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="svc-pay" source="svc-pay-fe" target="p3">
           <mxGeometry relative="1" as="geometry"/>
         </mxCell>
-        <mxCell id="e-p4" value="" style="endArrow=classic;strokeColor=#4CAF50;strokeWidth=2;html=1;edgeStyle=orthogonalEdgeStyle;rounded=1;exitX=0.024;exitY=1;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="svc-pay" source="svc-pay-fe" target="p4">
+        <mxCell id="e-pg" value="" style="endArrow=classic;strokeColor=#BDBDBD;strokeWidth=2;html=1;dashed=1;dashPattern=6 4;edgeStyle=orthogonalEdgeStyle;rounded=1;exitX=0.024;exitY=1;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="svc-pay" source="svc-pay-fe" target="p-ghost">
           <mxGeometry relative="1" as="geometry"/>
         </mxCell>
 
@@ -269,7 +269,7 @@
         <mxCell id="e-t3" value="" style="endArrow=classic;strokeColor=#4CAF50;strokeWidth=2;html=1;edgeStyle=orthogonalEdgeStyle;rounded=1;exitX=0.024;exitY=1;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="svc-txn" source="svc-txn-fe" target="t3">
           <mxGeometry relative="1" as="geometry"/>
         </mxCell>
-        <mxCell id="e-tg" value="" style="endArrow=classic;strokeColor=#BDBDBD;strokeWidth=2;html=1;dashed=1;dashPattern=6 4;edgeStyle=orthogonalEdgeStyle;rounded=1;exitX=0.024;exitY=1;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="svc-txn" source="svc-txn-fe" target="t-ghost">
+        <mxCell id="e-t4" value="" style="endArrow=classic;strokeColor=#4CAF50;strokeWidth=2;html=1;edgeStyle=orthogonalEdgeStyle;rounded=1;exitX=0.024;exitY=1;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="svc-txn" source="svc-txn-fe" target="t4">
           <mxGeometry relative="1" as="geometry"/>
         </mxCell>
 

@@ -40,7 +40,7 @@ Cross-cutting docs:
 - `docs/path-routing-at-scale.md` — Paper design: URL hierarchy → Apigee → Cloud Run at ~50 domains / ~500 APIs (PoC extension plan in §9; items 1–3 — most-specific match, live carve-out, base-path conflict — verified live 2026-08-03)
 - `docs/auth/jwt-enforcement-design.md` — Design: where to enforce authn/authz for external-issuer JWTs (Apigee shared flow vs Cloud Run IAM vs sidecar vs in-service middleware); §10 items 1–6 verified live
 - `docs/auth/auth-poc-field-notes.md` — Auth PoC live-run lessons: greenfield races, BASE-env limits, flow hook casing, JWKS reachability, 403 signatures
-- `docs/auth/envoy-sidecar-flow.md` — Envoy sidecar JWT flow explained three ways: sequence view, wire-level headers per hop, checkpoint/rejection tables; §8.1 is the fleet view (what one sidecar multiplies into across services/instances) (diagrams: `envoy-sidecar-{sequence,headers}.drawio`, `sidecar-fanout-at-scale.drawio`)
+- `docs/auth/envoy-sidecar-flow.md` — Envoy sidecar JWT flow explained three ways: sequence view, wire-level headers per hop, checkpoint/rejection tables; §8.1 is the fleet view — a diagram pair read in order, `service-fanout-envoy.drawio` (the shape: 1 client → 1 Apigee → 3 services → 9 two-container instances) then `sidecar-fanout-at-scale.drawio` (same snapshot annotated with tokens, sidecar sizing arithmetic and autoscaler headroom) (diagrams: `envoy-sidecar-{sequence,headers}.drawio`, `service-fanout-envoy.drawio`, `sidecar-fanout-at-scale.drawio`)
 
 ## PoC Scripts
 
