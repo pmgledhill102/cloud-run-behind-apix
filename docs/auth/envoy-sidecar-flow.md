@@ -334,6 +334,40 @@ T0 ─────────────────────────�
   test suite; the cost was ≈ +7 ms p50 on the RS256 verify vs +3 ms at
   1 vCPU (field notes, "sidecar vs library numbers").
 
+### 8.1 Fleet view — what "one sidecar" multiplies into
+
+Everything above describes a single instance. The operational question is
+what the same picture looks like once Apigee is fanning out across several
+services, each of which the autoscaler has scaled independently:
+
+![Sidecar fan-out at scale — 1 client, 1 Apigee, 3 services, 9 instances, 9 Envoys](../diagrams/sidecar-fanout-at-scale.svg)
+
+Instance counts in that diagram are illustrative (the PoC runs one service
+at `--max-instances=5`); the arithmetic it makes visible is not:
+
+- **You never deploy the Envoy fleet — the autoscaler does.** Nine
+  instances means nine Envoy processes, each with its own config and its
+  own copy of the JWKS. The count moves with load, per service, and no
+  deploy step corresponds to it.
+- **Sidecar sizing is a fleet multiplier, not a per-service one.** At the
+  PoC's 0.25 vCPU / 128 Mi that is +2.25 vCPU / +1.1 GiB across nine
+  instances; on per-container defaults (1 vCPU / 512 Mi) the same nine cost
+  +9 vCPU / +4.5 GiB. This is §8's "size the sidecar explicitly" bullet,
+  seen from the fleet end.
+- **Verification count scales with the fan-out.** The client JWT is
+  verified once at the Apigee edge and again in every Envoy it reaches —
+  1 + N for a single logical request path. That redundancy is the point
+  (it is what closes the direct-bypass threat, §6), but it is redundancy
+  you pay for per instance.
+- **There is no shared control plane.** A JWKS rotation or an
+  issuer/audience change reaches those Envoys only as a new revision on
+  each service. That is the standing trade against enforcing once at the
+  edge — design doc
+  [§4.5](jwt-enforcement-design.md).
+- **Scale-to-zero cuts both ways.** `min-instances 0` means no instance, no
+  Envoy, no cost — and the first call after idle pays cold start for *both*
+  containers, since the startup probe traverses Envoy → app (§8).
+
 ## 9. Seeing it live
 
 ```bash
@@ -348,3 +382,6 @@ Key sources if you want to trace the config behind each hop:
 - Proxy bundle + target `Authentication` block: [`scripts/auth/setup.sh`](../../scripts/auth/setup.sh) `deploy_auth_proxy()`
 - `VerifyJWT` policy + flow hook attach: [`scripts/auth/setup.sh`](../../scripts/auth/setup.sh) step 6
 - App echo behaviour / `JWT_MODE=off`: [`scripts/auth/container/main.go`](../../scripts/auth/container/main.go)
+- Diagram sources: [`envoy-sidecar-sequence.drawio`](../diagrams/envoy-sidecar-sequence.drawio),
+  [`envoy-sidecar-headers.drawio`](../diagrams/envoy-sidecar-headers.drawio),
+  [`sidecar-fanout-at-scale.drawio`](../diagrams/sidecar-fanout-at-scale.drawio)
