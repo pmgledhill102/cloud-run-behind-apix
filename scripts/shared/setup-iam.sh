@@ -93,31 +93,42 @@ for role in "${ROLES[@]}"; do
 done
 echo "IAM roles bound."
 
-# --- Grant caller permission to impersonate the SA ---
+# --- Grant the caller impersonation + actAs on the SA ---
+# Both grants exist for Apigee proxy deploys: tokenCreator to impersonate the
+# SA, serviceAccountUser because a GoogleIDToken <Authentication> block needs
+# iam.serviceAccounts.actAs on the SA passed to the deployment (tokenCreator
+# alone is not enough).
+#
+# The caller is not always a human. Running under short-lived credentials
+# (auth/access_token_file, e.g. the credential broker) leaves
+# `gcloud config get-value account` empty, and an impersonated or attached
+# service account needs the `serviceAccount:` member prefix, not `user:` —
+# so resolve both the identity and its prefix rather than assuming a person.
+# Override with CALLER_ACCOUNT=<email> when gcloud cannot report one.
 echo ""
-echo "--- Granting caller serviceAccountTokenCreator ---"
-CALLER_ACCOUNT="$(gcloud config get-value account 2>/dev/null)"
-retry_iam "grant tokenCreator on ${SA_NAME} to caller" \
-  gcloud iam service-accounts add-iam-policy-binding "${SA_EMAIL}" \
-  --member="user:${CALLER_ACCOUNT}" \
-  --role="roles/iam.serviceAccountTokenCreator" \
-  --project="${PROJECT_ID}" \
-  --quiet
-echo "Caller '${CALLER_ACCOUNT}' can now impersonate '${SA_EMAIL}'."
-
-# --- Grant caller permission to deploy proxies as the SA ---
-# Deploying an Apigee proxy with a GoogleIDToken <Authentication> block requires
-# the deployer to have iam.serviceAccounts.actAs on the SA passed to the
-# deployment (roles/iam.serviceAccountUser); tokenCreator alone is not enough.
-echo ""
-echo "--- Granting caller serviceAccountUser ---"
-retry_iam "grant serviceAccountUser on ${SA_NAME} to caller" \
-  gcloud iam service-accounts add-iam-policy-binding "${SA_EMAIL}" \
-  --member="user:${CALLER_ACCOUNT}" \
-  --role="roles/iam.serviceAccountUser" \
-  --project="${PROJECT_ID}" \
-  --quiet
-echo "Caller '${CALLER_ACCOUNT}' can now deploy Apigee proxies as '${SA_EMAIL}'."
+echo "--- Granting caller tokenCreator + serviceAccountUser ---"
+CALLER_ACCOUNT="${CALLER_ACCOUNT:-$(gcloud config get-value account 2>/dev/null)}"
+if [[ -z "${CALLER_ACCOUNT}" || "${CALLER_ACCOUNT}" == "(unset)" ]]; then
+  echo "SKIPPED: gcloud reports no active account (short-lived credentials?)."
+  echo "         These two grants only matter for Apigee proxy deploys"
+  echo "         (setup-slow.sh, auth/setup.sh step 6). Re-run with"
+  echo "         CALLER_ACCOUNT=<email> ./scripts/shared/setup-iam.sh before those."
+else
+  if [[ "${CALLER_ACCOUNT}" == *.gserviceaccount.com ]]; then
+    CALLER_MEMBER="serviceAccount:${CALLER_ACCOUNT}"
+  else
+    CALLER_MEMBER="user:${CALLER_ACCOUNT}"
+  fi
+  for CALLER_ROLE in roles/iam.serviceAccountTokenCreator roles/iam.serviceAccountUser; do
+    retry_iam "grant ${CALLER_ROLE} on ${SA_NAME} to caller" \
+      gcloud iam service-accounts add-iam-policy-binding "${SA_EMAIL}" \
+      --member="${CALLER_MEMBER}" \
+      --role="${CALLER_ROLE}" \
+      --project="${PROJECT_ID}" \
+      --quiet
+  done
+  echo "Caller '${CALLER_MEMBER}' can now impersonate and deploy proxies as '${SA_EMAIL}'."
+fi
 
 # --- Grant Cloud Run Service Agent compute.networkUser ---
 echo ""
