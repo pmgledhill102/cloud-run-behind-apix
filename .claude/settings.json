@@ -11,8 +11,8 @@
       "Bash(gcloud services peered-dns-domains list *)",
       "Bash(bash -n *)",
       "Bash(shellcheck *)",
-      "Bash(.claude/bin/gcp-credentials status)",
-      "Bash(.claude/bin/gcp-credentials release)",
+      "Bash(gcp-credentials status)",
+      "Bash(gcp-credentials release)",
       "mcp__github__pull_request_read",
       "mcp__google-developer-knowledge__answer_query"
     ]
