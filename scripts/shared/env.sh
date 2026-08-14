@@ -8,11 +8,19 @@
 #
 
 # --- Project ---
-PROJECT_ID="${PROJECT_ID:-sb-paul-g-apigee}"
+# No default, deliberately. PoC projects are ephemeral sandboxes, so any ID
+# baked in here is dead by the next session — and a stale default does not
+# fail cleanly: it sends a setup or (worse) a teardown at whatever project
+# still answers to that name. Every script sourcing this file requires
+# PROJECT_ID in the environment; exported so nested invocations inherit it.
+# `export PROJECT_ID=<id>` once per shell is the intended idiom — the "next
+# step" hints these scripts print at the end assume it is still set.
+: "${PROJECT_ID:?PROJECT_ID must be set explicitly — there is no default (PoC projects are ephemeral sandboxes). Set it once per shell: export PROJECT_ID=<your-project>}"
+export PROJECT_ID
 REGION="europe-north2"
 # Overridable: small VM types can stock out in a single zone (e.g. e2-micro in
 # europe-north2-a) — switch zone or size without editing this file:
-#   ZONE=europe-north2-b ./scripts/shared/setup-base.sh
+#   PROJECT_ID=<your-project> ZONE=europe-north2-b ./scripts/shared/setup-base.sh
 ZONE="${ZONE:-${REGION}-a}"
 VM_MACHINE_TYPE="${VM_MACHINE_TYPE:-e2-micro}"
 

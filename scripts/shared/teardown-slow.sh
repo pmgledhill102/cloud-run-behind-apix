@@ -6,7 +6,7 @@
 # then teardown-base.sh.
 #
 # Usage:
-#   ./scripts/shared/teardown-slow.sh
+#   PROJECT_ID=<your-project> ./scripts/shared/teardown-slow.sh
 #
 set -euo pipefail
 

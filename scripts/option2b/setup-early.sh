@@ -40,10 +40,10 @@
 #     Apigee/option2 NOT required.
 #   - Caller needs org-level roles/accesscontextmanager.policyAdmin to create
 #     the access policy. If you already have a policy, skip creation with:
-#       ACCESS_POLICY_ID=1234567890 ./scripts/option2b/setup-early.sh
+#       PROJECT_ID=<your-project> ACCESS_POLICY_ID=1234567890 ./scripts/option2b/setup-early.sh
 #
 # Usage:
-#   ./scripts/option2b/setup-early.sh
+#   PROJECT_ID=<your-project> ./scripts/option2b/setup-early.sh
 #   PROJECT_ID=my-project ./scripts/option2b/setup-early.sh
 #
 # NOTE: perimeter changes can take a few minutes (up to ~30) to propagate.
@@ -159,7 +159,7 @@ else
       echo "You need org-level roles/accesscontextmanager.policyAdmin, or"
       echo "reuse an existing policy:"
       echo "  gcloud access-context-manager policies list --organization=${ORG_ID} --billing-project=${PROJECT_ID}"
-      echo "  ACCESS_POLICY_ID=<id> ./scripts/option2b/setup-early.sh"
+      echo "  PROJECT_ID=${PROJECT_ID} ACCESS_POLICY_ID=<id> ./scripts/option2b/setup-early.sh"
       exit 1
     fi
 

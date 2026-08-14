@@ -42,6 +42,8 @@ This is the key advantage of Option C over Options A and D, which require per-se
 The `scripts/option3/` directory supports a scaled variant via `SERVICE_COUNT` — it deploys 20 Cloud Run services (`cr-svc-01` through `cr-svc-20`) and verifies each is reachable through the single PSC endpoint.
 
 ```bash
+export PROJECT_ID=<your-project>   # required — no default
+
 # Shared setup (once):
 ./scripts/shared/setup-iam.sh
 ./scripts/shared/setup-base.sh

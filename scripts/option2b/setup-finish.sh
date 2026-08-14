@@ -33,7 +33,7 @@
 #   - option2/setup.sh completed (run-app-pga DNS zone the tenant resolves via)
 #
 # Usage:
-#   ./scripts/option2b/setup-finish.sh
+#   PROJECT_ID=<your-project> ./scripts/option2b/setup-finish.sh
 #   PROJECT_ID=my-project ./scripts/option2b/setup-finish.sh
 #
 set -euo pipefail

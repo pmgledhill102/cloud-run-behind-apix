@@ -29,7 +29,7 @@
 #   - setup-slow.sh / option2b NOT required — that's the point
 #
 # Usage:
-#   ./scripts/mock-apigee/setup.sh
+#   PROJECT_ID=<your-project> ./scripts/mock-apigee/setup.sh
 #   PROJECT_ID=my-project ./scripts/mock-apigee/setup.sh
 #
 set -euo pipefail

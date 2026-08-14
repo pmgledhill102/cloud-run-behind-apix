@@ -5,7 +5,7 @@
 # Run AFTER teardown-base.sh.
 #
 # Usage:
-#   ./scripts/shared/teardown-iam.sh
+#   PROJECT_ID=<your-project> ./scripts/shared/teardown-iam.sh
 #
 set -euo pipefail
 

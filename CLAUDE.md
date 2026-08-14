@@ -57,7 +57,7 @@ Scripts are structured in three tiers for fast iteration:
 - `setup-base.sh` — apigee-vpc, subnet, firewall, NAT, VM, AR, image, Cloud Run (~5 min)
 - `setup-slow.sh` — Apigee org + instance + env + proxy (~60-90 min)
 - `teardown-base.sh`, `teardown-slow.sh`, `teardown-iam.sh` — Reverse order
-- `stack-up.sh` / `stack-down.sh` — Full-stack orchestrators (#66): encode the parallel bring-up (setup-slow ∥ option2b/setup-early) and reverse-order teardown described below as one command each. `SKIP_VPCSC=1`/`SKIP_AUTH=1`/`SKIP_MOCK=1` skip a tier on the way up; `stack-down.sh` always tears down everything (idempotent, safe on a partial stack). Both require `PROJECT_ID` set explicitly — no dead-sandbox default
+- `stack-up.sh` / `stack-down.sh` — Full-stack orchestrators (#66): encode the parallel bring-up (setup-slow ∥ option2b/setup-early) and reverse-order teardown described below as one command each. `SKIP_VPCSC=1`/`SKIP_AUTH=1`/`SKIP_MOCK=1` skip a tier on the way up; `stack-down.sh` always tears down everything (idempotent, safe on a partial stack)
 
 ### Option-specific scripts (`scripts/option{1,2,3,4}/`)
 - `setup.sh` — Option-specific resources only (~1-2 min each)
@@ -66,14 +66,21 @@ Scripts are structured in three tiers for fast iteration:
 
 ### Workflow
 
+**`PROJECT_ID` is required by every script — `env.sh` has no default.** PoC
+projects are ephemeral sandboxes, so a baked-in ID would be stale by the next
+session and would silently aim a setup (or a teardown) at whatever project
+still answers to it. Unset, the scripts exit immediately with a usage message.
+
 One command each, via the orchestrators (#66):
 ```bash
-PROJECT_ID=sb-paul-g-apixN ./scripts/shared/stack-up.sh     # ~60-90 min, parallel #52 path
-PROJECT_ID=sb-paul-g-apixN ./scripts/shared/stack-down.sh   # reverse dependency order
+PROJECT_ID=<your-project> ./scripts/shared/stack-up.sh     # ~60-90 min, parallel #52 path
+PROJECT_ID=<your-project> ./scripts/shared/stack-down.sh   # reverse dependency order
 ```
 
 Or the manual steps they encode:
 ```bash
+export PROJECT_ID=<your-project>    # required — no default
+
 # Once at start:
 ./scripts/shared/setup-iam.sh
 ./scripts/shared/setup-base.sh      # ~5 min

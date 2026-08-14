@@ -32,7 +32,7 @@
 # applied, Apigee provisioned.
 #
 # Usage:
-#   ./scripts/option2b/test-external.sh
+#   PROJECT_ID=<your-project> ./scripts/option2b/test-external.sh
 #
 set -euo pipefail
 

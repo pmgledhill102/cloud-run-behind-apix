@@ -48,6 +48,8 @@ fights back, the decided fallback is a small Go gateway
 ```bash
 # Prerequisites: shared/setup-base.sh + auth/setup.sh (keypair, cr-auth-echo).
 # setup-slow.sh (Apigee) and option2b (VPC-SC) NOT required — that's the point.
+export PROJECT_ID=<your-project>   # required — no default
+
 ./scripts/mock-apigee/setup.sh      # ~2-3 min (+ ~1-2 min first image pull)
 ./scripts/mock-apigee/test.sh       # M1-M4
 ./scripts/mock-apigee/teardown.sh   # full reverse, ~1-2 min

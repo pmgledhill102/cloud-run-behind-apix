@@ -383,6 +383,8 @@ Instance counts in both are illustrative (the PoC runs one service at
 ## 9. Seeing it live
 
 ```bash
+export PROJECT_ID=<your-project>   # required — no default
+
 ./scripts/auth/setup.sh     # keypair, cr-idp-mock, shared flow + flow hook, BOTH variants
 ./scripts/auth/test.sh      # Tests 1-5 plus E1 happy path · E2 Envoy-isolated rejections · E3 latency vs library
 ./scripts/auth/teardown.sh  # remove both variants, shared flow, flow hook

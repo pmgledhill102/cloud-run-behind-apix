@@ -9,7 +9,7 @@
 # apigee-vpc idempotently.
 #
 # Usage:
-#   ./scripts/shared/setup-base.sh
+#   PROJECT_ID=<your-project> ./scripts/shared/setup-base.sh
 #
 set -euo pipefail
 

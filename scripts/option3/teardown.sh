@@ -5,7 +5,7 @@
 # Deletes: DNS, PSC forwarding rule, PSC IP, extra Cloud Run services (if scaled)
 #
 # For scaled variant:
-#   SERVICE_COUNT=20 ./scripts/option3/teardown.sh
+#   PROJECT_ID=<your-project> SERVICE_COUNT=20 ./scripts/option3/teardown.sh
 #
 set -euo pipefail
 

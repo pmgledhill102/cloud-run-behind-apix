@@ -25,6 +25,8 @@ VM (10.0.0.x) [simulates Apigee in peered VPC]
 Run shared setup first (once across all options):
 
 ```bash
+export PROJECT_ID=<your-project>   # required — no default
+
 ./scripts/shared/setup-iam.sh
 ./scripts/shared/setup-base.sh        # ~5 min
 ./scripts/shared/setup-slow.sh        # ~60-90 min (Apigee — optional, can run in parallel)
@@ -33,6 +35,8 @@ Run shared setup first (once across all options):
 ## Run instructions
 
 ```bash
+export PROJECT_ID=<your-project>   # required — no default
+
 ./scripts/option2/setup.sh            # ~30 sec
 ./scripts/option2/test.sh
 # when done:
