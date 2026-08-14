@@ -56,7 +56,7 @@ VPC's `run-app-pga` zone → restricted VIP → its own restricted-VIP route
   DNS zone and restricted-VIP routing this builds on).
 - **Org-level permission**: creating the access policy requires
   `roles/accesscontextmanager.policyAdmin` on the organization. To reuse an
-  existing policy instead: `ACCESS_POLICY_ID=<id> ./scripts/option2b/setup.sh`.
+  existing policy instead: `PROJECT_ID=<your-project> ACCESS_POLICY_ID=<id> ./scripts/option2b/setup.sh`.
 - Apigee (`shared/setup-slow.sh`) optional — test 4 skips if absent.
 
 ## Parallel workflow: hide propagation inside Apigee provisioning
@@ -80,6 +80,8 @@ Cloud Build image builds succeed under the enforced perimeter (the ingress
 rule admits the caller + build SA).
 
 ```bash
+export PROJECT_ID=<your-project>   # required — no default
+
 ./scripts/shared/setup-base.sh          # ~5 min
 ./scripts/shared/setup-slow.sh &        # ~60-90 min, in parallel with:
 ./scripts/option2b/setup-early.sh       # perimeter — propagation clock starts
@@ -97,6 +99,8 @@ state is independent of that ordering.
 ## Run instructions
 
 ```bash
+export PROJECT_ID=<your-project>   # required — no default
+
 ./scripts/option2b/setup.sh                        # setup-early + setup-finish
 ./scripts/option2b/measure-propagation.sh blocked  # optional: measure enforcement arrival
 ./scripts/option2b/test.sh                         # core perimeter validation

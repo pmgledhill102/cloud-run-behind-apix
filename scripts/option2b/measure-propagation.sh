@@ -6,6 +6,7 @@
 # bucket) on an interval and reports how long the enforcement state takes to
 # reach the expected TARGET state:
 #
+#   export PROJECT_ID=<your-project>
 #   ./scripts/option2b/setup.sh    && ./scripts/option2b/measure-propagation.sh blocked
 #   ./scripts/option2b/teardown.sh && ./scripts/option2b/measure-propagation.sh open
 #
@@ -22,8 +23,8 @@
 # enforcement can flap mid-propagation.
 #
 # Usage:
-#   ./scripts/option2b/measure-propagation.sh [blocked|open]
-#   INTERVAL=30 MAX_MINUTES=90 ./scripts/option2b/measure-propagation.sh blocked
+#   PROJECT_ID=<your-project> ./scripts/option2b/measure-propagation.sh [blocked|open]
+#   PROJECT_ID=<your-project> INTERVAL=30 MAX_MINUTES=90 ./scripts/option2b/measure-propagation.sh blocked
 #
 # Output is timestamped per probe, so a scroll-back after an unattended run
 # still yields the number.

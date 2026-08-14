@@ -28,12 +28,12 @@
 #   SKIP_MOCK=1    skip the mock-apigee quick stack only
 #
 # Usage:
-#   PROJECT_ID=sb-paul-g-apixN ./scripts/shared/stack-up.sh
-#   SKIP_MOCK=1 PROJECT_ID=sb-paul-g-apixN ./scripts/shared/stack-up.sh
+#   PROJECT_ID=<your-project> ./scripts/shared/stack-up.sh
+#   SKIP_MOCK=1 PROJECT_ID=<your-project> ./scripts/shared/stack-up.sh
 #
 set -euo pipefail
 
-: "${PROJECT_ID:?PROJECT_ID must be set explicitly — env.sh has no live default (sandboxes are ephemeral by design). Usage: PROJECT_ID=<your-project> ./scripts/shared/stack-up.sh}"
+: "${PROJECT_ID:?PROJECT_ID must be set explicitly — env.sh has no default (PoC projects are ephemeral sandboxes). Set it once per shell: export PROJECT_ID=<your-project>}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SCRIPTS_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"

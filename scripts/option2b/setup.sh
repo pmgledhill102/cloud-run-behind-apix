@@ -25,7 +25,7 @@
 #   - shared/setup-base.sh and option2/setup.sh completed
 #   - Caller needs org-level roles/accesscontextmanager.policyAdmin to create
 #     the access policy. If you already have a policy, skip creation with:
-#       ACCESS_POLICY_ID=1234567890 ./scripts/option2b/setup.sh
+#       PROJECT_ID=<your-project> ACCESS_POLICY_ID=1234567890 ./scripts/option2b/setup.sh
 #
 # NOTE: perimeter changes can take a few minutes (up to ~30) to propagate.
 #

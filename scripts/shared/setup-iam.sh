@@ -6,8 +6,7 @@
 # by any option. Run this once with a privileged account (Owner or IAM Admin).
 #
 # Usage:
-#   ./scripts/shared/setup-iam.sh
-#   PROJECT_ID=my-project ./scripts/shared/setup-iam.sh
+#   PROJECT_ID=<your-project> ./scripts/shared/setup-iam.sh
 #
 set -euo pipefail
 

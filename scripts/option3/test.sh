@@ -3,7 +3,7 @@
 # option3/test.sh — Verify PSC endpoint connectivity to Cloud Run
 #
 # For scaled variant:
-#   SERVICE_COUNT=20 ./scripts/option3/test.sh
+#   PROJECT_ID=<your-project> SERVICE_COUNT=20 ./scripts/option3/test.sh
 #
 set -euo pipefail
 

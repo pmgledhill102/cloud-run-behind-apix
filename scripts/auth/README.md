@@ -31,6 +31,8 @@ cr-idp-mock:  JWKS endpoint (allow-unauth + ingress=internal — §7.4 mirror po
 # Prerequisites: shared/setup-iam.sh, shared/setup-base.sh, option2/setup.sh
 # (+ shared/setup-slow.sh for the Apigee parts; option2b optional)
 
+export PROJECT_ID=<your-project>   # required — no default
+
 ./scripts/auth/setup.sh      # ~4-5 min first run (3 image builds), ~1-2 min after
 ./scripts/auth/test.sh       # Tests 1-5 (shared layers + library) and E1-E3 (sidecar)
 ./scripts/auth/teardown.sh   # removes both variants + shared flow + flow hook

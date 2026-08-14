@@ -13,7 +13,7 @@
 # Can run in parallel with setup-base.sh — both create apigee-vpc idempotently.
 #
 # Usage:
-#   ./scripts/shared/setup-slow.sh
+#   PROJECT_ID=<your-project> ./scripts/shared/setup-slow.sh
 #
 set -euo pipefail
 

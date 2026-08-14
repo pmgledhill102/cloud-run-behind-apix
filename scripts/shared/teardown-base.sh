@@ -9,7 +9,7 @@
 # then this script.
 #
 # Usage:
-#   ./scripts/shared/teardown-base.sh
+#   PROJECT_ID=<your-project> ./scripts/shared/teardown-base.sh
 #
 set -euo pipefail
 

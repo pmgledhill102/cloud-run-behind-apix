@@ -5,7 +5,7 @@
 # Creates: PSC endpoint (all-apis), private DNS zone for run.app
 #
 # For scaled variant (20 services):
-#   SERVICE_COUNT=20 ./scripts/option3/setup.sh
+#   PROJECT_ID=<your-project> SERVICE_COUNT=20 ./scripts/option3/setup.sh
 #
 # Prerequisites: shared/setup-base.sh completed.
 #
