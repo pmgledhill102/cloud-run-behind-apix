@@ -34,7 +34,6 @@
 #
 # Usage:
 #   PROJECT_ID=<your-project> ./scripts/option2b/setup-finish.sh
-#   PROJECT_ID=my-project ./scripts/option2b/setup-finish.sh
 #
 set -euo pipefail
 

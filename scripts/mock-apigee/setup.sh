@@ -30,7 +30,6 @@
 #
 # Usage:
 #   PROJECT_ID=<your-project> ./scripts/mock-apigee/setup.sh
-#   PROJECT_ID=my-project ./scripts/mock-apigee/setup.sh
 #
 set -euo pipefail
 

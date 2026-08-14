@@ -44,7 +44,6 @@
 #
 # Usage:
 #   PROJECT_ID=<your-project> ./scripts/option2b/setup-early.sh
-#   PROJECT_ID=my-project ./scripts/option2b/setup-early.sh
 #
 # NOTE: perimeter changes can take a few minutes (up to ~30) to propagate.
 # All ACM commands pass --billing-project explicitly because ACM is an

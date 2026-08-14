@@ -8,7 +8,6 @@
 #
 # Usage:
 #   PROJECT_ID=<your-project> ./scripts/mock-apigee/teardown.sh
-#   PROJECT_ID=my-project ./scripts/mock-apigee/teardown.sh
 #
 set -euo pipefail
 

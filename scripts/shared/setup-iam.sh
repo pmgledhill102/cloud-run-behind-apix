@@ -7,7 +7,6 @@
 #
 # Usage:
 #   PROJECT_ID=<your-project> ./scripts/shared/setup-iam.sh
-#   PROJECT_ID=my-project ./scripts/shared/setup-iam.sh
 #
 set -euo pipefail
 
