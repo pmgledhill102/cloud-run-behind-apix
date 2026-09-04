@@ -70,7 +70,7 @@ if deploys:
       # No audience requested — match if none is configured
       echo "${CURRENT_TARGET}" | grep -q "<GoogleIDToken>" || AUTH_MATCH=true
     fi
-    if [[ "${URL_MATCH}" == "true" && "${AUTH_MATCH}" == "true" ]]; then
+    if [[ "${URL_MATCH}" == "true" && "${AUTH_MATCH}" == "true" && "${FORCE_PROXY_UPDATE:-}" != "true" ]]; then
       echo "Proxy target already set to ${target_url} (auth: ${audience:-none}), skipping."
       NEEDS_UPDATE=false
     fi
@@ -84,6 +84,29 @@ if deploys:
     mkdir -p "${BUNDLE_DIR}/apiproxy/proxies"
     mkdir -p "${BUNDLE_DIR}/apiproxy/targets"
     mkdir -p "${BUNDLE_DIR}/apiproxy/policies"
+
+    # Apigee preserves the ORIGINAL inbound Host header (the env group hostname,
+    # e.g. api.internal.example.com) on the outbound target request by default —
+    # it does not rewrite it to the target URL's own hostname. Cloud Run's GFE
+    # routes by Host header, so an unrewritten Host that doesn't match any real
+    # Cloud Run service returns a generic "the requested URL was not found" 404
+    # (found live: debug-session trace showed target_info.host correct but
+    # target_info.header.host still the envgroup hostname). Explicitly set Host
+    # to the target's own hostname before the target call.
+    local TARGET_HOST="${target_url#https://}"
+    TARGET_HOST="${TARGET_HOST#http://}"
+    TARGET_HOST="${TARGET_HOST%%/*}"
+
+    cat > "${BUNDLE_DIR}/apiproxy/policies/SetHostHeader.xml" << XMLEOF
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<AssignMessage name="SetHostHeader">
+  <Set>
+    <Headers>
+      <Header name="Host">${TARGET_HOST}</Header>
+    </Headers>
+  </Set>
+</AssignMessage>
+XMLEOF
 
     cat > "${BUNDLE_DIR}/apiproxy/proxies/default.xml" << 'XMLEOF'
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -130,7 +153,9 @@ XMLEOF
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <TargetEndpoint name="default">
   <PreFlow name="PreFlow">
-    <Request/>
+    <Request>
+      <Step><Name>SetHostHeader</Name></Step>
+    </Request>
     <Response/>
   </PreFlow>
   <Flows/>

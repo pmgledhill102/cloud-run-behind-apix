@@ -90,6 +90,12 @@ state (see §4). Assume any VPC-SC change affects the tenant differently than
 your own VMs, and test the Apigee path separately — a passing VM test proves
 nothing about Apigee's path.
 
+The sharpest instance of this: point your `run.app` zone at the **private**
+VIP instead of the restricted one and your workloads carry on returning
+`200` while every Apigee call dies with `TARGET_CONNECT_TIMEOUT`, because
+only the tenant lost its route. §4.1 has the reproduction; §9 has the
+one-test method for telling that apart from a firewall problem.
+
 ---
 
 ## 2. Failure catalogue — provisioning a hardened project
@@ -242,7 +248,7 @@ What we tried, in order:
 | Apigee `organizations.dnsZones` API (create DNS peering zone) | ✗ — `FAILED_PRECONDITION: organization with VPC Peering enabled is not supported`. **That API is for PSC-provisioned orgs only** |
 | `gcloud services peered-dns-domains create run-app --dns-suffix=run.app.` | ✓ — this is the mechanism for VPC-peered orgs |
 
-The working combination for a **VPC-peered** org (all four together):
+The working combination for a **VPC-peered** org:
 
 1. `gcloud services vpc-peerings enable-vpc-service-controls` on the peering
 2. `roles/dns.peer` for `service-<num>@gcp-sa-apigee` on the project
@@ -250,7 +256,21 @@ The working combination for a **VPC-peered** org (all four together):
    are answered from *your* VPC's resolution order, where the private
    `run.app → restricted VIP` zone lives
 4. A restricted-VIP static route (`199.36.153.4/30` →
-   `default-internet-gateway`) with `--export-custom-routes` on the peering
+   `default-internet-gateway`) with `--export-custom-routes` on the peering —
+   **belt and braces, not load-bearing; see the correction below**
+
+> **Correction (verified live 2026-09-04).** This list used to say "all four
+> together". Item 4 is **not load-bearing for connectivity**. With items 1–3
+> in place we deleted the `restricted-vip` route outright and Apigee kept
+> working: three requests spanning eight minutes all reached Cloud Run, and a
+> debug-session trace of a *fresh* connection (`isFromClientPool=false`,
+> `socketUseCount=0`) showed `resolvedAddress = 199.36.153.7` and
+> `connectionStatus = CONNECTED` with no route of ours in existence.
+> `enable-vpc-service-controls` installs restricted-VIP routing *inside the
+> tenant*, and that is what actually carries this traffic. Keep the route if
+> you like — it costs nothing — but do not go hunting for a missing route
+> when you are debugging a timeout. What *is* load-bearing is item 3: delete
+> the peered DNS domain and southbound dies in about a minute (§9).
 
 Once the peered DNS domain existed, the runtime picked it up dynamically
 within minutes — no instance recreation, no proxy redeploy.
@@ -259,6 +279,63 @@ within minutes — no instance recreation, no proxy redeploy.
 > use the `organizations.dnsZones` API. The two mechanisms are mutually
 > exclusive by provisioning model, and nothing in the error messages of the
 > wrong one points you at the right one.
+
+### 4.1 Restricted vs private VIP — the trap that produces TARGET_CONNECT_TIMEOUT
+
+**Verified live 2026-09-04, A/B/A, on an otherwise-working stack.**
+
+`enable-vpc-service-controls` installs tenant routing for the **restricted**
+VIP (`199.36.153.4/30`) only. It installs **nothing** for the **private** VIP
+(`199.36.153.8/30`). So if your private `run.app` zone points at the private
+range, the tenant resolves your Cloud Run URL to an address it cannot route
+to, and every southbound call dies at TCP connect — the §3.3 symptom, with no
+VPC-SC change and nothing in Cloud Run's logs to show for it.
+
+| Private `run.app` zone points at | workload path (VM → Cloud Run) | Apigee path |
+|---|---|---|
+| `199.36.153.4-7` (restricted) | `200` | connects |
+| **`199.36.153.8-11` (private)** | **`200`** | **`503 TARGET_CONNECT_TIMEOUT` in ~3 s** |
+| `199.36.153.4-7` (restored) | `200` | connects again |
+
+The middle row is the whole trap: **your workloads keep working**, because
+your own VPC still has a default route covering the private VIP. Only the
+tenant — whose default route `enable-vpc-service-controls` removed — is
+stranded. So a VM test "proves" the path is healthy while Apigee times out,
+and the obvious suspects (firewall, routes, auth) are all innocent.
+
+**Adding and exporting a custom route for `199.36.153.8/30` does not fix it.**
+We created the route, confirmed `exportCustomRoutesToPeer: true` on the
+peering, and the tenant still could not reach `199.36.153.9` — while a VM in
+the same VPC reached it fine (`403` in 0.30 s, i.e. TCP and TLS both
+succeeded). Exported custom routes evidently reach the servicenetworking peer
+network but not the Apigee runtime tenant that makes the call: there are two
+Google-managed tenant projects in play (the peering's
+`…-tp/global/networks/servicenetworking`, and the org's `apigeeProjectId`)
+and you can see into neither. Caveat: tested to ~4 minutes after route
+creation, not longer.
+
+**Fix:** point the zone at `199.36.153.4-7`. Cloud Run is a VPC-SC-supported
+service, so the restricted VIP serves it. DNS-only change — no routes, no
+firewall rules, no proxy redeploy.
+
+**Security consequence, worth raising explicitly.** While you are on the
+private VIP, Apigee southbound is **not** subject to VPC-SC enforcement even
+though `enable-vpc-service-controls` is switched on — the switch is on, but
+the traffic never traverses the enforcing endpoint. If a compliance story
+claims that path is perimeter-protected, it is not. Moving to the restricted
+VIP starts genuinely enforcing it, so expect a `403` rather than a `200` if
+the perimeter does not yet admit the path. That `403` is progress, not a
+regression: connectivity works and it has become a policy question (§7 shows
+how to find the denial in audit logs).
+
+**Targeting the VIP by IP is not a workaround.** A target of
+`<URL>https://199.36.153.5/</URL>` with an `AssignMessage`-set `Host` header
+returns `403 "The service you are trying to access is not available on
+Google's Restricted VIPs"` in ~45 ms. The Google front end selects the backend
+from **TLS SNI**, not from the `Host` header, and connecting by raw IP puts
+the IP in SNI. DNS is precisely what lets the hostname reach SNI while the
+packets go to the VIP — which is why the peered DNS domain is load-bearing
+and the static route is not.
 
 ---
 
@@ -481,6 +558,12 @@ VPC-SC:
 - [ ] Ingress rule for admin/CI identities *in the initial perimeter spec*
 - [ ] `enable-vpc-service-controls` on the peering **plus** the §4 DNS/routing
       set (peered model: `peered-dns-domains`; PSC model: `dnsZones` API)
+- [ ] Private `run.app` zone points at the **restricted** VIP
+      (`199.36.153.4-7`) — **not** the private VIP (`199.36.153.8-11`), which
+      the tenant cannot route to at all (§4.1)
+- [ ] All three checks run against the project owning the Apigee
+      `authorizedNetwork` — under Shared VPC that is the **host** project, not
+      the Apigee org's project (§9)
 - [ ] A negative test that proves denial of out-of-perimeter access
 - [ ] Time budgeted for enforcement propagation (hours, pessimistically)
 - [ ] Teardown tested — perimeters, policies, peered DNS domains and route
@@ -488,7 +571,133 @@ VPC-SC:
 
 ---
 
-## 9. Pointers
+## 9. Differential diagnosis: telling the failure modes apart
+
+Everything below was reproduced live on 2026-09-04 by breaking one thing at a
+time on a working stack and reverting it, on the PoC's single-project
+topology.
+
+### Where to run the checks
+
+Every check anchors on the Apigee org's `authorizedNetwork` — the VPC the
+tenant peers to — and **the project that owns that VPC**. None of them are
+about the workloads/Cloud Run project. Read the anchor first:
+
+```bash
+curl -H "Authorization: Bearer $(gcloud auth print-access-token)" \
+  "https://apigee.googleapis.com/v1/organizations/<ORG>"   # eu-/us- per residency
+```
+
+The **format** of `authorizedNetwork` tells you which project to use:
+
+| Value | Meaning | Run checks against |
+|---|---|---|
+| `my-vpc` (bare name) | VPC is in the Apigee org's own project | the Apigee org project |
+| `projects/HOST/global/networks/my-vpc` | **Shared VPC** | the **host** project |
+
+Under Shared VPC the `dns.peer` grant is a *cross-project* grant, and easy to
+get wrong: the service agent is named for the **Apigee org project's** number,
+but the binding must be applied on the **host** project that owns the network
+and the DNS zone. (Documented structure — our PoC is single-project, so this
+split is not something we exercised.)
+
+### What each break looks like
+
+| Broken | Path that breaks | HTTP | Signature | Time to fail |
+|---|---|---|---|---|
+| Peered DNS domain deleted | **Apigee only** | `503` | `messaging.adaptors.http.flow.ServiceUnavailable` / `reason: TARGET_CONNECT_TIMEOUT` | ~3.0 s |
+| Zone points at private VIP (§4.1) | **Apigee only** | `503` | identical to above | ~3.0 s |
+| Egress firewall deny to the VIP | **workloads only** | `000` | no response at all — silent drop, no RST, no ICMP | client timeout (30 s) |
+| `restricted-vip` route deleted | neither | — | no effect (§4) | — |
+
+Two things worth internalising:
+
+- **`TARGET_CONNECT_TIMEOUT` fires in ~3 seconds, not 30.** It reads like a
+  fast failure, which is why it gets misfiled as something other than a
+  connectivity problem.
+- **The DNS and firewall failures break *opposite* paths**, so one test
+  discriminates: an authenticated `curl` to the Cloud Run URL from a VM in the
+  Apigee-peered VPC. VM fine + Apigee timing out → tenant DNS/routing. VM also
+  broken → your own egress path. They cannot both be true.
+
+### Firewall rules are not in the Apigee path
+
+Proved by construction: an egress `DENY tcp:443 → 199.36.153.4/30` in the
+Apigee VPC killed the VM path stone dead (`HTTP 000`, 30 s, silent drop) while
+the Apigee path was **unaffected** (`404` in 0.2 s — still reaching the front
+end). Apigee southbound originates in the Google-owned tenant network; peering
+firewall rules are non-transitive, and your hierarchical policies do not reach
+that project either. Removing the rule restored the VM path in ~20 s.
+
+So no firewall rule of yours can cause the Apigee→Cloud Run timeout. They
+*can* cause an identical-looking timeout for your own workloads — GCP denies
+drop silently — which is exactly why the two get confused. (Deny-by-default
+egress orgs still need `tcp:443` to `199.36.153.4/30` for their own workloads;
+just not for the Apigee leg.)
+
+### "No logs on the Cloud Run side" proves nothing
+
+Cloud Run request logs recorded **only** the VM-originated calls. Not one
+Apigee-originated request appeared — including ones that demonstrably reached
+Google's front end and came back `404` (debug trace: TLS handshake completed,
+response returned). Front-end rejections never reach the service's request log.
+
+Silence in Cloud Run is therefore equally consistent with:
+
+| Reality | Apigee-side signal | Cloud Run logs |
+|---|---|---|
+| Never reached Google (DNS/routing) | `503 TARGET_CONNECT_TIMEOUT` | nothing |
+| Reached the GFE, rejected there (Host mismatch, IAM, VPC-SC) | `404`/`403` propagated; `BadGateway` in trace | nothing |
+| Reached the service | `2xx` or app error | logged |
+
+The discriminator lives on the Apigee side, not the Cloud Run side.
+
+### Read it from a debug session in one request
+
+`POST .../apis/<proxy>/revisions/<rev>/debugsessions?timeout=<secs>`, send a
+request, then `GET .../debugsessions/<id>/data/<txn>`:
+
+| Working | Failing (no route) |
+|---|---|
+| `targetendpoint_default.resolvedAddress = 199.36.153.7` | **field absent** |
+| `connectionStatus = CONNECTED` | **field absent** |
+| `tlsHandshakeStatus = COMPLETED` | **field absent** |
+| `error.class = …BadGateway` (a response came back) | `…ServiceUnavailableException` |
+| `state = TARGET_RESP_FLOW` | `state = TARGET_REQ_FLOW` |
+
+The connection fields do not merely show failure — they **do not exist**,
+because no socket was created. Fastest "did we ever get a TCP connection?"
+test available, and it costs one request.
+
+Two gotchas: a debug session needs ~60 s to propagate to the message processor
+before it captures anything (create it, wait, *then* send traffic), and an
+active session appears to force a fresh connection (`isFromClientPool=false`),
+so traced requests run slower than untraced ones — do not read latency
+differences between traced and untraced runs as signal.
+
+`target_info.header.*` in the trace is also where you catch a wrong outbound
+`Host`: Apigee preserves the *inbound* `Host` (the env-group hostname) on the
+target call unless you rewrite it, and Cloud Run's front end routes by `Host`,
+so an unrewritten one returns a generic `404`. Fixed in
+[`shared/lib/apigee-proxy.sh`](../scripts/shared/lib/apigee-proxy.sh) with a
+`SetHostHeader` `AssignMessage`.
+
+### Observed propagation, this run
+
+| Change | Effect visible after | Recovery after revert |
+|---|---|---|
+| Peered DNS domain delete / create | ~1 min | ~70 s |
+| DNS record repoint (TTL 60 s) | < 90 s | < 90 s |
+| Firewall rule add / delete | < 20 s | ~20 s |
+| Custom route delete | no effect at all (§4) | — |
+
+Note how different these are from VPC-SC perimeter propagation (§5, 1–40 min
+and non-monotonic). If you change DNS or a firewall rule and the symptom has
+not moved within a couple of minutes, that change was not the cause.
+
+---
+
+## 10. Pointers
 
 - Working scripts: [`scripts/option2b/`](../scripts/option2b/) (setup, test
   with real PASS/FAIL reporting, teardown)
