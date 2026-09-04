@@ -192,7 +192,12 @@ echo "--- Step 4: Restricted-VIP static route ---"
 # Needs only apigee-vpc (setup-base). Exporting it to the Apigee tenant is a
 # custom-route export on the servicenetworking peering, which doesn't exist
 # until Apigee provisioning creates it — setup-finish.sh does the export.
-if resource_exists gcloud compute routes describe "restricted-vip" --project="${PROJECT_ID}"; then
+if [[ "${SKIP_RESTRICTED_VIP_ROUTE:-}" == "1" ]]; then
+  # Omission switch for experiment-tenant-dns.sh. The route is belt-and-braces,
+  # not load-bearing (field notes §4) — this makes "built without it" a state
+  # you can reach on purpose rather than by deleting it afterwards.
+  echo "SKIP_RESTRICTED_VIP_ROUTE=1 — omitting the restricted-VIP route."
+elif resource_exists gcloud compute routes describe "restricted-vip" --project="${PROJECT_ID}"; then
   echo "Route 'restricted-vip' already exists, skipping."
 else
   gcloud compute routes create "restricted-vip" \

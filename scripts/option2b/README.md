@@ -30,6 +30,7 @@ VM ─────────────────│──► restricted VI
 | `measure-propagation.sh` | Probes the negative test every `INTERVAL` (60s) until the expected state arrives and reports elapsed time — `measure-propagation.sh blocked` after `setup.sh`, `measure-propagation.sh open` after `teardown.sh`. Pass the target: if the flip lands before the first probe (deletion has been near-instant), auto-detect would anchor on the wrong state |
 | `setup-external.sh` | Governance-test fixtures: two Apigee pass-through proxies (`/external-blocked` → `BLOCKED_RUN_URL`, `/external-allowed` → `ALLOWED_RUN_URL`, both from `shared/env.sh`). Drift-aware: retargets via a new revision if a URL changes |
 | `test-external.sh` | Proves the perimeter is **governable** — deny by default, admit by explicit egress policy. **Observes only** (fixtures come from `setup-external.sh`; exits with a hint if they're missing). Seven probes: laptop controls for both external services, Apigee→internal control, then Apigee/VM → blocked (expect BLOCKED) and Apigee/VM → allowed (expect OK) — with explicit leak and lockout checks |
+| `experiment-tenant-dns.sh` | **Greenfield test of the "DNS peering isn't needed under VPC-SC" claim.** Phases `omit` → `dns` → `full` build the omitted state in from the start and add the pieces back one at a time; each phase probes `*.run.app` and `*.googleapis.com` through the same Apigee runtime in the same minute. See [the claim](#the-dns-peering-claim) below |
 | `teardown.sh` | Test fixture proxies, perimeter (incl. egress allow-list), policy (only if ours and empty), peered DNS domain, route + export, `dns.peer`, peering VPC-SC off |
 
 ## Why the Apigee tenant needs DNS + routing plumbing
@@ -49,6 +50,48 @@ Two mechanisms exist to peer DNS into the customer VPC, and they are
 With the peered DNS domain in place, the tenant resolves `run.app` via this
 VPC's `run-app-pga` zone → restricted VIP → its own restricted-VIP route
 (installed by the VPC-SC enablement) → Cloud Run, inside the perimeter.
+
+## The DNS-peering claim
+
+> "The peered DNS domain and the network routes aren't required if VPC Service
+> Controls is enabled, because enabling it redirects the DNS to
+> `restricted.googleapis.com` anyway."
+> — reported from a Google support agent, 2026-09
+
+Half of that is right, and the half that is right is the reason the other half
+is so persuasive. `enable-vpc-service-controls` really does install
+restricted-VIP DNS and routing inside the Apigee tenant — **for
+`*.googleapis.com` names**. Cloud Run is reached at `*.run.app`, which is not
+one of them, so nothing in that redirect covers the hop this pattern depends
+on.
+
+`experiment-tenant-dns.sh` tests it rather than asserting it, and does so on a
+stack that **never had** the DNS peering — closing the loophole left by field
+notes §4/§9, which established the same thing by deleting the peering from a
+working stack:
+
+```bash
+export PROJECT_ID=<your-project>
+
+# Build the stack with the plumbing deliberately omitted:
+SKIP_RESTRICTED_VIP_ROUTE=1 ./scripts/option2b/setup-early.sh
+SKIP_TENANT_DNS=1           ./scripts/option2b/setup-finish.sh
+
+./scripts/option2b/experiment-tenant-dns.sh omit   # expect: run.app FAILS
+./scripts/option2b/experiment-tenant-dns.sh dns    # expect: run.app WORKS
+./scripts/option2b/experiment-tenant-dns.sh full   # expect: no further change
+```
+
+Two omission switches make the "without it" state reachable on purpose rather
+than by deleting resources afterwards:
+
+| Variable | Script | Omits |
+|---|---|---|
+| `SKIP_RESTRICTED_VIP_ROUTE=1` | `setup-early.sh` | the `restricted-vip` static route |
+| `SKIP_TENANT_DNS=1` | `setup-finish.sh` | `dns.peer`, the custom route export, and the peered DNS domain |
+
+Results are recorded in
+[field notes §4.2](../../docs/option-b-vpcsc-field-notes.md).
 
 ## Prerequisites
 

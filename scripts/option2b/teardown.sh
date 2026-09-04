@@ -37,9 +37,10 @@ fi
 # Step 0: Remove external test fixture proxies (test-external.sh)
 # ============================================================
 # cr-external-passthrough is the legacy single-fixture name; the blocked/
-# allowed pair replaced it.
+# allowed pair replaced it. gapi-probe is experiment-tenant-dns.sh's
+# googleapis.com discriminator proxy.
 echo "--- Step 0: Remove external test fixture proxies ---"
-for FIXTURE in cr-external-blocked cr-external-allowed cr-external-passthrough; do
+for FIXTURE in cr-external-blocked cr-external-allowed cr-external-passthrough gapi-probe; do
   # Undeploy whichever revision is actually deployed (fixtures gain revisions
   # when their target URL changes), then delete the proxy.
   FIXTURE_REV="$(apigee_api GET "organizations/${PROJECT_ID}/environments/${APIGEE_ENV}/apis/${FIXTURE}/deployments" \

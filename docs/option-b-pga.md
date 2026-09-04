@@ -134,6 +134,18 @@ tenant DNS/route plumbing from
 the servicenetworking peering) — even if you don't want the perimeter itself.
 See [auth/auth-poc-field-notes.md](auth/auth-poc-field-notes.md).
 
+**Refinement (greenfield run, 2026-09-04).** Those pieces are not
+interchangeable, and enabling VPC-SC on the peering is not sufficient on its
+own — it removes the tenant's default internet route and replaces it for
+`googleapis.com` names only, so on its own it *breaks* `run.app` rather than
+fixing it (`TARGET_CONNECT_TIMEOUT`). The peered DNS domain is what restores
+connectivity; the restricted-VIP route and its custom-route export change
+nothing either way. With connectivity restored but no perimeter, an
+`--ingress=internal` service still answers Apigee with `404` while the same
+request to an `ingress=all` service returns `200`. Full evidence and the one
+question that run could not close in
+[option-b-vpcsc-field-notes.md §4.2](option-b-vpcsc-field-notes.md).
+
 ### IAM Invoker Permission
 
 Grant the Apigee service identity permission to invoke the Cloud Run service:

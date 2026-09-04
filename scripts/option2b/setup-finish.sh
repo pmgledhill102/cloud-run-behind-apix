@@ -79,7 +79,9 @@ echo "--- Step 2: Grant Apigee service agent roles/dns.peer ---"
 # tenant DNS-peer into this VPC and resolve the private run.app zone
 # (per the Apigee VPC-SC docs).
 APIGEE_AGENT_SA="service-${PROJECT_NUMBER}@gcp-sa-apigee.iam.gserviceaccount.com"
-if gcloud projects add-iam-policy-binding "${PROJECT_ID}" \
+if [[ "${SKIP_TENANT_DNS:-}" == "1" ]]; then
+  echo "SKIP_TENANT_DNS=1 — omitting the dns.peer grant."
+elif gcloud projects add-iam-policy-binding "${PROJECT_ID}" \
     --member="serviceAccount:${APIGEE_AGENT_SA}" \
     --role="roles/dns.peer" \
     --condition=None \
@@ -106,7 +108,9 @@ PEERING_NAME="$(gcloud compute networks peerings list \
   --network="${APIGEE_NETWORK}" --project="${PROJECT_ID}" \
   --flatten="peerings[]" --format='value(peerings.name)' \
   --filter='peerings.network~servicenetworking' 2>/dev/null || true)"
-if [[ -n "${PEERING_NAME}" ]]; then
+if [[ "${SKIP_TENANT_DNS:-}" == "1" ]]; then
+  echo "SKIP_TENANT_DNS=1 — omitting the custom route export."
+elif [[ -n "${PEERING_NAME}" ]]; then
   gcloud compute networks peerings update "${PEERING_NAME}" \
     --network="${APIGEE_NETWORK}" \
     --export-custom-routes \
@@ -128,7 +132,9 @@ echo "--- Step 4: Peered DNS domain (run.app) ---"
 # the private run-app-pga zone (restricted VIP). Without this, the tenant
 # resolves run.app to public IPs it can no longer route to (VPC-SC enablement
 # removed its default internet route) → TARGET_CONNECT_TIMEOUT.
-if gcloud services peered-dns-domains list \
+if [[ "${SKIP_TENANT_DNS:-}" == "1" ]]; then
+  echo "SKIP_TENANT_DNS=1 — omitting the peered DNS domain 'run-app'."
+elif gcloud services peered-dns-domains list \
     --network="${APIGEE_NETWORK}" --project="${PROJECT_ID}" \
     --format='value(name)' 2>/dev/null | grep -qx "run-app"; then
   echo "Peered DNS domain 'run-app' already exists, skipping."
