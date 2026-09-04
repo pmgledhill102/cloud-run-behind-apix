@@ -12,6 +12,11 @@ resource_exists() {
   return $?
 }
 
+# Transport to vm-test. The default is IAP SSH; VM_CHANNEL=metadata swaps in
+# the metadata/guest-attributes channel from lib/vm-exec.sh, for sandboxes
+# whose egress policy denies tunnel.cloudproxy.app (IAP's WebSocket relay).
+# Sourced at the END of this file so its ssh_cmd/ssh_curl_auth overrides win.
+
 # Run a command on vm-test via IAP SSH (filters NumPy warning)
 ssh_cmd() {
   gcloud compute ssh "vm-test" \
@@ -83,3 +88,9 @@ apigee_api() {
     return 0  # Don't fail teardown on errors
   fi
 }
+
+# --- Alternative transport (must come last: it overrides the two above) ---
+if [[ "${VM_CHANNEL:-}" == "metadata" ]]; then
+  # shellcheck source=/dev/null
+  source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/vm-exec.sh"
+fi
