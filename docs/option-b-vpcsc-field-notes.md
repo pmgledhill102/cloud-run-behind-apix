@@ -66,6 +66,11 @@ the audit-log entry tells you *what* to allow, not the literal syntax.
 But it took ~3 elapsed days, 11 distinct failure modes, and several
 multi-hour waits to get those lines. Budget accordingly.
 
+**If you have been told the tenant DNS peering is unnecessary under VPC-SC,
+read [§4.2](#42-vpc-sc-redirects-dns-to-restrictedgoogleapiscom-so-you-dont-need-the-peering)
+first.** It is the one claim in this area that is half true, and the true half
+is what makes it convincing.
+
 ---
 
 ## 1. The two lessons that matter most
@@ -270,7 +275,9 @@ The working combination for a **VPC-peered** org:
 > tenant*, and that is what actually carries this traffic. Keep the route if
 > you like — it costs nothing — but do not go hunting for a missing route
 > when you are debugging a timeout. What *is* load-bearing is item 3: delete
-> the peered DNS domain and southbound dies in about a minute (§9).
+> the peered DNS domain and southbound dies in about a minute (§9). Both halves
+> were re-confirmed greenfield — built without them rather than broken after
+> the fact — in §4.2.
 
 Once the peered DNS domain existed, the runtime picked it up dynamically
 within minutes — no instance recreation, no proxy redeploy.
@@ -336,6 +343,105 @@ from **TLS SNI**, not from the `Host` header, and connecting by raw IP puts
 the IP in SNI. DNS is precisely what lets the hostname reach SNI while the
 packets go to the VIP — which is why the peered DNS domain is load-bearing
 and the static route is not.
+
+---
+
+### 4.2 "VPC-SC redirects DNS to restricted.googleapis.com, so you don't need the peering"
+
+**Verified live 2026-09-04, greenfield, on a stack that never had the DNS
+peering.** Reproduce with
+[`option2b/experiment-tenant-dns.sh`](../scripts/option2b/experiment-tenant-dns.sh).
+
+A Google support agent told us the peered DNS domain and the network routes
+are not required once VPC Service Controls is enabled, because enabling it
+"redirects the DNS to `restricted.googleapis.com` anyway".
+
+**The mechanism they describe is real. It just does not cover `run.app`.**
+`enable-vpc-service-controls` installs restricted-VIP DNS and routing inside
+the Apigee tenant for `*.googleapis.com` names. Cloud Run is reached at
+`*.run.app`, which is not one of them.
+
+§4 and §9 already pointed this way, but both established it by *deleting* the
+peered DNS domain from a working stack. That leaves a loophole: perhaps
+enablement binds tenant `run.app` resolution once, and deleting the peering
+afterwards only removes something already bound. So this run built the
+omission in from the start (`SKIP_TENANT_DNS=1`,
+`SKIP_RESTRICTED_VIP_ROUTE=1`) and added the pieces back one at a time.
+
+Every row probes **two** hostnames through the same Apigee runtime within the
+same minute — that pairing is the whole point, because it separates "the
+tenant has no DNS/routing" from "the tenant has no DNS/routing *for this
+name*":
+
+`cr-hello` is `--ingress=internal`, which turns out to matter independently
+(see below), so it is a column rather than a constant — compare rows at equal
+ingress:
+
+| # | State | `cr-hello` ingress | Apigee → `*.run.app` | Apigee → `storage.googleapis.com` | VM control |
+|---|---|---|---|---|---|
+| 0 | Baseline: **no** VPC-SC, no plumbing | `internal` | `404` in 0.36 s (public GFE) | `200` | `200` |
+| 1 | `enable-vpc-service-controls` only | `internal` | **`503` `TARGET_CONNECT_TIMEOUT` in 3.26 s** | `200` in 0.76 s | `200` |
+| 2 | \+ `dns.peer` \+ peered DNS domain | `internal` | **`404` in 0.067 s** (connected — see below) | `200` | `200` |
+| 3 | (row 2 unchanged) | **`all`** | **`200` in 0.058 s** | `200` | `200` |
+| 4 | \+ restricted-VIP route \+ custom route export | `all` | `200` in 0.060 s — **no change** | `200` | `200` |
+| 5 | (row 4 unchanged) | `internal` | `404` in 0.049 s | `200` | `200` |
+
+Read row 1 against row 0 and the claim inverts: enabling VPC-SC did not make
+the DNS peering unnecessary, it is **what made it necessary**. Before
+enablement the tenant reached Cloud Run over its own default internet route;
+enablement removes that route, and installs a replacement for `googleapis.com`
+only. Row 1 is the proof in one line — the googleapis probe returns `200`
+through exactly the redirect the support agent is describing, in the same
+minute that the `run.app` probe cannot open a socket at all.
+
+Row 4 against row 3 confirms the §4 correction independently, and this time on
+a stack that never had them: adding the restricted-VIP route and its
+custom-route export changes nothing, `200` either side.
+
+The debug-session trace at row 1 shows the §9 "no socket" signature exactly —
+`resolvedAddress`, `connectionStatus` and `tlsHandshakeStatus` are not merely
+wrong, they are **absent**:
+
+```text
+error.class = com.apigee.errors.http.server.ServiceUnavailableException
+error.state = TARGET_REQ_FLOW
+state       = TARGET_REQ_FLOW
+```
+
+#### The `404` in rows 2 and 3 is a second finding, not a failure of the fix
+
+Connectivity is restored the moment the peered DNS domain exists: the response
+time collapses from 3.26 s (timeout, no socket) to ~0.05 s, which is the
+restricted VIP answering. The `404` is Google's front end declining to route
+the request to an `--ingress=internal` service.
+
+Proved by A/B/A — rows 2→3 and 4→5 above are that experiment, run twice, with
+the peering, DNS and routes untouched across the flip:
+
+| `cr-hello` ingress | Apigee → `run.app` | VM → `run.app` |
+|---|---|---|
+| `internal` | `404` in 0.049 s | `200` |
+| **`all`** | **`200` in 0.058 s** | `200` |
+| `internal` (restored) | `404` in 0.049 s | `200` |
+
+So the full southbound path — tenant DNS, restricted VIP, TLS, ID-token auth —
+works end to end. What the tenant lacks is *admission* to an internal-ingress
+service.
+
+**This run could not close why.** Creating the perimeter needs org-level
+`roles/accesscontextmanager.policyAdmin`, which the sandbox identity did not
+have, so rows 0–3 were all run with **no perimeter at all** — only
+`enable-vpc-service-controls` on the peering. Earlier runs in this document
+reached `200` from Apigee against the same `--ingress=internal` service *with*
+a perimeter in place (the §0 headline `Test 4 [PASS]`), which strongly suggests
+the perimeter is what makes the Apigee tenant count as internal. Consistent,
+but not demonstrated here — one variable differs, and it is the one we could
+not set. Treat it as the next thing to test, not as established.
+
+The practical read either way: **`enable-vpc-service-controls` on the peering
+is not sufficient on its own.** It buys `googleapis.com` routing and takes away
+the default route. Cloud Run needs the peered DNS domain for connectivity, and
+appears to need the perimeter for admission when ingress is `internal`.
 
 ---
 

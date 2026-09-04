@@ -412,15 +412,15 @@ print(d[0].get('revision','') if d else '')
   local session
   session="$(curl -s -X POST -H "Authorization: Bearer ${TOKEN}" \
     -H 'Content-Type: application/json' \
-    "${APIGEE_API}/organizations/${PROJECT_ID}/environments/${APIGEE_ENV}/apis/${PROXY_NAME}/revisions/${rev}/debugsessions?timeout=180" \
+    "${APIGEE_API}/organizations/${PROJECT_ID}/environments/${APIGEE_ENV}/apis/${PROXY_NAME}/revisions/${rev}/debugsessions?timeout=300" \
     -d '{}' \
     | python3 -c "import sys,json; print(json.load(sys.stdin).get('name',''))" 2>/dev/null || true)"
   if [[ -z "${session}" ]]; then
     echo "  could not create debug session; skipping trace."
     return 0
   fi
-  echo "  session ${session} created; waiting 60s for it to reach the MP..."
-  sleep 60
+  echo "  session ${session} created; waiting 75s for it to reach the MP..."
+  sleep 75
 
   apigee_probe '/hello' >/dev/null || true
   sleep 15
@@ -431,7 +431,9 @@ print(d[0].get('revision','') if d else '')
     | python3 -c "
 import sys,json
 d = json.load(sys.stdin)
-v = d.get('responses') or d.get('data') or []
+# The endpoint returns a bare JSON array of transaction ids (confirmed live);
+# older docs suggest a wrapped object, so tolerate both.
+v = d if isinstance(d, list) else (d.get('responses') or d.get('data') or [])
 print(v[0] if v and isinstance(v[0], str) else '')
 " 2>/dev/null || true)"
   if [[ -z "${txn}" ]]; then
