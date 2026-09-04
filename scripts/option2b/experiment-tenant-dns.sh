@@ -66,6 +66,11 @@
 #     servicenetworking peering (that is the mechanism under test; run it with
 #     SKIP_TENANT_DNS=1 to reach the 'omit' state)
 #
+#   - A working transport to vm-test. On a sandbox whose egress policy denies
+#     IAP (tunnel.cloudproxy.app), prefix every invocation with
+#     VM_CHANNEL=metadata to use the metadata/guest-attributes channel
+#     (shared/lib/vm-exec.sh) — run vm_exec_setup once first.
+#
 # Usage:
 #   PROJECT_ID=<your-project> ./scripts/option2b/experiment-tenant-dns.sh omit
 #   PROJECT_ID=<your-project> ./scripts/option2b/experiment-tenant-dns.sh dns
