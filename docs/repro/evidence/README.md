@@ -39,9 +39,15 @@ are not interesting to a reader either — if a future run needs them masked too
 extend the substitution list in the capture block at the top of
 `experiment-tenant-dns.sh` rather than editing files by hand after the fact.
 
+## What's here now
+
+| File | From |
+|---|---|
+| `20260905T115110Z-perimeter-propagation.log` | Enforcement-arrival measurement for a freshly created perimeter, 2026-09-05. Independently reproduces the flap documented in [field notes §5](../../option-b-vpcsc-field-notes.md#5-waiting-observed-propagation-and-provisioning-times): first `403` at ~24 min after create, back to `200`, stable from ~28 min, confirmed at ~30 min. A probe loop that stopped at the first denial would have declared victory ~6 minutes early, while the perimeter was still intermittently open — which is why `CONFIRM=3` exists |
+
 ## Status
 
-Empty pending a live run. The results quoted in `../dns-peering.md` are from the
+The `experiment-tenant-dns.sh` phase transcripts are still pending a live run. The results quoted in `../dns-peering.md` are from the
 2026-09-04 greenfield run, recorded in
 [field notes §4.2](../../option-b-vpcsc-field-notes.md#42-vpc-sc-redirects-dns-to-restrictedgoogleapiscom-so-you-dont-need-the-peering)
 and on [issue #81](https://github.com/pmgledhill102/cloud-run-behind-apix/issues/81);
