@@ -12,6 +12,10 @@
 #
 # Can run in parallel with setup-base.sh — both create apigee-vpc idempotently.
 #
+# Refuses to start if this project's Apigee org was deleted less than ~24h ago:
+# the org name is reserved for that long and provisioning cannot succeed until
+# it is released (issue #87).
+#
 # Usage:
 #   PROJECT_ID=<your-project> ./scripts/shared/setup-slow.sh
 #
@@ -27,6 +31,17 @@ echo "Analytics region: ${ANALYTICS_REGION}"
 echo "Network:          ${APIGEE_NETWORK}"
 echo "Peering CIDR:     ${APIGEE_PEERING_CIDR}"
 echo ""
+
+# ============================================================
+# Preflight: is the org name still reserved from a previous delete?
+# ============================================================
+# Deliberately before step 1. Hit at step 5 instead (where the API reports it),
+# this costs API enablement, a VPC check, range allocation and peering setup
+# first — several minutes of work and a confusing error. Here it costs one log
+# query and refuses in seconds. See issue #87.
+if ! apigee_org_lock_check; then
+  exit 1
+fi
 
 # ============================================================
 # Step 1: Enable APIs
