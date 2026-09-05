@@ -160,6 +160,19 @@ curl -s -X DELETE \
   >/dev/null 2>&1 || true
 echo "Done. (Soft-deleted; permanent deletion in ~24 hours. Billing stops at soft-delete.)"
 
+# Say when this project can host an Apigee org again. The name is global and
+# must equal the project id, so until it is released setup-slow.sh cannot run
+# here at all — and the API's own error for that state ("already associated
+# with another project") does not say when it clears. Tell the person who
+# caused it, at the moment they cause it. See issue #87.
+DELETE_EPOCH="$(date -u +%s)"
+RELEASE_EPOCH=$((DELETE_EPOCH + 86400))
+echo ""
+echo "NOTE: the org name '${PROJECT_ID}' is now reserved for ~24 hours."
+echo "      This project cannot host an Apigee org again until approximately"
+echo "        $(epoch_to_utc "${RELEASE_EPOCH}")"
+echo "      setup-slow.sh will refuse to start before then, and say so."
+
 # ============================================================
 # Step 9: Remove VPC peering
 # ============================================================
