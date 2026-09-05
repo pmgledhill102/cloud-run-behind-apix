@@ -71,6 +71,11 @@ read [§4.2](#42-vpc-sc-redirects-dns-to-restrictedgoogleapiscom-so-you-dont-nee
 first.** It is the one claim in this area that is half true, and the true half
 is what makes it convincing.
 
+**Taking this to Google?** [`docs/repro/dns-peering.md`](repro/dns-peering.md)
+is the same finding written for a Customer Engineer who will not run any of
+this — the claim, the mechanism, what it takes to reproduce, and the specific
+asks — without the 800 lines around it.
+
 ---
 
 ## 1. The two lessons that matter most
@@ -456,7 +461,7 @@ going to fix itself (§4).
 |---|---|---|
 | Apigee org creation | 30–50 min | ~40 min |
 | Apigee instance creation | 30–60 min | ~45 min |
-| VPC-SC perimeter **enforcement** after create | "a few minutes, up to 30" | **highly variable — three instrumented samples: ~1 min, ~35 min, and ~40 min** (probe loop, 60s resolution; creation-to-enforcement, probe-start gaps added). The 2026-08-03 greenfield sample also caught **flapping on a clean perimeter**: first BLOCKED at ~20 min, reverted to OPEN, stable from ~40 min — so require N consecutive confirmations (`CONFIRM=3+`) before trusting the state. Deleting-then-recreating a perimeter interleaves both propagation waves and flaps worse (BLOCKED×3 then OPEN again observed). Treat 30 min as the planning envelope, 40+ min as possible; do not design processes assuming either extreme |
+| VPC-SC perimeter **enforcement** after create | "a few minutes, up to 30" | **highly variable — four instrumented samples: ~1 min, ~30 min, ~35 min, and ~40 min** (probe loop, 60s resolution; creation-to-enforcement, probe-start gaps added). The 2026-08-03 greenfield sample also caught **flapping on a clean perimeter**: first BLOCKED at ~20 min, reverted to OPEN, stable from ~40 min — and the 2026-09-05 sample reproduced that flap independently (first BLOCKED ~24 min after create, back to OPEN, stable from ~28 min, confirmed x3 at ~30 min) — so require N consecutive confirmations (`CONFIRM=3+`) before trusting the state. Deleting-then-recreating a perimeter interleaves both propagation waves and flaps worse (BLOCKED×3 then OPEN again observed). Treat 30 min as the planning envelope, 40+ min as possible; do not design processes assuming either extreme |
 | VPC-SC perimeter deletion | similar | **near-instant in our one measured sample** — already OPEN at the first probe seconds after teardown finished. Asymmetry with creation (~30 min) noted; don't assume either direction's timing from the other |
 | IAM grant propagation | ~1–2 min | 1–2 min (a retry loop suffices) |
 | Peered DNS domain pickup by Apigee runtime | undocumented | minutes |

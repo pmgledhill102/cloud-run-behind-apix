@@ -93,6 +93,19 @@ than by deleting resources afterwards:
 Results are recorded in
 [field notes §4.2](../../docs/option-b-vpcsc-field-notes.md).
 
+To capture the run as an artifact rather than as scrollback — for a Google CE or
+a support escalation — set `EVIDENCE_DIR` (and `EVIDENCE_REDACT=1`, since this
+repo is public):
+
+```bash
+PROJECT_ID=<your-project> EVIDENCE_DIR=docs/repro/evidence EVIDENCE_REDACT=1 TRACE=1 \
+  ./scripts/option2b/experiment-tenant-dns.sh omit
+```
+
+Each phase writes a transcript and a manifest; see
+[`docs/repro/evidence/`](../../docs/repro/evidence/). The reader-facing writeup
+of the whole thing is [`docs/repro/dns-peering.md`](../../docs/repro/dns-peering.md).
+
 ## Prerequisites
 
 - `shared/setup-base.sh` and `option2/setup.sh` completed (option2 provides the

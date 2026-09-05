@@ -1,0 +1,122 @@
+<mxfile host="app.diagrams.net" modified="2026-09-05T10:00:00.000Z">
+  <diagram name="Tenant DNS under VPC-SC" id="tenant-dns-under-vpcsc">
+    <mxGraphModel dx="1422" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="900" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+
+        <!-- Title -->
+        <mxCell id="title" value="What `enable-vpc-service-controls` does to the Apigee tenant project" style="text;html=1;fontSize=18;fontStyle=1;align=center;fontColor=#202124;" vertex="1" parent="1">
+          <mxGeometry x="200" y="12" width="1200" height="30" as="geometry"/>
+        </mxCell>
+        <mxCell id="subtitle" value="It installs restricted-VIP DNS + routing for *.googleapis.com — and removes the tenant&#39;s default internet route. Cloud Run is *.run.app, which is neither.&#xa;VPC Peering provisioning model. Observed live, greenfield, 2026-09-04 — docs/repro/dns-peering.md" style="text;html=1;fontSize=11;align=center;fontColor=#5F6368;" vertex="1" parent="1">
+          <mxGeometry x="200" y="44" width="1200" height="34" as="geometry"/>
+        </mxCell>
+
+        <!-- ==================== COLUMN HEADERS ==================== -->
+        <mxCell id="col1-hdr" value="1. Before&#xa;no VPC-SC on the peering" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F1F3F4;strokeColor=#BDC1C6;strokeWidth=1;fontSize=12;fontStyle=1;fontColor=#3C4043;arcSize=8;" vertex="1" parent="1">
+          <mxGeometry x="340" y="96" width="380" height="48" as="geometry"/>
+        </mxCell>
+        <mxCell id="col2-hdr" value="2. enable-vpc-service-controls&#xa;on the servicenetworking peering" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FEF7E0;strokeColor=#FBBC04;strokeWidth=2;fontSize=12;fontStyle=1;fontColor=#B06000;arcSize=8;" vertex="1" parent="1">
+          <mxGeometry x="760" y="96" width="380" height="48" as="geometry"/>
+        </mxCell>
+        <mxCell id="col3-hdr" value="3. + peered DNS domain&#xa;services peered-dns-domains create" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E6F4EA;strokeColor=#34A853;strokeWidth=2;fontSize=12;fontStyle=1;fontColor=#137333;arcSize=8;" vertex="1" parent="1">
+          <mxGeometry x="1180" y="96" width="380" height="48" as="geometry"/>
+        </mxCell>
+
+        <!-- ==================== ROW 1: TENANT STATE ==================== -->
+        <mxCell id="row1-lbl" value="The Apigee tenant project&#xa;&#xa;Google-owned, peered to your VPC.&#xa;You cannot see its routes or its&#xa;resolver — and that is why this&#xa;failure is so hard to diagnose." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ECEFF1;strokeColor=#607D8B;strokeWidth=2;fontSize=11;fontColor=#37474F;align=left;spacingLeft=12;verticalAlign=middle;arcSize=6;" vertex="1" parent="1">
+          <mxGeometry x="40" y="160" width="280" height="150" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="r1c1" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#DADCE0;strokeWidth=1;arcSize=6;" vertex="1" parent="1">
+          <mxGeometry x="340" y="160" width="380" height="150" as="geometry"/>
+        </mxCell>
+        <mxCell id="r1c1a" value="default internet route&#xa;PRESENT" style="text;html=1;fontSize=10;align=center;fontStyle=1;fontColor=#137333;fillColor=#E6F4EA;rounded=1;strokeColor=#34A853;" vertex="1" parent="r1c1">
+          <mxGeometry x="20" y="20" width="160" height="44" as="geometry"/>
+        </mxCell>
+        <mxCell id="r1c1b" value="restricted-VIP DNS&#xa;not installed" style="text;html=1;fontSize=10;align=center;fontColor=#5F6368;fillColor=#F1F3F4;rounded=1;strokeColor=#DADCE0;" vertex="1" parent="r1c1">
+          <mxGeometry x="200" y="20" width="160" height="44" as="geometry"/>
+        </mxCell>
+        <mxCell id="r1c1c" value="Tenant reaches Google&#39;s public front end over its own default route." style="text;html=1;fontSize=10;align=center;fontColor=#3C4043;" vertex="1" parent="r1c1">
+          <mxGeometry x="20" y="78" width="340" height="52" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="r1c2" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#FBBC04;strokeWidth=2;arcSize=6;" vertex="1" parent="1">
+          <mxGeometry x="760" y="160" width="380" height="150" as="geometry"/>
+        </mxCell>
+        <mxCell id="r1c2a" value="default internet route&#xa;REMOVED" style="text;html=1;fontSize=10;align=center;fontStyle=1;fontColor=#C5221F;fillColor=#FCE8E6;rounded=1;strokeColor=#EA4335;" vertex="1" parent="r1c2">
+          <mxGeometry x="20" y="20" width="160" height="44" as="geometry"/>
+        </mxCell>
+        <mxCell id="r1c2b" value="restricted-VIP DNS + route&#xa;INSTALLED — googleapis.com only" style="text;html=1;fontSize=10;align=center;fontStyle=1;fontColor=#137333;fillColor=#E6F4EA;rounded=1;strokeColor=#34A853;" vertex="1" parent="r1c2">
+          <mxGeometry x="200" y="20" width="160" height="44" as="geometry"/>
+        </mxCell>
+        <mxCell id="r1c2c" value="Both halves are real. The claim under test names the right-hand box and&#xa;assumes it covers everything. It does not cover run.app." style="text;html=1;fontSize=10;align=center;fontColor=#B06000;fontStyle=1;" vertex="1" parent="r1c2">
+          <mxGeometry x="20" y="78" width="340" height="52" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="r1c3" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#34A853;strokeWidth=2;arcSize=6;" vertex="1" parent="1">
+          <mxGeometry x="1180" y="160" width="380" height="150" as="geometry"/>
+        </mxCell>
+        <mxCell id="r1c3a" value="default internet route&#xa;still REMOVED" style="text;html=1;fontSize=10;align=center;fontColor=#C5221F;fillColor=#FCE8E6;rounded=1;strokeColor=#EA4335;" vertex="1" parent="r1c3">
+          <mxGeometry x="20" y="20" width="160" height="44" as="geometry"/>
+        </mxCell>
+        <mxCell id="r1c3b" value="run.app now resolved via&#xa;YOUR VPC&#39;s private zone" style="text;html=1;fontSize=10;align=center;fontStyle=1;fontColor=#137333;fillColor=#E6F4EA;rounded=1;strokeColor=#34A853;" vertex="1" parent="r1c3">
+          <mxGeometry x="200" y="20" width="160" height="44" as="geometry"/>
+        </mxCell>
+        <mxCell id="r1c3c" value="The peered DNS domain hands run.app lookups to your VPC&#39;s resolution&#xa;order, where the *.run.app &#8594; restricted VIP zone lives." style="text;html=1;fontSize=10;align=center;fontColor=#3C4043;" vertex="1" parent="r1c3">
+          <mxGeometry x="20" y="78" width="340" height="52" as="geometry"/>
+        </mxCell>
+
+        <!-- ==================== ROW 2: GOOGLEAPIS LANE ==================== -->
+        <mxCell id="row2-lbl" value="Lane A&#xa;*.googleapis.com&#xa;&#xa;the control probe —&#xa;storage.googleapis.com" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8F0FE;strokeColor=#4285F4;strokeWidth=2;fontSize=11;fontColor=#174EA6;fontStyle=1;align=left;spacingLeft=12;verticalAlign=middle;arcSize=6;" vertex="1" parent="1">
+          <mxGeometry x="40" y="330" width="280" height="130" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="r2c1" value="200&#xa;&#xa;via the default internet route" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E6F4EA;strokeColor=#34A853;strokeWidth=2;fontSize=20;fontStyle=1;fontColor=#137333;arcSize=6;" vertex="1" parent="1">
+          <mxGeometry x="340" y="330" width="380" height="130" as="geometry"/>
+        </mxCell>
+        <mxCell id="r2c2" value="200 in 0.76 s&#xa;&#xa;via the restricted VIP — exactly the redirect&#xa;the support agent describes. It works." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E6F4EA;strokeColor=#34A853;strokeWidth=2;fontSize=20;fontStyle=1;fontColor=#137333;arcSize=6;" vertex="1" parent="1">
+          <mxGeometry x="760" y="330" width="380" height="130" as="geometry"/>
+        </mxCell>
+        <mxCell id="r2c3" value="200&#xa;&#xa;unchanged" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E6F4EA;strokeColor=#34A853;strokeWidth=2;fontSize=20;fontStyle=1;fontColor=#137333;arcSize=6;" vertex="1" parent="1">
+          <mxGeometry x="1180" y="330" width="380" height="130" as="geometry"/>
+        </mxCell>
+
+        <!-- ==================== ROW 3: RUN.APP LANE ==================== -->
+        <mxCell id="row3-lbl" value="Lane B&#xa;*.run.app&#xa;&#xa;the hop this pattern&#xa;actually depends on —&#xa;Cloud Run" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F3E5F5;strokeColor=#9C27B0;strokeWidth=2;fontSize=11;fontColor=#6A1B9A;fontStyle=1;align=left;spacingLeft=12;verticalAlign=middle;arcSize=6;" vertex="1" parent="1">
+          <mxGeometry x="40" y="480" width="280" height="150" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="r3c1" value="reaches Google&#xa;&#xa;via the default internet route&#xa;(404 only because the service is --ingress=internal)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E6F4EA;strokeColor=#34A853;strokeWidth=2;fontSize=18;fontStyle=1;fontColor=#137333;arcSize=6;" vertex="1" parent="1">
+          <mxGeometry x="340" y="480" width="380" height="150" as="geometry"/>
+        </mxCell>
+        <mxCell id="r3c2" value="503 TARGET_CONNECT_TIMEOUT&#xa;in 3.26 s&#xa;&#xa;No socket was ever opened. resolvedAddress,&#xa;connectionStatus, tlsHandshakeStatus: ABSENT" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FCE8E6;strokeColor=#EA4335;strokeWidth=3;fontSize=16;fontStyle=1;fontColor=#C5221F;arcSize=6;" vertex="1" parent="1">
+          <mxGeometry x="760" y="480" width="380" height="150" as="geometry"/>
+        </mxCell>
+        <mxCell id="r3c3" value="200 in 0.058 s&#xa;&#xa;restored in about a minute — no proxy&#xa;redeploy, no instance recreation" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E6F4EA;strokeColor=#34A853;strokeWidth=2;fontSize=20;fontStyle=1;fontColor=#137333;arcSize=6;" vertex="1" parent="1">
+          <mxGeometry x="1180" y="480" width="380" height="150" as="geometry"/>
+        </mxCell>
+
+        <!-- The divergence callout -->
+        <mxCell id="diverge" value="Same tenant. Same runtime. Same minute." style="text;html=1;fontSize=12;fontStyle=1;align=center;fontColor=#C5221F;" vertex="1" parent="1">
+          <mxGeometry x="760" y="638" width="380" height="20" as="geometry"/>
+        </mxCell>
+
+        <!-- ==================== TAKEAWAY ==================== -->
+        <mxCell id="takeaway" value="Enabling VPC-SC did not make the peered DNS domain unnecessary — it is what made it necessary." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8F0FE;strokeColor=#1A73E8;strokeWidth=3;fontSize=15;fontStyle=1;fontColor=#174EA6;arcSize=4;verticalAlign=top;spacingTop=14;" vertex="1" parent="1">
+          <mxGeometry x="40" y="680" width="1520" height="128" as="geometry"/>
+        </mxCell>
+        <mxCell id="takeaway-body" value="Before enablement the tenant reached Cloud Run over its own default internet route. Enablement removes that route and installs a replacement for *.googleapis.com only.&#xa;The claim&#39;s mechanism is real and is doing exactly what was described — in Lane A. Lane B is not a googleapis.com name, so nothing in that redirect covers it. The causality is inverted." style="text;html=1;fontSize=11;align=center;fontColor=#174EA6;" vertex="1" parent="takeaway">
+          <mxGeometry x="40" y="52" width="1440" height="60" as="geometry"/>
+        </mxCell>
+
+        <!-- Footnote -->
+        <mxCell id="footnote" value="The restricted-VIP static route and its custom-route export were also tested (added at a fourth state): no change, 200 either side. The peered DNS domain alone is load-bearing.&#xa;Not shown: pointing the run.app zone at the PRIVATE VIP (199.36.153.8/30) produces the identical 503 while your VMs keep returning 200 — see docs/repro/dns-peering.md §6.2." style="text;html=1;fontSize=10;align=center;fontColor=#5F6368;" vertex="1" parent="1">
+          <mxGeometry x="40" y="820" width="1520" height="40" as="geometry"/>
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

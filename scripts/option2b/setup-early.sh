@@ -245,11 +245,19 @@ YAMLEOF
 # The production-grade alternative is a private worker pool inside the
 # perimeter.
 CALLER_ACCOUNT="$(gcloud config get-value account 2>/dev/null)"
+# An identity in an ingress rule carries a type prefix, and the wrong one is
+# rejected as INVALID_ARGUMENT with no indication of which field is at fault.
+# The caller is a human at a laptop on one surface and a service account on
+# another (an agent sandbox, CI) — so derive the prefix instead of assuming.
+case "${CALLER_ACCOUNT}" in
+  *.gserviceaccount.com) CALLER_PRINCIPAL="serviceAccount:${CALLER_ACCOUNT}" ;;
+  *)                     CALLER_PRINCIPAL="user:${CALLER_ACCOUNT}" ;;
+esac
 INGRESS_FILE="$(mktemp)"
 cat > "${INGRESS_FILE}" << YAMLEOF
 - ingressFrom:
     identities:
-    - user:${CALLER_ACCOUNT}
+    - ${CALLER_PRINCIPAL}
     - serviceAccount:${PROJECT_NUMBER}-compute@developer.gserviceaccount.com
     sources:
     - accessLevel: '*'
@@ -285,7 +293,7 @@ else
   echo "Creating perimeter '${PERIMETER_NAME}'..."
   echo "  Resources:  projects/${PROJECT_NUMBER}"
   echo "  Restricted: ${RESTRICTED_SERVICES}"
-  echo "  Ingress:    ${CALLER_ACCOUNT} + build SA allowed from any source"
+  echo "  Ingress:    ${CALLER_PRINCIPAL} + build SA allowed from any source"
   echo "  Egress:     projects/${ALLOWED_EGRESS_PROJECT_NUMBER} allowed (run.routes.invoke)"
 
   gcloud access-context-manager perimeters create "${PERIMETER_NAME}" \

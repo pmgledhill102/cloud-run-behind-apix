@@ -46,12 +46,20 @@ The PSC (non-peering) alternative is documented for reference in each option's d
 | **C** | PSC Endpoint for Google APIs | [docs/option-c-psc-google-apis.md](docs/option-c-psc-google-apis.md) | [diagram](docs/diagrams/option-c-architecture.svg) |
 | **D** | PSC Published Service | [docs/option-d-psc-service-attachment.md](docs/option-d-psc-service-attachment.md) | [diagram](docs/diagrams/option-d-architecture.svg) |
 
+### For a Google CE or support escalation
+
+- **[DNS-Peering Reproduction Brief](docs/repro/dns-peering.md)** — self-contained:
+  what it takes to stand up Option B + VPC-SC, and the live evidence that the
+  Apigee tenant **peered DNS domain is required** for Cloud Run southbound.
+  Start here rather than in the field notes.
+
 ### Cross-Cutting References
 
 - [Provisioning Decision](docs/apigee-provisioning-decision.md) — VPC Peering model choice, pay-as-you-go cost analysis
 - [DNS Guide](docs/dns-guide.md) — Private zones, restricted VIP, PSC auto-DNS, forwarding
 - [Scaling Analysis](docs/scaling-analysis.md) — How each option behaves at 1000+ services
 - [Option C Scaled](docs/option-c-scaled.md) — 20-service PoC validating Option C linear scaling
+- [Option B VPC-SC Field Notes](docs/option-b-vpcsc-field-notes.md) — failures, propagation timings, audit logs
 
 ## PoC Scripts
 
