@@ -33,6 +33,7 @@ Each option doc follows the same structure:
 11. Testing requirements
 
 Cross-cutting docs:
+- `docs/repro/dns-peering.md` — **CE-facing brief**: the disputed "VPC-SC makes the peered DNS domain unnecessary" claim, what it takes to reproduce option 2 + 2b, and the live refutation. Written for a reader who will not run the scripts; raw transcripts in `docs/repro/evidence/`
 - `docs/dns-guide.md` — DNS reference across all options
 - `docs/scaling-analysis.md` — Scale to 1000s of services analysis
 - `docs/option-c-scaled.md` — 20-service PoC validating Option C linear scaling

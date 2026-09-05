@@ -76,6 +76,14 @@
 #   PROJECT_ID=<your-project> ./scripts/option2b/experiment-tenant-dns.sh dns
 #   PROJECT_ID=<your-project> ./scripts/option2b/experiment-tenant-dns.sh full
 #
+# EVIDENCE_DIR=<dir> captures a timestamped transcript + manifest per phase, for
+# a run whose output is going to someone who will not re-run it (a Google CE, a
+# support escalation). EVIDENCE_REDACT=1 masks the project id/number on the way
+# out. See docs/repro/dns-peering.md.
+#
+#   PROJECT_ID=<p> EVIDENCE_DIR=docs/repro/evidence EVIDENCE_REDACT=1 TRACE=1 \
+#     ./scripts/option2b/experiment-tenant-dns.sh omit
+#
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -83,6 +91,36 @@ source "${SCRIPT_DIR}/../shared/env.sh"
 source "${SHARED_DIR}/lib/helpers.sh"
 
 PHASE="${1:-probe}"
+
+# ============================================================
+# Evidence capture
+# ============================================================
+# A read-and-escalate audience — a Google CE, a support escalation — needs the
+# raw run, not a summary of it. EVIDENCE_DIR captures a timestamped transcript
+# per phase plus a manifest of what produced it.
+#
+# Done by re-executing under `tee` rather than `exec > >(tee ...)`: a process
+# substitution is not waited for at exit, so the last lines of a phase — which
+# are the result — can be lost. A real pipeline element cannot be.
+#
+# EVIDENCE_REDACT=1 substitutes the project id and number in the transcript,
+# for a run whose output is going somewhere public.
+if [[ -n "${EVIDENCE_DIR:-}" && -z "${_EVIDENCE_REEXEC:-}" ]]; then
+  mkdir -p "${EVIDENCE_DIR}"
+  _stamp="$(date -u '+%Y%m%dT%H%M%SZ')"
+  EVIDENCE_TRANSCRIPT="${EVIDENCE_DIR}/${_stamp}-phase-${PHASE}.log"
+  export _EVIDENCE_REEXEC=1 EVIDENCE_TRANSCRIPT EVIDENCE_STAMP="${_stamp}"
+
+  if [[ -n "${EVIDENCE_REDACT:-}" ]]; then
+    _num="$(gcloud projects describe "${PROJECT_ID}" --format='value(projectNumber)' 2>/dev/null || true)"
+    _sed=(-e "s/${PROJECT_ID}/<PROJECT_ID>/g")
+    [[ -n "${_num}" ]] && _sed+=(-e "s/${_num}/<PROJECT_NUMBER>/g")
+    "${BASH_SOURCE[0]}" ${@+"$@"} 2>&1 | sed "${_sed[@]}" | tee "${EVIDENCE_TRANSCRIPT}"
+  else
+    "${BASH_SOURCE[0]}" ${@+"$@"} 2>&1 | tee "${EVIDENCE_TRANSCRIPT}"
+  fi
+  exit "${PIPESTATUS[0]}"
+fi
 GAPI_PROXY="gapi-probe"
 GAPI_BASEPATH="/gapi-probe"
 # Any googleapis.com REST endpoint that answers without credentials is fine —
@@ -128,6 +166,38 @@ fi
 echo "Cloud Run:      ${SERVICE_URL}"
 echo "Apigee runtime: ${INSTANCE_IP}"
 echo ""
+
+# A transcript without provenance is an anecdote. The manifest records what
+# produced it, so a reader can tell whether two phases came from one stack.
+if [[ -n "${EVIDENCE_DIR:-}" ]]; then
+  _mf="${EVIDENCE_DIR}/${EVIDENCE_STAMP:-$(date -u '+%Y%m%dT%H%M%SZ')}-phase-${PHASE}.manifest.txt"
+  {
+    echo "phase:            ${PHASE}"
+    echo "captured_at:      $(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+    echo "project:          ${PROJECT_ID}"
+    echo "project_number:   ${PROJECT_NUMBER}"
+    echo "region:           ${REGION}"
+    echo "apigee_org:       ${PROJECT_ID}"
+    echo "apigee_instance:  ${INSTANCE_NAME}"
+    echo "apigee_runtime:   ${INSTANCE_IP}"
+    echo "apigee_env:       ${APIGEE_ENV}"
+    echo "apigee_api:       ${APIGEE_API}"
+    echo "authorized_net:   ${APIGEE_NETWORK}"
+    echo "cloud_run_url:    ${SERVICE_URL}"
+    echo "cloud_run_ingress: $(gcloud run services describe cr-hello --region="${REGION}" \
+        --project="${PROJECT_ID}" --format='value(spec.template.metadata.annotations["run.googleapis.com/ingress"])' 2>/dev/null || echo '?')"
+    echo "gapi_target:      ${GAPI_TARGET}"
+    echo "gcloud_version:   $(gcloud version --format='value(\"Google Cloud SDK\")' 2>/dev/null | head -1)"
+    echo "transcript:       ${EVIDENCE_TRANSCRIPT:-<none>}"
+  } > "${_mf}"
+  if [[ -n "${EVIDENCE_REDACT:-}" ]]; then
+    sed -i.bak -e "s/${PROJECT_ID}/<PROJECT_ID>/g" -e "s/${PROJECT_NUMBER}/<PROJECT_NUMBER>/g" "${_mf}" 2>/dev/null \
+      || sed -i '' -e "s/${PROJECT_ID}/<PROJECT_ID>/g" -e "s/${PROJECT_NUMBER}/<PROJECT_NUMBER>/g" "${_mf}"
+    rm -f "${_mf}.bak"
+  fi
+  echo "Evidence manifest: ${_mf}"
+  echo ""
+fi
 
 # ============================================================
 # State dump — what actually exists right now

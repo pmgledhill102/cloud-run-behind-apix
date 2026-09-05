@@ -71,6 +71,11 @@ read [§4.2](#42-vpc-sc-redirects-dns-to-restrictedgoogleapiscom-so-you-dont-nee
 first.** It is the one claim in this area that is half true, and the true half
 is what makes it convincing.
 
+**Taking this to Google?** [`docs/repro/dns-peering.md`](repro/dns-peering.md)
+is the same finding written for a Customer Engineer who will not run any of
+this — the claim, the mechanism, what it takes to reproduce, and the specific
+asks — without the 800 lines around it.
+
 ---
 
 ## 1. The two lessons that matter most
