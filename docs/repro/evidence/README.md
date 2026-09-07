@@ -41,11 +41,38 @@ extend the substitution list in the capture block at the top of
 
 ## What's here now
 
+### The 2026-09-07 scope map (`dns-peering.md` §6.4)
+
+Four transcripts from one greenfield stack, in order. All four carry
+`phase: after` in the filename except the first, because the *phase argument* to
+the script is `after` for every state that measures — what distinguishes them is
+the network state at capture time, which the filename cannot express. Read them
+in this order:
+
+| File | State captured | The row that matters |
+|---|---|---|
+| `20260907T112556Z-scope-before.log` | 1 — VPC-SC **off** | all five probes connect; establishes the fixtures work |
+| `20260907T113942Z-scope-after.log` | 2 — VPC-SC **on** | `run.app` and `www.google.com` both `NO SOCKET`; the three DOC-NAMED domains still `200`/`401` |
+| `20260907T114316Z-scope-after.log` | 2, with `TRACE=1` | `resolvedAddress` = `199.36.153.x` for googleapis/pkg.dev/gcr.io, **ABSENT** for `run.app` |
+| `20260907T115930Z-scope-after.log` | 3 — **+ peered DNS domain**, `TRACE=1` | `run.app` restored at `resolvedAddress = 199.36.153.4`, **while `www.google.com` stays `NO SOCKET`** |
+
+The last file is the one to read if you only read one. It is what shows the
+peered DNS domain to be a name-scoped DNS fix rather than a restoration of
+internet egress — the tenant still has no default route after it is applied.
+
+Redacted with `EVIDENCE_REDACT=1` (the `before` transcript was captured without
+`EVIDENCE_DIR` and redacted with the same substitutions afterwards).
+
+### Other
+
 | File | From |
 |---|---|
 | `20260905T115110Z-perimeter-propagation.log` | Enforcement-arrival measurement for a freshly created perimeter, 2026-09-05. Independently reproduces the flap documented in [field notes §5](../../option-b-vpcsc-field-notes.md#5-waiting-observed-propagation-and-provisioning-times): first `403` at ~24 min after create, back to `200`, stable from ~28 min, confirmed at ~30 min. A probe loop that stopped at the first denial would have declared victory ~6 minutes early, while the perimeter was still intermittently open — which is why `CONFIRM=3` exists |
 
 ## Status
+
+The 2026-09-07 scope-map transcripts above are from a live greenfield run and
+are complete.
 
 The `experiment-tenant-dns.sh` phase transcripts are still pending a live run. The results quoted in `../dns-peering.md` are from the
 2026-09-04 greenfield run, recorded in

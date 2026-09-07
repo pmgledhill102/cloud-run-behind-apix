@@ -1,0 +1,82 @@
+==========================================================
+  VPC-SC DNS scope map — which domains does the tenant reach?
+==========================================================
+Project:        <PROJECT_ID>
+Phase:          after
+Cloud Run:      https://cr-hello-psbk34e45a-ma.a.run.app
+Apigee runtime: 10.2.0.2
+Run at:         2026-09-07 11:59:37 UTC
+
+enable-vpc-service-controls currently: True
+
+--- Fixtures: one pass-through proxy per probe ---
+  probe-gapi: already deployed (rev 1)
+  probe-pkgdev: already deployed (rev 1)
+  probe-gcrio: already deployed (rev 1)
+  probe-runapp: already deployed (rev 1)
+  probe-inet: already deployed (rev 1)
+
+==========================================================
+  RESULTS — phase 'after', VPC-SC enabled=True
+==========================================================
+PROBE    TARGET HOST                        RESULT                 CLASSIFICATION
+-----    -----------                        ------                 --------------
+gapi     storage.googleapis.com             connected HTTP 200     DOC-NAMED googleapis.com
+pkgdev   europe-north2-docker.pkg.dev       connected HTTP 401     DOC-NAMED pkg.dev
+gcrio    gcr.io                             connected HTTP 401     DOC-NAMED gcr.io
+runapp   cr-hello-psbk34e45a-ma.a.run.app   connected HTTP 404     DOC-VAGUE run.app  <<< THE DISPUTED ONE
+inet     www.google.com                     NO SOCKET (3.134910s)  CONTROL public internet
+
+--- TRACE: resolvedAddress per probe (what the tenant's DNS returned) ---
+    199.36.153.4-7 = restricted VIP (domain IS in the zone set)
+    a public IP    = tenant used public DNS (domain is NOT in the zone set)
+    ABSENT         = no socket at all
+
+  gapi (storage.googleapis.com):
+      targetendpoint_default.connectionStatus = CONNECTED
+      targetendpoint_default.resolvedAddress = 199.36.153.6
+      targetendpoint_default.tlsHandshakeStatus = COMPLETED
+
+  pkgdev (europe-north2-docker.pkg.dev):
+      error.class = com.apigee.errors.http.server.BadGateway
+      targetendpoint_default.connectionStatus = CONNECTED
+      targetendpoint_default.resolvedAddress = 199.36.153.5
+      targetendpoint_default.tlsHandshakeStatus = COMPLETED
+
+  gcrio (gcr.io):
+      error.class = com.apigee.errors.http.server.BadGateway
+      targetendpoint_default.connectionStatus = CONNECTED
+      targetendpoint_default.resolvedAddress = 199.36.153.6
+      targetendpoint_default.tlsHandshakeStatus = COMPLETED
+
+  runapp (cr-hello-psbk34e45a-ma.a.run.app):
+      error.class = com.apigee.errors.http.server.BadGateway
+      targetendpoint_default.connectionStatus = CONNECTED
+      targetendpoint_default.resolvedAddress = 199.36.153.4
+      targetendpoint_default.tlsHandshakeStatus = COMPLETED
+
+  inet (www.google.com):
+      error.class = com.apigee.errors.http.server.ServiceUnavailableException
+
+--- VM control: what THIS VPC resolves (should be unaffected throughout) ---
+  storage.googleapis.com -> 2600:1901:4020:1b00:: 2600:1901:4024:1b00:: 2600:1901:4021:1b00:: 2600:1901:4025:1b00:: 2600:1901:4022:1b00:: 2600:1901:4027:1b00:: 2600:1901:4026:1b00:: 2600:1901:4023:1b00:: 
+  gcr.io -> 2a00:1450:400c:c0a::52 
+  cr-hello-psbk34e45a-ma.a.run.app -> 199.36.153.7 199.36.153.5 199.36.153.4 199.36.153.6 
+  www.google.com -> 2001:4860:4827:7700:: 2001:4860:482d:7700:: 2001:4860:4828:7700:: 2001:4860:4826:7700:: 2001:4860:482b:7700:: 2001:4860:482a:7700:: 2001:4860:482c:7700:: 2001:4860:4829:7700:: 
+
+==========================================================
+  How to read this
+==========================================================
+  Phase 'before' (VPC-SC off): everything should connect. The tenant still has
+  its default internet route, so this only proves the fixtures work.
+
+  Phase 'after' (VPC-SC on): the discriminator.
+    - DOC-NAMED domains connecting proves the mechanism is working.
+    - CONTROL (www.google.com) failing proves the default route was removed.
+    - run.app failing IN THE SAME RUN proves run.app is not in the zone set,
+      and that its failure is a consequence of the route removal rather than
+      anything specific to Cloud Run.
+
+  If run.app fails while googleapis.com/pkg.dev/gcr.io succeed, the phrase
+  "and other necessary domains" demonstrably does not include run.app, and a
+  peered DNS domain (gcloud services peered-dns-domains create) is required.

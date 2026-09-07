@@ -1,7 +1,9 @@
 # Apigee X → Cloud Run under VPC Service Controls: the tenant DNS peering is required
 
 **For:** a Google Customer Engineer or support engineer assessing the claim below.
-**Status:** refuted live, greenfield, 2026-09-04. One follow-up question remains open (§7).
+**Status:** refuted live, greenfield, 2026-09-04; the covered-domain set mapped
+and the remedy's blast radius measured, 2026-09-07 (§6.4). One follow-up
+question remains open (§7).
 **Provisioning model:** Apigee X, **VPC Peering** (not PSC). This distinction decides which
 mechanism applies and is the single most load-bearing fact on this page.
 
@@ -19,10 +21,13 @@ mechanism applies and is the single most load-bearing fact on this page.
 
 **The mechanism described is real. It does not cover `run.app`.**
 `gcloud services vpc-peerings enable-vpc-service-controls` does install
-restricted-VIP DNS and routing inside the Apigee tenant project — **for
-`*.googleapis.com` names**. Cloud Run is reached at `*.run.app`, which is not one
-of them. Worse, the same call **removes the tenant project's default internet
-route**, which is the route the tenant had been using to reach Cloud Run. So
+restricted-VIP DNS and routing inside the Apigee tenant project — for the domains
+its own reference text names, which we have confirmed live resolve to
+`199.36.153.4-7` inside the tenant: `googleapis.com`, `pkg.dev` and `gcr.io`
+(§6.4). Cloud Run is reached at `*.run.app`, which is not one of them, and which
+the tenant cannot resolve at all. Worse, the same call **removes the tenant
+project's default internet route**, which is the route the tenant had been using
+to reach Cloud Run. So
 enabling VPC-SC does not make the peered DNS domain unnecessary — **it is what
 makes it necessary.** The causality in the claim is inverted.
 
@@ -281,6 +286,70 @@ Two consequences:
    cannot inspect. That raises ask 1 in §8 from "please confirm" to "please
    publish the list."
 
+### 6.4 The scope map: making "and other necessary domains" concrete
+
+§4 probes two hostnames, which is enough to show the mechanism works and misses
+`run.app`. It is not enough to describe the *shape* of the covered set, which is
+what a reader of the reference text actually needs. This section probes five,
+through the same Apigee runtime, and adds the field that settles it:
+`resolvedAddress` from an Apigee debug session — **the IP the tenant's own DNS
+returned**.
+
+Greenfield run, 2026-09-07, VPC Peering model, no perimeter (per §5.1 none is
+needed). Each probe is a pass-through proxy to one host.
+
+| Probe | Host | Classification | 1. VPC-SC off | 2. VPC-SC on | 3. + peered DNS domain |
+|---|---|---|---|---|---|
+| `gapi` | `storage.googleapis.com` | DOC-NAMED | `200` | `200` | `200` |
+| `pkgdev` | `<region>-docker.pkg.dev` | DOC-NAMED | `401` | `401` | `401` |
+| `gcrio` | `gcr.io` | DOC-NAMED | `401` | `401` | `401` |
+| **`runapp`** | `<svc>.run.app` | **DOC-VAGUE** | `404` | **`NO SOCKET` 3.16s** | **`404` (connected)** |
+| `inet` | `www.google.com` | **CONTROL** | `204` | `NO SOCKET` 3.21s | **`NO SOCKET` — still** |
+
+`404` on the `run.app` rows is `--ingress=internal` refusing admission (§6.1), not
+a connectivity failure — the socket opened. The discriminator is `NO SOCKET`.
+
+And the same runs, read through `resolvedAddress`:
+
+| Probe | State 2 (VPC-SC on) | State 3 (+ peered DNS domain) |
+|---|---|---|
+| `gapi` | `199.36.153.5`, TLS `COMPLETED` | `199.36.153.6`, TLS `COMPLETED` |
+| `pkgdev` | `199.36.153.4`, TLS `COMPLETED` | `199.36.153.5`, TLS `COMPLETED` |
+| `gcrio` | `199.36.153.4`, TLS `COMPLETED` | `199.36.153.6`, TLS `COMPLETED` |
+| **`runapp`** | **field ABSENT** — no socket ever created | **`199.36.153.4`, TLS `COMPLETED`** |
+| `inet` | **field ABSENT** | **field ABSENT** |
+
+Four things follow, and the fourth is the one we could not previously state.
+
+1. **The mechanism works, precisely as documented.** All three DOC-NAMED domains
+   resolve inside the tenant to the restricted VIP. This is not a broken feature.
+2. **`run.app` is not in the zone set.** In the same minute, on the same runtime,
+   it cannot open a socket and has no `resolvedAddress` at all.
+3. **The control proves the cause.** `www.google.com` fails identically. So
+   `run.app`'s failure is a consequence of the default internet route being
+   removed, not something peculiar to Cloud Run — an objection a single-probe
+   result cannot answer.
+4. **The peered DNS domain is a name-scoped DNS fix, not a restored route.**
+   State 3 is the load-bearing new observation: `run.app` comes back with
+   `resolvedAddress = 199.36.153.4` — the same restricted VIP the auto-created
+   zones hand out — **while `www.google.com` stays dead**. The remedy does not
+   re-open general egress, and the security posture of the perimeter is
+   unchanged by applying it. Anyone worried that `peered-dns-domains create`
+   loosens the tenant can be shown this row.
+
+So the reference text's "and other necessary domains or host names" demonstrably
+does not include `run.app`, and on a VPC-peered org the peered DNS domain is
+required — the exact opposite of the claim in §1.
+
+Reproduce with:
+
+```bash
+export PROJECT_ID=<your-project>
+./scripts/option2b/experiment-vpcsc-dns-scope.sh before
+./scripts/option2b/experiment-vpcsc-dns-scope.sh enable
+TRACE=1 ./scripts/option2b/experiment-vpcsc-dns-scope.sh after
+```
+
 ## 7. What we could not close, and why
 
 **Does an enforced perimeter admit the Apigee tenant to an `--ingress=internal`
@@ -338,4 +407,6 @@ run it.
 | Observed propagation and provisioning times | [§5](../option-b-vpcsc-field-notes.md#5-waiting-observed-propagation-and-provisioning-times) |
 | The pattern itself, end state | [`docs/option-b-pga.md`](../option-b-pga.md) |
 | Experiment script | [`scripts/option2b/experiment-tenant-dns.sh`](../../scripts/option2b/experiment-tenant-dns.sh) |
+| Scope-map script (§6.4) | [`scripts/option2b/experiment-vpcsc-dns-scope.sh`](../../scripts/option2b/experiment-vpcsc-dns-scope.sh) |
+| Prompt to gather Google doc citations | [`doc-research-prompt.md`](doc-research-prompt.md) |
 | Raw run transcripts | [`docs/repro/evidence/`](evidence/) |
