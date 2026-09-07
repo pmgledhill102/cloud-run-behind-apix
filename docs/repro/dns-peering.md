@@ -233,6 +233,54 @@ Apigee southbound is **not** subject to VPC-SC enforcement even though
 never traverses the enforcing endpoint. A compliance story claiming that path is
 perimeter-protected would be wrong.
 
+### 6.3 The customer cannot check this for themselves
+
+The obvious objection to everything above is "why infer the zone set from
+probes — just look at it." You cannot, and that is worth stating explicitly
+because it is the reason the doc wording matters so much.
+
+The reference text for the command names three zones and then says **"and other
+necessary domains or host names"**. Whether `run.app` is one of them is exactly
+the question a customer putting Cloud Run behind Apigee has to answer, and the
+sentence does not answer it.
+
+The Service Networking API has the endpoint that would:
+
+```text
+GET services.projects.global.networks.dnsZones.list
+```
+
+Called as the consumer it returns:
+
+```text
+PERMISSION_DENIED: Permission denied to list dns zones for service
+'servicenetworking.googleapis.com'
+  permission: servicenetworking.services.listDnsZones
+```
+
+That permission is producer-side only. Verified 2026-09-07 on a greenfield
+sandbox at `roles/owner`:
+
+| Check | Result |
+|---|---|
+| `servicenetworking.services.listDnsZones` in `roles/owner`, `editor`, `viewer` | absent |
+| …in `servicenetworking.networksAdmin` / `serviceAgent` / `networksViewer` | absent |
+| …listed by `gcloud iam list-testable-permissions` on the project | **not present at all** |
+| Sibling consumer-side permissions that *are* testable | `addDnsZone`, `removeDnsZone`, `listPeeredDnsDomains`, `createPeeredDnsDomain`, … |
+
+So the zones exist in a Google-owned tenant project, and no role the customer
+can hold — and no org-level grant they can be given — makes them enumerable.
+
+Two consequences:
+
+1. **Behavioural probing is not a lazy method here, it is the only method.** The
+   probe tables in §4 and §6.4 are what "reading the zone list" has to be
+   replaced with.
+2. **The vagueness in the reference text is not a cosmetic docs nit.** It is the
+   sole published description of a configuration the customer depends on and
+   cannot inspect. That raises ask 1 in §8 from "please confirm" to "please
+   publish the list."
+
 ## 7. What we could not close, and why
 
 **Does an enforced perimeter admit the Apigee tenant to an `--ingress=internal`
@@ -256,10 +304,18 @@ run it.
 
 ## 8. What would be useful from Google
 
-1. **Confirm or correct §2 and §6** — specifically, that
-   `enable-vpc-service-controls` scopes its tenant DNS/routing to
-   `*.googleapis.com` and removes the tenant default route, and that `*.run.app`
-   therefore requires a peered DNS domain on VPC-peered orgs.
+1. **Publish the actual zone list, and confirm or correct §2 and §6** —
+   specifically, that `enable-vpc-service-controls` scopes its tenant DNS/routing
+   to `*.googleapis.com` and removes the tenant default route, and that
+   `*.run.app` therefore requires a peered DNS domain on VPC-peered orgs.
+   The reference text's "and other necessary domains or host names" is the
+   load-bearing phrase and it is unresolvable from outside Google: per §6.3 the
+   customer cannot enumerate the zones at any permission level. Naming the set
+   in the docs — as the VPC-SC and Backup-and-DR pages already partly do
+   (`googleapis.com`, `gcr.io`, `pkg.dev`, `notebooks.cloud.google.com`,
+   `kernels.googleusercontent.com`, `backupdr.cloud.google.com`,
+   `backupdr.googleusercontent.com`) — would close this question permanently,
+   and would make it obvious at a glance that `run.app` is not in it.
 2. **Run, or tell us the answer to, the open cell in §7.**
 3. **Fix the `dnsZones` error message** for VPC-peered orgs to name
    `peered-dns-domains` as the correct mechanism.
