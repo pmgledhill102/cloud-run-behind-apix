@@ -128,7 +128,7 @@ which is often the hardest prerequisite to obtain. It is not on this critical pa
 | 4 | A Cloud Run service | any container; `--ingress=all` for the cleanest signal (see §6.1) |
 | 5 | An Apigee pass-through proxy targeting the service's `run.app` URL | with `<Authentication><GoogleIDToken><Audience>` for an authenticated target |
 | 6 | Private Cloud DNS zone: `*.run.app` → `199.36.153.4-7` | the **restricted** VIP — see §6.2, this one bites |
-| 7 | Private Cloud DNS zone for `googleapis.com` | required because the `run.app` records are CNAMEs |
+| 7 | Private Cloud DNS zone for `googleapis.com` | **only if** you point `*.run.app` at a `CNAME` to `restricted.googleapis.com`, as Google's PGA guide describes. Not needed with the `A`-record form in item 6 — which is what our scripts use, and what the 2026-09-07 run in §6.4 proved end to end with **no** `googleapis.com` zone present |
 | 8 | A test VM in the same VPC | the control probe |
 | 9 | `gcloud services vpc-peerings enable-vpc-service-controls` | **the mechanism under test** |
 | 10 | `roles/dns.peer` for `service-<num>@gcp-sa-apigee.iam.gserviceaccount.com` | a *prerequisite* — it activates nothing on its own |
@@ -282,6 +282,18 @@ sandbox at `roles/owner`:
 So the zones exist in a Google-owned tenant project, and no role the customer
 can hold — and no org-level grant they can be given — makes them enumerable.
 
+One caveat, so a reviewer does not think they have caught us out.
+[Citations §7](dns-peering-citations.md) notes that Google's published roles
+page renders `roles/servicenetworking.admin` and
+`roles/servicenetworking.networksAdmin` with a `servicenetworking.*` wildcard
+alongside their explicit permission lists — read literally, that wildcard would
+encompass `listDnsZones`. The table above is not derived from that page: it comes
+from `gcloud iam roles describe`, which returns the **expanded**
+`includedPermissions` set, and from a live call that returned
+`PERMISSION_DENIED` at `roles/owner`. The live result is the authoritative one,
+and citations §7 defers to it explicitly. The two documents agree; they are just
+measuring different things.
+
 Two consequences:
 
 1. **Behavioural probing is not a lazy method here, it is the only method.** The
@@ -385,12 +397,21 @@ run it.
    `*.run.app` therefore requires a peered DNS domain on VPC-peered orgs.
    The reference text's "and other necessary domains or host names" is the
    load-bearing phrase and it is unresolvable from outside Google: per §6.3 the
-   customer cannot enumerate the zones at any permission level. Naming the set
-   in the docs — as the VPC-SC and Backup-and-DR pages already partly do
-   (`googleapis.com`, `gcr.io`, `pkg.dev`, `notebooks.cloud.google.com`,
+   customer cannot enumerate the zones at any permission level.
+
+   A longer, seven-domain enumeration does exist and is Google-authored — it
+   flows from the API resource description through magic-modules — but it
+   surfaces **only in the Terraform and Pulumi provider documentation, on no
+   `cloud.google.com` page at all**
+   ([citations §0 and §2](dns-peering-citations.md)):
+   `googleapis.com`, `gcr.io`, `pkg.dev`, `notebooks.cloud.google.com`,
    `kernels.googleusercontent.com`, `backupdr.cloud.google.com`,
-   `backupdr.googleusercontent.com`) — would close this question permanently,
-   and would make it obvious at a glance that `run.app` is not in it.
+   `backupdr.googleusercontent.com`. `run.app` is absent from that list too.
+
+   So the ask is not "write this down somewhere" — Google has already written it
+   down. It is **put it on the command's own reference page**, where the person
+   configuring the peering will actually see it. That would close the question
+   permanently and make it obvious at a glance that `run.app` is not in the set.
 2. **Run, or tell us the answer to, the open cell in §7.**
 3. **Fix the `dnsZones` error message** for VPC-peered orgs to name
    `peered-dns-domains` as the correct mechanism.
