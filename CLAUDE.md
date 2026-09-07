@@ -34,6 +34,7 @@ Each option doc follows the same structure:
 
 Cross-cutting docs:
 - `docs/repro/dns-peering.md` — **CE-facing brief**: the disputed "VPC-SC makes the peered DNS domain unnecessary" claim, what it takes to reproduce option 2 + 2b, and the live refutation. Written for a reader who will not run the scripts; raw transcripts in `docs/repro/evidence/`
+- `docs/repro/dns-peering-citations.md` — the paper trail behind that brief: every documentary claim quoted verbatim with exact URLs and access dates, plus the absences (no `run.app` on the `enable-vpc-service-controls` page; no `run.app` or peered-DNS mention in the Apigee VPC-SC guide). §0 states where our position rests on absence rather than citation
 - `docs/dns-guide.md` — DNS reference across all options
 - `docs/scaling-analysis.md` — Scale to 1000s of services analysis
 - `docs/option-c-scaled.md` — 20-service PoC validating Option C linear scaling
