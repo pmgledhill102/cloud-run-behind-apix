@@ -36,6 +36,12 @@ with `503 TARGET_CONNECT_TIMEOUT` at roughly 3.3 s, having never opened a socket
 Adding the peered DNS domain restores connectivity in about a minute, with no
 proxy redeploy and no instance recreation.
 
+Every documentary claim on this page is quoted verbatim, with exact URLs and
+access dates, in [`dns-peering-citations.md`](dns-peering-citations.md) — read
+that alongside this one if you intend to check the wording rather than take ours.
+Its §0 names the two places our position rests on absence rather than on a
+citation.
+
 ![What enable-vpc-service-controls does to the Apigee tenant](../diagrams/tenant-dns-under-vpcsc.svg)
 
 (Source: [tenant-dns-under-vpcsc.drawio](../diagrams/tenant-dns-under-vpcsc.drawio))
@@ -410,3 +416,4 @@ run it.
 | Scope-map script (§6.4) | [`scripts/option2b/experiment-vpcsc-dns-scope.sh`](../../scripts/option2b/experiment-vpcsc-dns-scope.sh) |
 | Prompt to gather Google doc citations | [`doc-research-prompt.md`](doc-research-prompt.md) |
 | Raw run transcripts | [`docs/repro/evidence/`](evidence/) |
+| Every documentary claim above, quoted verbatim with URLs | [`docs/repro/dns-peering-citations.md`](dns-peering-citations.md) |
