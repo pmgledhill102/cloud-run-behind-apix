@@ -1,0 +1,80 @@
+# experiment-tls-validation.sh observe (vm-test, europe-north2-c) — 2026-09-28 ~10:40Z
+=== observe — certificate presented at the restricted VIP (from vm-test) ===
+
+--- SNI cr-hello-vuoyppegva-ma.a.run.app ---
+199.36.153.7    cr-hello-vuoyppegva-ma.a.run.app
+199.36.153.4    cr-hello-vuoyppegva-ma.a.run.app
+199.36.153.5    cr-hello-vuoyppegva-ma.a.run.app
+199.36.153.6    cr-hello-vuoyppegva-ma.a.run.app
+Verification: OK
+New, TLSv1.3, Cipher is TLS_AES_256_GCM_SHA384
+Verify return code: 0 (ok)
+subject=CN = *.a.run.app
+issuer=C = US
+notAfter=Dec  3 19:21:47 2026 GMT
+DNS:*.a.run.app
+DNS:run.app
+DNS:*.africa-south1.run.app
+DNS:*.asia-east1.run.app
+DNS:*.asia-east2.run.app
+DNS:*.asia-northeast1.run.app
+DNS:*.asia-northeast2.run.app
+DNS:*.asia-northeast3.run.app
+DNS:*.asia-south1.run.app
+DNS:*.asia-south2.run.app
+DNS:*.asia-southeast1.run.app
+DNS:*.asia-southeast2.run.app
+DNS:*.asia-southeast3.run.app
+DNS:*.asia-southeast4.run.app
+DNS:*.australia-southeast1.run.app
+DNS:*.australia-southeast2.run.app
+DNS:*.europe-central2.run.app
+ 0 s:CN = *.a.run.app
+   i:C = US, O = Google Trust Services, CN = WE2
+ 1 s:C = US, O = Google Trust Services, CN = WE2
+   i:C = US, O = Google Trust Services LLC, CN = GTS Root R4
+ 2 s:C = US, O = Google Trust Services LLC, CN = GTS Root R4
+   i:C = BE, O = GlobalSign nv-sa, OU = Root CA, CN = GlobalSign Root CA
+
+--- SNI nomatch.cr-hello-vuoyppegva-ma.a.run.app ---
+199.36.153.5    nomatch.cr-hello-vuoyppegva-ma.a.run.app
+199.36.153.4    nomatch.cr-hello-vuoyppegva-ma.a.run.app
+199.36.153.7    nomatch.cr-hello-vuoyppegva-ma.a.run.app
+199.36.153.6    nomatch.cr-hello-vuoyppegva-ma.a.run.app
+Verification error: hostname mismatch
+New, TLSv1.3, Cipher is TLS_AES_256_GCM_SHA384
+Verify return code: 62 (hostname mismatch)
+subject=CN = *.googleapis.com
+issuer=C = US
+notAfter=Dec  3 19:23:09 2026 GMT
+ 0 s:CN = *.googleapis.com
+   i:C = US, O = Google Trust Services, CN = WR2
+ 1 s:C = US, O = Google Trust Services, CN = WR2
+   i:C = US, O = Google Trust Services LLC, CN = GTS Root R1
+ 2 s:C = US, O = Google Trust Services LLC, CN = GTS Root R1
+   i:C = BE, O = GlobalSign nv-sa, OU = Root CA, CN = GlobalSign Root CA
+
+# no-SNI / IP-literal SNI against 199.36.153.5 — 2026-09-28 ~13:00Z
+== no SNI
+verify error:num=18:self-signed certificate
+ 0 s:OU = No SNI provided - please fix your client., CN = invalid2.invalid
+   i:OU = No SNI provided - please fix your client., CN = invalid2.invalid
+Verification error: self-signed certificate
+Verify return code: 18 (self-signed certificate)
+== SNI = IP literal
+ 0 s:CN = *.googleapis.com
+   i:C = US, O = Google Trust Services, CN = WR2
+ 1 s:C = US, O = Google Trust Services, CN = WR2
+   i:C = US, O = Google Trust Services LLC, CN = GTS Root R1
+ 2 s:C = US, O = Google Trust Services LLC, CN = GTS Root R1
+   i:C = BE, O = GlobalSign nv-sa, OU = Root CA, CN = GlobalSign Root CA
+Verify return code: 0 (ok)
+
+# self-signed fixture on vm-test (setup, served locally) — 2026-09-28
+--- Self-signed fixture: https://tls-selfsigned-probe.run.app/ → vm-test (10.0.0.2) ---
+  DNS tls-selfsigned-probe.run.app exists.
+  vm-test: subject=CN = tls-selfsigned-probe.run.app
+  vm-test: Verify return code: 18 (self-signed certificate)
+  vm-test:     Verify return code: 18 (self-signed certificate)
+  vm-test:     Verify return code: 18 (self-signed certificate)
+

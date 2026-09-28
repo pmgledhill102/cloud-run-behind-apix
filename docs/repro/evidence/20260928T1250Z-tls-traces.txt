@@ -1,0 +1,39 @@
+## tls-probe-p1.json
+target.url = https://cr-hello-vuoyppegva-ma.a.run.app/
+targetendpoint_default.tlsHandshakeStatus = COMPLETED
+targetendpoint_default.actualTargetTlsProtocol = TLSv1.3
+targetendpoint_default.actualTargetCipherSuite = TLS_AES_256_GCM_SHA384
+targetendpoint_default.isTlsEnabled = true
+targetendpoint_default.resolvedAddress = 199.36.153.5
+targetendpoint_default.connectionStatus = CONNECTED
+targetendpoint_default.connectionTlsHandshakeTimeMs = 6
+target_info.header.host = cr-hello-vuoyppegva-ma.a.run.app
+target response = 404 Not Found server=['Google Frontend']
+error.class = com.apigee.errors.http.server.BadGateway
+
+## tls-probe-p2.json
+target.url = https://cr-hello-vuoyppegva-ma.a.run.app/
+targetendpoint_default.tlsHandshakeStatus = COMPLETED
+targetendpoint_default.actualTargetTlsProtocol = TLSv1.3
+targetendpoint_default.actualTargetCipherSuite = TLS_AES_256_GCM_SHA384
+targetendpoint_default.isTlsEnabled = true
+targetendpoint_default.resolvedAddress = 199.36.153.5
+targetendpoint_default.connectionStatus = CONNECTED
+targetendpoint_default.connectionTlsHandshakeTimeMs = 9
+target_info.header.host = cr-hello-vuoyppegva-ma.a.run.app
+target response = 404 Not Found server=['Google Frontend']
+error.class = com.apigee.errors.http.server.BadGateway
+
+## tls-probe-p3.json
+target.url = https://cr-hello-vuoyppegva-ma.a.run.app/
+targetendpoint_default.tlsHandshakeStatus = COMPLETED
+targetendpoint_default.actualTargetTlsProtocol = TLSv1.3
+targetendpoint_default.actualTargetCipherSuite = TLS_AES_256_GCM_SHA384
+targetendpoint_default.isTlsEnabled = true
+targetendpoint_default.resolvedAddress = 199.36.153.6
+targetendpoint_default.connectionStatus = CONNECTED
+targetendpoint_default.connectionTlsHandshakeTimeMs = 7
+target_info.header.host = cr-hello-vuoyppegva-ma.a.run.app
+target response = 404 Not Found server=['Google Frontend']
+error.class = com.apigee.errors.http.server.BadGateway
+

@@ -340,6 +340,13 @@ the perimeter does not yet admit the path. That `403` is progress, not a
 regression: connectivity works and it has become a policy question (§7 shows
 how to find the denial in audit logs).
 
+> **Correction (2026-09-28):** the `403` below did not reproduce on runtime
+> `1-18-0-apigee-5` — the same no-`<SSLInfo>` IP target now fails the TLS
+> handshake (`No subject alternative names matching IP address`), because
+> Apigee checks the hostname by default (not the chain — see the TLS doc)
+> and, with no SNI, the front end serves a self-signed placeholder. The conclusion stands, for a stronger
+> reason. See [TLS validation §8](option-b-tls-validation.md#8-correction-to-field-notes-41).
+
 **Targeting the VIP by IP is not a workaround.** A target of
 `<URL>https://199.36.153.5/</URL>` with an `AssignMessage`-set `Host` header
 returns `403 "The service you are trying to access is not available on

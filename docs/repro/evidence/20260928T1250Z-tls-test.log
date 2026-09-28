@@ -1,0 +1,110 @@
+# experiment-tls-validation.sh test — 13 probes (final run)
+=== test — Apigee → restricted VIP → Cloud Run, per SSLInfo variant ===
+Run at: 2026-09-28T13:13:59Z
+Apigee instance: 10.2.0.2   env group host: api.internal.example.com
+(northbound VM→Apigee uses curl -k: the PoC env group has a self-signed cert;
+ this experiment is about the SOUTHBOUND Apigee→Cloud Run hop)
+
+--- p1: no <SSLInfo> (current option 2 config)  [target https://cr-hello-vuoyppegva-ma.a.run.app/] ---
+  
+  <html><head>
+  <meta http-equiv="content-type" content="text/html;charset=utf-8">
+  <title>404 Not Found</title>
+  </head>
+  <body text=#000000 bgcolor=#ffffff>
+  <h1>Error: Not Found</h1>
+  <h2>The requested URL <code>/</code> was not found on this server.</h2>
+  <h2></h2>
+  </body></html>
+  
+  HTTP_STATUS:404 TIME:0.337101s
+
+--- p2: Enforce=true, platform default trust  [target https://cr-hello-vuoyppegva-ma.a.run.app/] ---
+  
+  <html><head>
+  <meta http-equiv="content-type" content="text/html;charset=utf-8">
+  <title>404 Not Found</title>
+  </head>
+  <body text=#000000 bgcolor=#ffffff>
+  <h1>Error: Not Found</h1>
+  <h2>The requested URL <code>/</code> was not found on this server.</h2>
+  <h2></h2>
+  </body></html>
+  
+  HTTP_STATUS:404 TIME:0.330727s
+
+--- p3: Enforce=true, truststore = GTS roots only  [target https://cr-hello-vuoyppegva-ma.a.run.app/] ---
+  
+  <html><head>
+  <meta http-equiv="content-type" content="text/html;charset=utf-8">
+  <title>404 Not Found</title>
+  </head>
+  <body text=#000000 bgcolor=#ffffff>
+  <h1>Error: Not Found</h1>
+  <h2>The requested URL <code>/</code> was not found on this server.</h2>
+  <h2></h2>
+  </body></html>
+  
+  HTTP_STATUS:404 TIME:0.342590s
+
+--- n1: Enforce=true, truststore = unrelated CA  [target https://cr-hello-vuoyppegva-ma.a.run.app/] ---
+  {"fault":{"faultstring":"SSL Handshake failed sun.security.provider.certpath.SunCertPathBuilderException: unable to find valid certification path to requested target","detail":{"errorcode":"messaging.adaptors.http.flow.SslHandshakeFailed"}}}
+  HTTP_STATUS:503 TIME:0.145575s
+
+--- n2: Enforce=true, hostname not on cert  [target https://nomatch.cr-hello-vuoyppegva-ma.a.run.app/] ---
+  {"fault":{"faultstring":"SSL Handshake failed java.security.cert.CertificateException: No subject alternative DNS name matching nomatch.cr-hello-vuoyppegva-ma.a.run.app found.","detail":{"errorcode":"messaging.adaptors.http.flow.SslHandshakeFailed"}}}
+  HTTP_STATUS:503 TIME:0.148629s
+
+--- n3: no <SSLInfo>, hostname not on cert  [target https://nomatch.cr-hello-vuoyppegva-ma.a.run.app/] ---
+  {"fault":{"faultstring":"SSL Handshake failed java.security.cert.CertificateException: No subject alternative DNS name matching nomatch.cr-hello-vuoyppegva-ma.a.run.app found.","detail":{"errorcode":"messaging.adaptors.http.flow.SslHandshakeFailed"}}}
+  HTTP_STATUS:503 TIME:0.151882s
+
+--- n4: truststore = unrelated CA, no Enforce  [target https://cr-hello-vuoyppegva-ma.a.run.app/] ---
+  {"fault":{"faultstring":"SSL Handshake failed sun.security.provider.certpath.SunCertPathBuilderException: unable to find valid certification path to requested target","detail":{"errorcode":"messaging.adaptors.http.flow.SslHandshakeFailed"}}}
+  HTTP_STATUS:503 TIME:0.139845s
+
+--- n5: no <SSLInfo>, raw restricted-VIP IP (field notes 4.1)  [target https://199.36.153.5/] ---
+  {"fault":{"faultstring":"SSL Handshake failed java.security.cert.CertificateException: No subject alternative names matching IP address 199.36.153.5 found","detail":{"errorcode":"messaging.adaptors.http.flow.SslHandshakeFailed"}}}
+  HTTP_STATUS:503 TIME:0.144249s
+
+--- n6: Enforce=true, raw restricted-VIP IP  [target https://199.36.153.5/] ---
+  {"fault":{"faultstring":"SSL Handshake failed sun.security.provider.certpath.SunCertPathBuilderException: unable to find valid certification path to requested target","detail":{"errorcode":"messaging.adaptors.http.flow.SslHandshakeFailed"}}}
+  HTTP_STATUS:503 TIME:0.147817s
+
+--- n7: no <SSLInfo>, self-signed cert, MATCHING name  [target https://tls-selfsigned-probe.run.app/] ---
+  OK
+  selfsigned-fixture
+  
+  HTTP_STATUS:200 TIME:0.237618s
+
+--- n8: Enforce=true, self-signed cert, MATCHING name  [target https://tls-selfsigned-probe.run.app/] ---
+  {"fault":{"faultstring":"SSL Handshake failed sun.security.provider.certpath.SunCertPathBuilderException: unable to find valid certification path to requested target","detail":{"errorcode":"messaging.adaptors.http.flow.SslHandshakeFailed"}}}
+  HTTP_STATUS:503 TIME:0.207575s
+
+--- n9: truststore = GTS roots, no Enforce, self-signed MATCHING name  [target https://tls-selfsigned-probe.run.app/] ---
+  {"fault":{"faultstring":"SSL Handshake failed sun.security.provider.certpath.SunCertPathBuilderException: unable to find valid certification path to requested target","detail":{"errorcode":"messaging.adaptors.http.flow.SslHandshakeFailed"}}}
+  HTTP_STATUS:503 TIME:0.200953s
+
+--- c1: control: IgnoreValidationErrors=true, same self-signed target  [target https://tls-selfsigned-probe.run.app/] ---
+  OK
+  selfsigned-fixture
+  
+  HTTP_STATUS:200 TIME:0.241248s
+
+==========================================================================
+id  HTTP    result    expect     verdict    variant
+p1  404     TLS_OK    TLS_OK     PASS       no <SSLInfo> (current option 2 config)
+p2  404     TLS_OK    TLS_OK     PASS       Enforce=true, platform default trust
+p3  404     TLS_OK    TLS_OK     PASS       Enforce=true, truststore = GTS roots only
+n1  503     TLS_FAIL  TLS_FAIL   PASS       Enforce=true, truststore = unrelated CA
+n2  503     TLS_FAIL  TLS_FAIL   PASS       Enforce=true, hostname not on cert
+n3  503     TLS_FAIL  ?          (observed) no <SSLInfo>, hostname not on cert
+n4  503     TLS_FAIL  ?          (observed) truststore = unrelated CA, no Enforce
+n5  503     TLS_FAIL  ?          (observed) no <SSLInfo>, raw restricted-VIP IP (field notes 4.1)
+n6  503     TLS_FAIL  TLS_FAIL   PASS       Enforce=true, raw restricted-VIP IP
+n7  200     OK        ?          (observed) no <SSLInfo>, self-signed cert, MATCHING name
+n8  503     TLS_FAIL  TLS_FAIL   PASS       Enforce=true, self-signed cert, MATCHING name
+n9  503     TLS_FAIL  ?          (observed) truststore = GTS roots, no Enforce, self-signed MATCHING name
+c1  200     OK        OK         PASS       control: IgnoreValidationErrors=true, same self-signed target
+==========================================================================
+All asserted probes matched expectation.

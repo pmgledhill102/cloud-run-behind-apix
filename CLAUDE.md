@@ -39,6 +39,7 @@ Cross-cutting docs:
 - `docs/scaling-analysis.md` — Scale to 1000s of services analysis
 - `docs/option-c-scaled.md` — 20-service PoC validating Option C linear scaling
 - `docs/option-b-vpcsc-field-notes.md` — Option 2b lessons learned: failures, propagation, audit logs
+- `docs/option-b-tls-validation.md` — Apigee → Cloud Run TLS over PGA, 13 probes: TLS 1.3 validates fully under `<Enforce>true</Enforce>` with no `IgnoreValidationErrors`; the option 2 proxy's no-`<SSLInfo>` default checks hostname but **not chain** (accepted a self-signed cert for a matching name). Evidence in `docs/repro/evidence/20260928T1250Z-tls-*`
 - `docs/path-routing-at-scale.md` — Paper design: URL hierarchy → Apigee → Cloud Run at ~50 domains / ~500 APIs (PoC extension plan in §9; items 1–3 — most-specific match, live carve-out, base-path conflict — verified live 2026-08-03)
 - `docs/auth/jwt-enforcement-design.md` — Design: where to enforce authn/authz for external-issuer JWTs (Apigee shared flow vs Cloud Run IAM vs sidecar vs in-service middleware); §10 items 1–6 verified live
 - `docs/auth/auth-poc-field-notes.md` — Auth PoC live-run lessons: greenfield races, BASE-env limits, flow hook casing, JWKS reachability, 403 signatures

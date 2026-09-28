@@ -14,27 +14,43 @@
 #
 # Probes — one proxy each, base path /tls/<id>:
 #
-#   p1  cr-hello   no <SSLInfo> (today's config)              expect 200
-#   p2  cr-hello   Enforce=true, no truststore                expect 200
-#   p3  cr-hello   Enforce=true, truststore = GTS roots only  expect 200
+#   p1  cr-hello   no <SSLInfo> (today's config)              expect TLS_OK
+#   p2  cr-hello   Enforce=true, no truststore                expect TLS_OK
+#   p3  cr-hello   Enforce=true, truststore = GTS roots only  expect TLS_OK
 #   n1  cr-hello   Enforce=true, truststore = unrelated CA    expect TLS FAIL (untrusted root)
 #   n2  bad name   Enforce=true                                expect TLS FAIL (hostname mismatch)
 #   n3  bad name   no <SSLInfo>                                what does the default allow?
 #   n4  cr-hello   truststore = unrelated CA, no Enforce       what does the default allow?
+#   n5  VIP IP     no <SSLInfo>                                what does the default allow?
+#   n6  VIP IP     Enforce=true                                expect TLS FAIL (IP not on cert)
+#   n7  self-sign  no <SSLInfo>                                what does the default allow?
+#   n8  self-sign  Enforce=true                                expect TLS FAIL (untrusted chain)
+#   n9  self-sign  truststore = GTS roots, no Enforce          what does a truststore alone do?
+#   c1  self-sign  IgnoreValidationErrors=true (CONTROL)       expect OK — proves the fixture is reachable
+#
+# "self-sign" is vm-test serving a self-signed cert whose CN/SAN MATCH the
+# name dialled (tls-selfsigned-probe.run.app, an A record in run-app-pga), so
+# only chain validation can reject it. Result on 2026-09-28: n7 ACCEPTED —
+# the no-<SSLInfo> default checks hostname but not chain.
+#
+# TLS_OK = the target answered, so the handshake completed and passed that
+# variant's validation. OK = a 200 from the service itself. Without a VPC-SC
+# perimeter an --ingress=internal service answers the tenant with a front-end
+# 404 AFTER the handshake (field notes §4.2) — TLS_OK, not OK.
 #
 # "bad name" is nomatch.<cr-hello host>: resolves through the same *.run.app
 # wildcard to the same restricted VIP, but is one label deeper than any
 # wildcard SAN on Google's certificate, so it can never validate.
 #
-# Every Apigee call carries a Google ID token for cr-hello (it is IAM-closed),
-# and a Host header set to the real service host — exactly as the option 2
-# proxy does.
+# Every probe rewrites Host to the real service host, as the option 2 proxy
+# does, and — except those aimed at the self-signed fixture — carries a
+# Google ID token for cr-hello (it is IAM-closed).
 #
 # Subcommands:
-#   setup     create truststores + deploy the seven probe proxies
+#   setup     truststores + self-signed fixture + deploy every probe proxy
 #   observe   from vm-test: the certificate the restricted VIP presents (openssl)
 #   test      probe each proxy from vm-test, classify, print a table
-#   teardown  undeploy + delete the probe proxies and truststores
+#   teardown  undeploy + delete the probe proxies, truststores and fixture
 #   all       setup, observe, test
 #
 # Prerequisites: shared/setup-base + setup-slow + option2 + option2b applied.
@@ -53,7 +69,7 @@ MODE="${1:-all}"
 
 KS_GOOD="tls-probe-gts-roots"
 KS_WRONG="tls-probe-wrong-root"
-PROBES=(p1 p2 p3 n1 n2 n3 n4)
+PROBES=(p1 p2 p3 n1 n2 n3 n4 n5 n6 n7 n8 n9 c1)
 
 # GTS roots: the anchors Cloud Run's certificate chains to. Taken from the
 # local CA bundle; override the directory if yours differs.
@@ -75,23 +91,58 @@ SERVICE_URL="$(gcloud run services describe cr-hello \
 [[ -n "${SERVICE_URL}" ]] || { echo "ERROR: cr-hello not found"; exit 1; }
 SERVICE_HOST="${SERVICE_URL#https://}"
 BAD_HOST="nomatch.${SERVICE_HOST}"
+# n5/n6: the restricted VIP by address. Field notes §4.1 recorded a
+# no-<SSLInfo> target of this form returning an HTTP 403 from the front end —
+# i.e. a completed handshake against a cert that cannot name an IP.
+VIP_IP="${VIP_IP:-199.36.153.5}"
+# n7/c1: an untrusted chain under a MATCHING name — the one case Google's
+# front end can never produce. vm-test serves a self-signed certificate for
+# SELF_HOST, published in the run-app-pga zone the Apigee tenant already
+# resolves through (peered DNS domain run.app). c1 is the reachability
+# control: IgnoreValidationErrors=true must get through, or n7's failure could
+# be connectivity rather than validation.
+SELF_HOST="tls-selfsigned-probe.run.app"
+DNS_ZONE="run-app-pga"
 
 # probe_spec <id> → "target_host|sslinfo_kind|expect|description"
 probe_spec() {
   case "$1" in
-    p1) echo "${SERVICE_HOST}|none|OK|no <SSLInfo> (current option 2 config)" ;;
-    p2) echo "${SERVICE_HOST}|enforce|OK|Enforce=true, platform default trust" ;;
-    p3) echo "${SERVICE_HOST}|enforce-good-ts|OK|Enforce=true, truststore = GTS roots only" ;;
+    p1) echo "${SERVICE_HOST}|none|TLS_OK|no <SSLInfo> (current option 2 config)" ;;
+    p2) echo "${SERVICE_HOST}|enforce|TLS_OK|Enforce=true, platform default trust" ;;
+    p3) echo "${SERVICE_HOST}|enforce-good-ts|TLS_OK|Enforce=true, truststore = GTS roots only" ;;
     n1) echo "${SERVICE_HOST}|enforce-wrong-ts|TLS_FAIL|Enforce=true, truststore = unrelated CA" ;;
     n2) echo "${BAD_HOST}|enforce|TLS_FAIL|Enforce=true, hostname not on cert" ;;
     n3) echo "${BAD_HOST}|none|?|no <SSLInfo>, hostname not on cert" ;;
     n4) echo "${SERVICE_HOST}|wrong-ts-no-enforce|?|truststore = unrelated CA, no Enforce" ;;
+    n5) echo "${VIP_IP}|none|?|no <SSLInfo>, raw restricted-VIP IP (field notes 4.1)" ;;
+    n6) echo "${VIP_IP}|enforce|TLS_FAIL|Enforce=true, raw restricted-VIP IP" ;;
+    n7) echo "${SELF_HOST}|none|?|no <SSLInfo>, self-signed cert, MATCHING name" ;;
+    n8) echo "${SELF_HOST}|enforce|TLS_FAIL|Enforce=true, self-signed cert, MATCHING name" ;;
+    n9) echo "${SELF_HOST}|good-ts-no-enforce|?|truststore = GTS roots, no Enforce, self-signed MATCHING name" ;;
+    c1) echo "${SELF_HOST}|ignore|OK|control: IgnoreValidationErrors=true, same self-signed target" ;;
   esac
+}
+
+# The self-signed fixture is not Cloud Run: do not hand it a cr-hello ID token.
+auth_xml() {
+  [[ "$1" == "${SELF_HOST}" ]] && return 0
+  cat << X
+    <Authentication>
+      <GoogleIDToken><Audience>${SERVICE_URL}</Audience></GoogleIDToken>
+    </Authentication>
+X
 }
 
 sslinfo_xml() {
   case "$1" in
     none) ;;
+    ignore) cat << 'X'
+    <SSLInfo>
+      <Enabled>true</Enabled>
+      <IgnoreValidationErrors>true</IgnoreValidationErrors>
+    </SSLInfo>
+X
+    ;;
     enforce) cat << 'X'
     <SSLInfo>
       <Enabled>true</Enabled>
@@ -112,6 +163,13 @@ X
       <Enabled>true</Enabled>
       <Enforce>true</Enforce>
       <TrustStore>${KS_WRONG}</TrustStore>
+    </SSLInfo>
+X
+    ;;
+    good-ts-no-enforce) cat << X
+    <SSLInfo>
+      <Enabled>true</Enabled>
+      <TrustStore>${KS_GOOD}</TrustStore>
     </SSLInfo>
 X
     ;;
@@ -146,7 +204,7 @@ ensure_cert_alias() {
     return 0
   fi
   local out
-  out="$(api POST "/environments/${APIGEE_ENV}/keystores/${ks}/aliases?alias=${alias}&format=pem" \
+  out="$(api POST "/environments/${APIGEE_ENV}/keystores/${ks}/aliases?alias=${alias}&format=keycertfile" \
     -F "certFile=@${pem}")"
   if echo "${out}" | grep -q '"error"'; then
     echo "ERROR uploading ${alias} to ${ks}:"; echo "${out}"; exit 1
@@ -165,7 +223,7 @@ deploy_probe() {
   mkdir -p "${bundle}/apiproxy/proxies" "${bundle}/apiproxy/targets" "${bundle}/apiproxy/policies"
   cat > "${bundle}/apiproxy/${name}.xml" << X
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<APIProxy name="${name}"><Description>TLS validation probe ${id}: ${desc}</Description></APIProxy>
+<APIProxy name="${name}"><Description>TLS validation probe ${id}: $(printf '%s' "${desc}" | sed 's/</\&lt;/g; s/>/\&gt;/g')</Description></APIProxy>
 X
   cat > "${bundle}/apiproxy/policies/SetHostHeader.xml" << X
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -195,9 +253,7 @@ X
   <HTTPTargetConnection>
     <URL>https://${host}/</URL>
 $(sslinfo_xml "${kind}")
-    <Authentication>
-      <GoogleIDToken><Audience>${SERVICE_URL}</Audience></GoogleIDToken>
-    </Authentication>
+$(auth_xml "${host}")
   </HTTPTargetConnection>
 </TargetEndpoint>
 X
@@ -217,12 +273,16 @@ X
 }
 
 wait_ready() {
-  local id name state elapsed
+  local id name rev state elapsed
   for id in "${PROBES[@]}"; do
     name="tls-probe-${id}"; elapsed=0
+    # The env-level deployments list carries no "state"; only the
+    # per-revision deployment resource does.
+    rev="$(api GET "/environments/${APIGEE_ENV}/apis/${name}/deployments" \
+      | python3 -c 'import sys,json; d=json.load(sys.stdin).get("deployments",[]); print(d[0]["revision"] if d else "")' 2>/dev/null || true)"
     while :; do
-      state="$(api GET "/environments/${APIGEE_ENV}/apis/${name}/deployments" \
-        | python3 -c 'import sys,json; d=json.load(sys.stdin).get("deployments",[]); print(d[0].get("state","") if d else "")' 2>/dev/null || true)"
+      state="$(api GET "/environments/${APIGEE_ENV}/apis/${name}/revisions/${rev}/deployments" \
+        | python3 -c 'import sys,json; print(json.load(sys.stdin).get("state",""))' 2>/dev/null || true)"
       [[ "${state}" == "READY" ]] && { echo "  ${name}: READY"; break; }
       (( elapsed >= 300 )) && { echo "  ${name}: not READY after 300s (${state:-unknown})"; break; }
       sleep 10; elapsed=$((elapsed + 10))
@@ -230,10 +290,64 @@ wait_ready() {
   done
 }
 
+ensure_selfsigned_fixture() {
+  local vm_ip
+  vm_ip="$(gcloud compute instances describe vm-test --zone="${ZONE}" \
+    --project="${PROJECT_ID}" --format='value(networkInterfaces[0].networkIP)')"
+  echo "--- Self-signed fixture: https://${SELF_HOST}/ → vm-test (${vm_ip}) ---"
+  if gcloud dns record-sets describe "${SELF_HOST}." --zone="${DNS_ZONE}" --type=A \
+      --project="${PROJECT_ID}" &>/dev/null; then
+    echo "  DNS ${SELF_HOST} exists."
+  else
+    gcloud dns record-sets create "${SELF_HOST}." --zone="${DNS_ZONE}" --type=A \
+      --ttl=60 --rrdatas="${vm_ip}" --project="${PROJECT_ID}" >/dev/null
+    echo "  DNS ${SELF_HOST} → ${vm_ip} created."
+  fi
+  # Idempotent: (re)start a one-file HTTPS server with a fresh self-signed
+  # cert whose CN and SAN both match SELF_HOST — so only CHAIN validation can
+  # reject it. Detached so the probe channel returns.
+  # Stop a previous server by pidfile — NOT pkill -f: this whole command line
+  # contains the server's path, so a pattern kill matches (and kills) the
+  # shell running it.
+  ssh_cmd "[ -f /tmp/tls-probe.pid ] && kill \$(cat /tmp/tls-probe.pid) 2>/dev/null; rm -f /tmp/tls-probe.pid; \
+    openssl req -x509 -newkey rsa:2048 -nodes -days 2 \
+      -subj '/CN=${SELF_HOST}' -addext 'subjectAltName=DNS:${SELF_HOST}' \
+      -keyout /tmp/tls-probe.key -out /tmp/tls-probe.pem 2>/dev/null; \
+    cat > /tmp/tls-selfsigned-probe-server.py << 'PY'
+import http.server, ssl
+class H(http.server.BaseHTTPRequestHandler):
+    def do_GET(self):
+        body = b'OK\\nselfsigned-fixture\\n'
+        self.send_response(200); self.send_header('Content-Length', str(len(body)))
+        self.end_headers(); self.wfile.write(body)
+    def log_message(self, *a): pass
+s = http.server.HTTPServer(('0.0.0.0', 443), H)
+ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER); ctx.load_cert_chain('/tmp/tls-probe.pem', '/tmp/tls-probe.key')
+s.socket = ctx.wrap_socket(s.socket, server_side=True)
+s.serve_forever()
+PY
+    setsid nohup python3 /tmp/tls-selfsigned-probe-server.py >/tmp/tls-probe.log 2>&1 < /dev/null & \
+    echo \$! > /tmp/tls-probe.pid; \
+    sleep 2; echo | openssl s_client -connect 127.0.0.1:443 -servername ${SELF_HOST} 2>/dev/null \
+      | grep -E 'subject=|Verify return code' | sed 's/^/  vm-test: /'"
+}
+
+remove_selfsigned_fixture() {
+  if gcloud dns record-sets describe "${SELF_HOST}." --zone="${DNS_ZONE}" --type=A \
+      --project="${PROJECT_ID}" &>/dev/null; then
+    gcloud dns record-sets delete "${SELF_HOST}." --zone="${DNS_ZONE}" --type=A \
+      --project="${PROJECT_ID}" >/dev/null
+    echo "  DNS ${SELF_HOST} deleted."
+  fi
+  ssh_cmd "[ -f /tmp/tls-probe.pid ] && kill \$(cat /tmp/tls-probe.pid) && rm -f /tmp/tls-probe.pid && echo '  fixture server stopped.' || true" || true
+}
+
 do_setup() {
   echo "=== setup — project ${PROJECT_ID}, env ${APIGEE_ENV} ==="
   echo "cr-hello:  ${SERVICE_URL}"
   echo "bad name:  ${BAD_HOST}"
+  echo ""
+  ensure_selfsigned_fixture
   echo ""
   echo "--- Truststore '${KS_GOOD}': GTS Root R1-R4 (from ${GTS_ROOT_DIR}) ---"
   ensure_keystore "${KS_GOOD}"
@@ -307,12 +421,22 @@ do_test() {
       result="OK"
     elif echo "${out}" | grep -qiE 'SslHandshakeFailed|SSL Handshake|handshake|certificate|PKIX'; then
       result="TLS_FAIL"
+    elif echo "${out}" | grep -q '"fault"'; then
+      # Any other Apigee-generated fault (connect timeout, etc.): the target
+      # never answered, so this says nothing about TLS.
+      result="OTHER"
+    elif [[ -n "${code}" && "${code}" != "000" ]]; then
+      # The TARGET answered (e.g. Google Front End's 404 for an
+      # --ingress=internal service the tenant is not admitted to): the
+      # handshake completed and passed whatever validation this variant
+      # applies. Admission is a separate question — see the report.
+      result="TLS_OK"
     else
       result="OTHER"
     fi
     if [[ "${expect}" == "?" ]]; then
       verdict="(observed)"
-    elif [[ "${result}" == "${expect}" ]]; then
+    elif [[ "${result}" == "${expect}" || ( "${expect}" == "TLS_OK" && "${result}" == "OK" ) ]]; then
       verdict="PASS"
     else
       verdict="FAIL"; fails=$((fails + 1))
@@ -361,6 +485,7 @@ do_teardown() {
       echo "  keystore ${ks} not present."
     fi
   done
+  remove_selfsigned_fixture
 }
 
 case "${MODE}" in
