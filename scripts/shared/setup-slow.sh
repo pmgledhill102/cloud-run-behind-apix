@@ -299,7 +299,7 @@ if [[ "${INSTANCE_EXISTS}" == "yes" && "${INSTANCE_STATE}" == "ACTIVE" ]]; then
 elif [[ "${INSTANCE_EXISTS}" == "yes" ]]; then
   echo "Apigee instance '${INSTANCE_NAME}' exists (state: ${INSTANCE_STATE}). Waiting..."
 else
-  echo "Creating Apigee instance '${INSTANCE_NAME}' in ${REGION}..."
+  echo "Creating Apigee instance '${INSTANCE_NAME}' in ${APIGEE_INSTANCE_REGION}..."
   echo "(This may take 30-60 minutes)"
 
   INST_RESPONSE="$(curl -s -X POST \
@@ -308,7 +308,7 @@ else
     "${APIGEE_API}/organizations/${PROJECT_ID}/instances" \
     -d "{
       \"name\": \"${INSTANCE_NAME}\",
-      \"location\": \"${REGION}\",
+      \"location\": \"${APIGEE_INSTANCE_REGION}\",
       \"ipRange\": \"${APIGEE_INSTANCE_CIDR}\"
     }")"
 
@@ -714,7 +714,7 @@ echo "=== Apigee X Provisioning Complete ==="
 echo "============================================================"
 echo ""
 echo "Organisation: ${PROJECT_ID}"
-echo "Instance:     ${INSTANCE_NAME} (${REGION})"
+echo "Instance:     ${INSTANCE_NAME} (${APIGEE_INSTANCE_REGION})"
 echo "Environment:  ${APIGEE_ENV}"
 echo "Env group:    ${APIGEE_ENV_GROUP} (${APIGEE_ENV_GROUP_HOSTNAME})"
 echo "API proxy:    ${PROXY_NAME} → /hello"
