@@ -294,6 +294,25 @@ INSTANCE_JSON="$(curl -s \
 INSTANCE_EXISTS="$(echo "${INSTANCE_JSON}" | python3 -c "import sys,json; d=json.load(sys.stdin); print('yes' if 'name' in d else 'no')" 2>/dev/null || echo "no")"
 INSTANCE_STATE="$(echo "${INSTANCE_JSON}" | python3 -c "import sys,json; print(json.load(sys.stdin).get('state','UNKNOWN'))" 2>/dev/null || echo "UNKNOWN")"
 
+# One-instance guard. A PAYG org accepts any number of instances, each billed
+# by the hour, and "not found under THIS name" is not "the org has none" — a
+# changed APIGEE_INSTANCE_REGION (or a forgotten one) changes INSTANCE_NAME and
+# would silently create a second runtime. A previous run accumulated five this
+# way. Refuse unless the org has zero instances; ALLOW_EXTRA_INSTANCE=1 is the
+# deliberate override.
+if [[ "${INSTANCE_EXISTS}" != "yes" && "${ALLOW_EXTRA_INSTANCE:-}" != "1" ]]; then
+  OTHER_INSTANCES="$(curl -s \
+    -H "Authorization: Bearer ${TOKEN}" \
+    "${APIGEE_API}/organizations/${PROJECT_ID}/instances" \
+    | python3 -c "import sys,json; print(' '.join(i['name'] + '(' + i.get('location','?') + ',' + i.get('state','?') + ')' for i in json.load(sys.stdin).get('instances', [])))")"
+  if [[ -n "${OTHER_INSTANCES}" ]]; then
+    echo "ERROR: org already has Apigee instance(s): ${OTHER_INSTANCES}"
+    echo "Refusing to create '${INSTANCE_NAME}' as well — each instance is billed hourly."
+    echo "Set APIGEE_INSTANCE_REGION to match the existing instance, or ALLOW_EXTRA_INSTANCE=1 if you really want another."
+    exit 1
+  fi
+fi
+
 if [[ "${INSTANCE_EXISTS}" == "yes" && "${INSTANCE_STATE}" == "ACTIVE" ]]; then
   echo "Apigee instance '${INSTANCE_NAME}' already exists and is ACTIVE, skipping."
 elif [[ "${INSTANCE_EXISTS}" == "yes" ]]; then
