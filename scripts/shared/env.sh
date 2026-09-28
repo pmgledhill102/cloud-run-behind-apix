@@ -57,7 +57,12 @@ APIGEE_PEERING_RANGE_NAME="apigee-peering-range"
 APIGEE_PEERING_CIDR="10.1.0.0/20"
 APIGEE_INSTANCE_RANGE_NAME="apigee-instance-range"
 APIGEE_INSTANCE_CIDR="10.2.0.0/22"
-INSTANCE_NAME="instance-${REGION}"
+# Apigee runtime region. Defaults to REGION; override when REGION is out of
+# capacity for Apigee (seen live 2026-09-28: instance create in europe-north2
+# failed GCEResourceExhausted). The runtime region is independent of the
+# apigee-vpc subnet region — the peering is global.
+APIGEE_INSTANCE_REGION="${APIGEE_INSTANCE_REGION:-${REGION}}"
+INSTANCE_NAME="instance-${APIGEE_INSTANCE_REGION}"
 PROXY_NAME="cr-hello-passthrough"
 
 # --- Option 2b: VPC-SC perimeter governance test ---

@@ -15,6 +15,18 @@ it, rather than against a summary of it.
 The manifest is what lets a reader tell whether two phases came from the same
 stack. A transcript without it is an anecdote.
 
+## TLS validation run (2026-09-28)
+
+From [`../../option-b-tls-validation.md`](../../option-b-tls-validation.md), produced by
+`scripts/option2b/experiment-tls-validation.sh` and redacted the same way (project id and
+number substituted):
+
+| File | Contents |
+|---|---|
+| `20260928T1250Z-tls-observe.log` | `openssl` from `vm-test` at the restricted VIP: cert + chain for the real name, a non-matching name, no SNI, IP-literal SNI, and the self-signed fixture |
+| `20260928T1250Z-tls-test.log` | The final 13-probe run — every Apigee response body, status and timing, and the verdict table |
+| `20260928T1250Z-tls-traces.txt` | Debug-session fields for p1–p3: resolved VIP, `tlsHandshakeStatus`, negotiated protocol and cipher, outbound `Host`, target response |
+
 ## Producing them
 
 ```bash
