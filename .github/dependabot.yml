@@ -22,3 +22,30 @@ updates:
     # GitHub mobile filters; an assignee is what makes them visible there.
     assignees:
       - "pmgledhill102"
+
+  - package-ecosystem: "docker"
+    directories:
+      - "/scripts/auth/container"
+      - "/scripts/auth/envoy"
+      - "/scripts/auth/idp-mock"
+      - "/scripts/mock-apigee/gateway"
+      - "/scripts/shared/container"
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    # Docker publishes no release dates, so Dependabot cannot always apply this
+    # to base images; it is here so the setting is consistent.
+    cooldown:
+      default-days: 7
+    groups:
+      docker:
+        patterns: ["*"]
+        update-types: [minor, patch]
+      docker-major:
+        patterns: ["*"]
+        update-types: [major]
+    commit-message:
+      prefix: "deps"
+    assignees:
+      - "pmgledhill102"

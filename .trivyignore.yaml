@@ -1,0 +1,8 @@
+misconfigurations:
+  - id: DS-0002
+    paths:
+      - "scripts/mock-apigee/gateway/Dockerfile"
+    statement: >-
+      Deliberate. The mock Apigee gateway binds :443 on the host network of a COS VM,
+      which needs root; the Dockerfile header says so. Scoped to this one file, so
+      any other image that runs as root is still reported.

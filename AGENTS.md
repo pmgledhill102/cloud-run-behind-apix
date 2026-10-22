@@ -13,13 +13,18 @@ P0-P4 priority labels, blocked-by dependencies).
 ## Quality gates
 
 `pre-commit run --all-files` runs whitespace hygiene, gitleaks, cspell,
-actionlint and semgrep. CI runs the same scanners as jobs of their own on every
+actionlint, shellcheck, shfmt, hadolint and semgrep. hadolint runs as a system
+tool, so it needs the binary on your PATH (`brew install hadolint`). CI runs the same scanners as jobs of their own on every
 push and pull request (`.github/workflows/ci.yml`), and gitleaks also scans the
 full history weekly (`gitleaks-history.yml`).
 
 - A word cspell does not know goes in `cspell.json`, unless it is a typo
 - A semgrep false positive is annotated at the line with `nosemgrep: <rule id>`
   and a one-line reason above it, not silenced in configuration
+- Image configuration is also scanned by trivy in CI (`docker.yml`), gated at HIGH
+  and CRITICAL. An exemption goes in `.trivyignore.yaml`, scoped to one path with
+  a reason, and in the Dockerfile as a `# hadolint ignore=` line above the
+  instruction
 - `docs/diagrams/*.svg` and `docs/repro/evidence/` are excluded from the
   whitespace hooks: the first is workflow output, the second is captured
   evidence
