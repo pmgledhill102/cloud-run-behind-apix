@@ -12,12 +12,12 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           fetch-depth: 0
 
       - name: Export draw.io to SVG
-        uses: rlespinasse/drawio-export-action@v2
+        uses: rlespinasse/drawio-export-action@711aa4f0ebbee18099c3ed8911819128b23eee21 # v2.54.1
         with:
           path: docs/diagrams
           format: svg
@@ -29,6 +29,8 @@ jobs:
           sudo chown -R "$(id -u):$(id -g)" docs/diagrams/export
           for drawio_file in docs/diagrams/*.drawio; do
             base="$(basename "$drawio_file" .drawio)"
+            # The names come from the export action: kebab-case, so ls is safe here.
+            # shellcheck disable=SC2012
             svg="$(ls docs/diagrams/export/"${base}"-*.svg 2>/dev/null | head -1)"
             if [ -n "$svg" ]; then
               mv "$svg" "docs/diagrams/${base}.svg"
@@ -37,7 +39,7 @@ jobs:
           rm -rf docs/diagrams/export
 
       - name: Commit exported SVGs
-        uses: stefanzweifel/git-auto-commit-action@v5
+        uses: stefanzweifel/git-auto-commit-action@b863ae1933cb653a53c021fe36dbb774e1fb9403 # v5.2.0
         with:
           commit_message: "chore: auto-export drawio diagrams to SVG"
           file_pattern: 'docs/diagrams/*.svg'
