@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# The variables below are consumed by the scripts that source this file, which
+# the linter cannot see from here.
+# shellcheck disable=SC2034
 #
 # env.sh — Shared configuration for all PoC scripts
 #

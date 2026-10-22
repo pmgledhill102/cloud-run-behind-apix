@@ -66,7 +66,7 @@ echo "--- Step 1: Delete service perimeter ---"
 if [[ -z "${POLICY_ID}" ]]; then
   echo "Access policy '${POLICY_TITLE}' not found, skipping perimeter deletion."
 elif resource_exists gcloud access-context-manager perimeters describe \
-    "${PERIMETER_NAME}" --policy="${POLICY_ID}" --billing-project="${PROJECT_ID}"; then
+  "${PERIMETER_NAME}" --policy="${POLICY_ID}" --billing-project="${PROJECT_ID}"; then
   gcloud access-context-manager perimeters delete "${PERIMETER_NAME}" \
     --policy="${POLICY_ID}" \
     --billing-project="${PROJECT_ID}" \
@@ -106,8 +106,8 @@ fi
 echo ""
 echo "--- Step 3: Disable VPC-SC on servicenetworking peering ---"
 if gcloud services vpc-peerings disable-vpc-service-controls \
-    --network="${APIGEE_NETWORK}" \
-    --project="${PROJECT_ID}" 2>/dev/null; then
+  --network="${APIGEE_NETWORK}" \
+  --project="${PROJECT_ID}" 2>/dev/null; then
   echo "VPC-SC disabled on peering for '${APIGEE_NETWORK}'."
 else
   echo "WARNING: could not disable VPC-SC on the peering (may already be off,"
@@ -120,8 +120,8 @@ fi
 echo ""
 echo "--- Step 4: Remove Apigee DNS peering zone + route + export + dns.peer ---"
 if gcloud services peered-dns-domains list \
-    --network="${APIGEE_NETWORK}" --project="${PROJECT_ID}" \
-    --format='value(name)' 2>/dev/null | grep -qx "run-app"; then
+  --network="${APIGEE_NETWORK}" --project="${PROJECT_ID}" \
+  --format='value(name)' 2>/dev/null | grep -qx "run-app"; then
   gcloud services peered-dns-domains delete "run-app" \
     --network="${APIGEE_NETWORK}" \
     --project="${PROJECT_ID}" --quiet \
@@ -157,10 +157,10 @@ fi
 PROJECT_NUMBER="$(gcloud projects describe "${PROJECT_ID}" --format='value(projectNumber)')"
 APIGEE_AGENT_SA="service-${PROJECT_NUMBER}@gcp-sa-apigee.iam.gserviceaccount.com"
 if gcloud projects remove-iam-policy-binding "${PROJECT_ID}" \
-    --member="serviceAccount:${APIGEE_AGENT_SA}" \
-    --role="roles/dns.peer" \
-    --condition=None \
-    --quiet >/dev/null 2>&1; then
+  --member="serviceAccount:${APIGEE_AGENT_SA}" \
+  --role="roles/dns.peer" \
+  --condition=None \
+  --quiet >/dev/null 2>&1; then
   echo "dns.peer removed from Apigee service agent."
 else
   echo "dns.peer binding not present, skipping."

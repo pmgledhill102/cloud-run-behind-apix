@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# The variables below are consumed by the scripts that source this file, which
+# the linter cannot see from here.
+# shellcheck disable=SC2034
 #
 # env-mock.sh — Mock-Apigee quick stack configuration (issue #51)
 #
@@ -24,9 +27,9 @@ PEERING_APIGEE_TO_MOCK="apigee-to-mock"
 PEERING_MOCK_TO_APIGEE="mock-to-apigee"
 
 # --- Southbound plumbing (hand-replicates peered-DNS-domain + route export) ---
-MOCK_DNS_ZONE="run-app-mock"       # private run.app. zone bound to MOCK_VPC only
-MOCK_ROUTE="restricted-vip-mock"   # 199.36.153.4/30 → default-internet-gateway
-MOCK_ROUTER="nat-router-mock"      # NAT so the COS VM can pull the image
+MOCK_DNS_ZONE="run-app-mock"     # private run.app. zone bound to MOCK_VPC only
+MOCK_ROUTE="restricted-vip-mock" # 199.36.153.4/30 → default-internet-gateway
+MOCK_ROUTER="nat-router-mock"    # NAT so the COS VM can pull the image
 MOCK_NAT="public-nat-mock"
 RESTRICTED_VIP_CIDR="199.36.153.4/30"
 RESTRICTED_VIP_IPS="199.36.153.4,199.36.153.5,199.36.153.6,199.36.153.7"

@@ -24,7 +24,7 @@ FAILED_RESOURCES=()
 echo "--- Step 1: Delete DNS ---"
 
 if gcloud dns record-sets describe "api.internal.example.com." \
-    --zone="api-internal-zone" --type=A --project="${PROJECT_ID}" &>/dev/null; then
+  --zone="api-internal-zone" --type=A --project="${PROJECT_ID}" &>/dev/null; then
   gcloud dns record-sets delete "api.internal.example.com." \
     --zone="api-internal-zone" --type=A --project="${PROJECT_ID}" --quiet
   echo "DNS record 'api.internal.example.com' deleted."
@@ -81,7 +81,7 @@ echo ""
 echo "--- Step 4: Delete VPN tunnels ---"
 for tunnel in vpn-tunnel-apigee-if0 vpn-tunnel-apigee-if1 vpn-tunnel-workloads-if0 vpn-tunnel-workloads-if1; do
   if resource_exists gcloud compute vpn-tunnels describe "${tunnel}" \
-      --region="${REGION}" --project="${PROJECT_ID}"; then
+    --region="${REGION}" --project="${PROJECT_ID}"; then
     gcloud compute vpn-tunnels delete "${tunnel}" \
       --region="${REGION}" --project="${PROJECT_ID}" --quiet
     echo "VPN tunnel '${tunnel}' deleted."
@@ -97,7 +97,7 @@ echo ""
 echo "--- Step 5: Delete VPN gateways ---"
 for gw in vpn-gw-apigee vpn-gw-workloads; do
   if resource_exists gcloud compute vpn-gateways describe "${gw}" \
-      --region="${REGION}" --project="${PROJECT_ID}"; then
+    --region="${REGION}" --project="${PROJECT_ID}"; then
     gcloud compute vpn-gateways delete "${gw}" \
       --region="${REGION}" --project="${PROJECT_ID}" --quiet
     echo "VPN gateway '${gw}' deleted."
@@ -113,7 +113,7 @@ echo ""
 echo "--- Step 6: Delete VPN Cloud Routers ---"
 for router in router-apigee router-workloads; do
   if resource_exists gcloud compute routers describe "${router}" \
-      --region="${REGION}" --project="${PROJECT_ID}"; then
+    --region="${REGION}" --project="${PROJECT_ID}"; then
     gcloud compute routers delete "${router}" \
       --region="${REGION}" --project="${PROJECT_ID}" --quiet
     echo "Cloud Router '${router}' deleted."

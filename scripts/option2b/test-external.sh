@@ -42,8 +42,10 @@ source "${SHARED_DIR}/lib/helpers.sh"
 
 BLOCKED_HEALTHY_PATTERN='"ok"'
 
-BLOCKED_HOST="${BLOCKED_RUN_URL#https://}"; BLOCKED_HOST="${BLOCKED_HOST%%/*}"
-ALLOWED_HOST="${ALLOWED_RUN_URL#https://}"; ALLOWED_HOST="${ALLOWED_HOST%%/*}"
+BLOCKED_HOST="${BLOCKED_RUN_URL#https://}"
+BLOCKED_HOST="${BLOCKED_HOST%%/*}"
+ALLOWED_HOST="${ALLOWED_RUN_URL#https://}"
+ALLOWED_HOST="${ALLOWED_HOST%%/*}"
 
 echo "=== Testing perimeter governance: default-deny + explicit egress allow ==="
 echo "Project:  ${PROJECT_ID}"
@@ -91,7 +93,6 @@ for FIXTURE in cr-external-blocked cr-external-allowed; do
 done
 echo "Fixture proxies deployed: cr-external-blocked, cr-external-allowed"
 echo ""
-
 
 # ============================================================
 # Probes 0a/0b (controls): laptop → both external services

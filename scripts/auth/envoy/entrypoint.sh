@@ -6,5 +6,5 @@
 #
 set -eu
 envsubst '$PORT $APP_PORT $JWT_ISSUER $JWT_AUDIENCE $JWKS_JSON' \
-  < /etc/envoy/envoy.yaml.tmpl > /tmp/envoy.yaml
+  </etc/envoy/envoy.yaml.tmpl >/tmp/envoy.yaml
 exec envoy -c /tmp/envoy.yaml --log-level info

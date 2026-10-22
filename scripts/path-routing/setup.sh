@@ -41,7 +41,7 @@ fi
 echo "--- Step 1: Cloud Run clones ---"
 for svc in "${SVC_PAYMENTS}" "${SVC_CARDS}" "${SVC_ISSUING}"; do
   if resource_exists gcloud run services describe "${svc}" \
-      --region="${REGION}" --project="${PROJECT_ID}"; then
+    --region="${REGION}" --project="${PROJECT_ID}"; then
     echo "Service '${svc}' already exists, skipping."
   else
     gcloud run deploy "${svc}" \
@@ -71,7 +71,7 @@ BUNDLE_DIR="$(mktemp -d)"
 build_single_bundle "${BUNDLE_DIR}" "${PROXY_PAYMENTS}" "/payments" "${PAYMENTS_URL}"
 echo "Importing '${PROXY_PAYMENTS}' (/payments)..."
 REV="$(import_proxy "${PROXY_PAYMENTS}" "${BUNDLE_DIR}")"
-deploy_proxy "${PROXY_PAYMENTS}" "${REV}" > /dev/null
+deploy_proxy "${PROXY_PAYMENTS}" "${REV}" >/dev/null
 wait_deployment_ready "${PROXY_PAYMENTS}" "${REV}"
 rm -rf "${BUNDLE_DIR}"
 
@@ -79,7 +79,7 @@ BUNDLE_DIR="$(mktemp -d)"
 build_cards_bundle "${BUNDLE_DIR}" "true" "${CARDS_URL}" "${ISSUING_URL}"
 echo "Importing '${PROXY_CARDS}' (/payments/cards, issuing via conditional route)..."
 REV="$(import_proxy "${PROXY_CARDS}" "${BUNDLE_DIR}")"
-deploy_proxy "${PROXY_CARDS}" "${REV}" > /dev/null
+deploy_proxy "${PROXY_CARDS}" "${REV}" >/dev/null
 wait_deployment_ready "${PROXY_CARDS}" "${REV}"
 rm -rf "${BUNDLE_DIR}"
 

@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# The variables below are consumed by the scripts that source this file, which
+# the linter cannot see from here.
+# shellcheck disable=SC2034
 #
 # env-routing.sh — Path-routing PoC configuration (issue #62)
 #
@@ -15,10 +18,10 @@ SVC_CARDS="cr-route-cards"
 SVC_ISSUING="cr-route-issuing"
 
 # --- Proxies (pr- prefix; BasePath in comment) ---
-PROXY_PAYMENTS="pr-payments"                        # /payments
-PROXY_CARDS="pr-payments-cards"                     # /payments/cards
-PROXY_ISSUING="pr-payments-cards-issuing"           # /payments/cards/issuing (carve-out)
-PROXY_DUP="pr-payments-cards-dup"                   # /payments/cards (conflict probe)
+PROXY_PAYMENTS="pr-payments"              # /payments
+PROXY_CARDS="pr-payments-cards"           # /payments/cards
+PROXY_ISSUING="pr-payments-cards-issuing" # /payments/cards/issuing (carve-out)
+PROXY_DUP="pr-payments-cards-dup"         # /payments/cards (conflict probe)
 
 # --- Carve-out probe ---
-PROBE_SECONDS="${PROBE_SECONDS:-300}"   # 1s-resolution probe window (test phase 3)
+PROBE_SECONDS="${PROBE_SECONDS:-300}" # 1s-resolution probe window (test phase 3)

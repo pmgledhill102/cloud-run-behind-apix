@@ -31,7 +31,7 @@ create_workloads_vpc
 
 # Option 4-specific: PSC NAT subnet
 if resource_exists gcloud compute networks subnets describe "psc-nat-workloads" \
-    --region="${REGION}" --project="${PROJECT_ID}"; then
+  --region="${REGION}" --project="${PROJECT_ID}"; then
   echo "Subnet 'psc-nat-workloads' already exists, skipping."
 else
   gcloud compute networks subnets create "psc-nat-workloads" \
@@ -69,7 +69,7 @@ create_ilb_stack
 echo ""
 echo "--- Step 3: Service Attachment ---"
 if resource_exists gcloud compute service-attachments describe "sa-workloads" \
-    --region="${REGION}" --project="${PROJECT_ID}"; then
+  --region="${REGION}" --project="${PROJECT_ID}"; then
   echo "Service Attachment 'sa-workloads' already exists, skipping."
 else
   gcloud compute service-attachments create "sa-workloads" \
@@ -92,7 +92,7 @@ SA_URI="$(gcloud compute service-attachments describe "sa-workloads" \
   --format='value(selfLink)')"
 
 if resource_exists gcloud compute addresses describe "psc-consumer-ip" \
-    --region="${REGION}" --project="${PROJECT_ID}"; then
+  --region="${REGION}" --project="${PROJECT_ID}"; then
   echo "Address 'psc-consumer-ip' already exists, skipping."
 else
   gcloud compute addresses create "psc-consumer-ip" \
@@ -104,7 +104,7 @@ else
 fi
 
 if resource_exists gcloud compute forwarding-rules describe "psc-endpoint-apigee" \
-    --region="${REGION}" --project="${PROJECT_ID}"; then
+  --region="${REGION}" --project="${PROJECT_ID}"; then
   echo "PSC endpoint 'psc-endpoint-apigee' already exists, skipping."
 else
   gcloud compute forwarding-rules create "psc-endpoint-apigee" \
@@ -136,7 +136,7 @@ else
 fi
 
 if gcloud dns record-sets describe "api.internal.example.com." \
-    --zone="api-internal-zone" --type=A --project="${PROJECT_ID}" &>/dev/null; then
+  --zone="api-internal-zone" --type=A --project="${PROJECT_ID}" &>/dev/null; then
   echo "DNS record 'api.internal.example.com' already exists, skipping."
 else
   gcloud dns record-sets create "api.internal.example.com." \
@@ -203,7 +203,7 @@ else
     INTERVAL=15
     ELAPSED=0
     while true; do
-      if (( ELAPSED > 0 && ELAPSED % 300 == 0 )); then
+      if ((ELAPSED > 0 && ELAPSED % 300 == 0)); then
         TOKEN="$(gcloud auth print-access-token)"
       fi
 
@@ -217,7 +217,7 @@ else
         echo "Endpoint attachment ACTIVE (host: ${EA_HOST})."
         break
       fi
-      if (( ELAPSED >= TIMEOUT )); then
+      if ((ELAPSED >= TIMEOUT)); then
         echo "WARNING: Timed out waiting for endpoint attachment. Check manually."
         break
       fi

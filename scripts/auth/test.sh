@@ -25,15 +25,17 @@ source "${SCRIPT_DIR}/env-auth.sh"
 
 PASS=0
 FAIL=0
-verdict() {  # verdict <ok-bool> <label>
+verdict() { # verdict <ok-bool> <label>
   if [[ "$1" == "true" ]]; then
-    echo "  PASS: $2"; PASS=$((PASS + 1))
+    echo "  PASS: $2"
+    PASS=$((PASS + 1))
   else
-    echo "  FAIL: $2"; FAIL=$((FAIL + 1))
+    echo "  FAIL: $2"
+    FAIL=$((FAIL + 1))
   fi
 }
 
-percentiles() {  # reads time_total lines on stdin, prints p50/p95 in ms
+percentiles() { # reads time_total lines on stdin, prints p50/p95 in ms
   sort -n | awk '{a[NR]=$1} END {
     if (NR==0) { print "no samples"; exit }
     p50=a[int(NR*0.5)+1]; p95=a[int(NR*0.95)]; if (NR<20) p95=a[NR];
@@ -81,7 +83,7 @@ echo ""
 # tenant warms the target cluster (observed live 2026-08-03). Absorb that
 # here — retry the first request per proxy path — so the tests below never
 # count a warming 503 as an enforcement failure.
-warm_proxy() {  # warm_proxy <base-path>
+warm_proxy() { # warm_proxy <base-path>
   local path="$1" max_attempts="${WARM_MAX_ATTEMPTS:-12}" attempt out code
   for attempt in $(seq 1 "${max_attempts}"); do
     out="$(ssh_cmd "curl -sk --max-time 15 -o /tmp/auth-warm-body -w '%{http_code}' -H 'Host: ${APIGEE_ENV_GROUP_HOSTNAME}' -H 'Authorization: Bearer ${JWT_VALID}' https://${INSTANCE_IP}${path}; echo ''; head -c 80 /tmp/auth-warm-body" || true)"
@@ -109,8 +111,10 @@ echo "=========================================="
 echo "  Test 1: JWKS via PGA (internal mirror posture)"
 echo "=========================================="
 JWKS_OUT="$(ssh_cmd "curl -s --max-time 10 ${IDP_URL}/.well-known/jwks.json" || true)"
-echo "${JWKS_OUT}" | head -c 200; echo ""
-OK=false; echo "${JWKS_OUT}" | grep -q "\"kid\":\"${JWT_KID}\"" && OK=true
+echo "${JWKS_OUT}" | head -c 200
+echo ""
+OK=false
+echo "${JWKS_OUT}" | grep -q "\"kid\":\"${JWT_KID}\"" && OK=true
 verdict "${OK}" "JWKS served over PGA without a Google token (allow-unauth + ingress=internal)"
 echo ""
 
@@ -123,9 +127,11 @@ echo "=========================================="
 if [[ -n "${INSTANCE_IP}" ]]; then
   T2_OUT="$(ssh_cmd "curl -sk --max-time 15 -H 'Host: ${APIGEE_ENV_GROUP_HOSTNAME}' -H 'Authorization: Bearer ${JWT_VALID}' https://${INSTANCE_IP}/auth-echo" || true)"
   echo "${T2_OUT}"
-  OK=false; echo "${T2_OUT}" | grep -q '"valid":true' && OK=true
+  OK=false
+  echo "${T2_OUT}" | grep -q '"valid":true' && OK=true
   verdict "${OK}" "client JWT validated end-to-end (Apigee VerifyJWT + middleware)"
-  OK=false; echo "${T2_OUT}" | grep -q '"authorization":true' && OK=true
+  OK=false
+  echo "${T2_OUT}" | grep -q '"authorization":true' && OK=true
   verdict "${OK}" "client JWT arrived intact in Authorization (§10 item 1)"
   # Informational, not asserted: whether Cloud Run forwards
   # X-Serverless-Authorization to the container is itself a PoC finding.
@@ -158,7 +164,8 @@ if [[ -n "${INSTANCE_IP}" ]]; then
     CODE="$(echo "${CODE_BODY}" | head -1)"
     echo "  ${LABEL}: HTTP ${CODE}"
     echo "${CODE_BODY}" | tail -n +2 | sed 's/^/    /'
-    OK=false; [[ "${CODE}" == "401" ]] && OK=true
+    OK=false
+    [[ "${CODE}" == "401" ]] && OK=true
     verdict "${OK}" "${LABEL} token rejected with 401 at the Apigee edge"
   done
 else
@@ -176,12 +183,14 @@ echo "In-perimeter VM calls ${AUTH_ECHO_SERVICE} directly over PGA, skipping Api
 echo ""
 T4_NOTOKEN="$(ssh_cmd "curl -s --max-time 10 -o /dev/null -w '%{http_code}' ${AUTH_ECHO_URL}/" || true)"
 echo "  no token:            HTTP ${T4_NOTOKEN}"
-OK=false; [[ "${T4_NOTOKEN}" == "403" || "${T4_NOTOKEN}" == "401" ]] && OK=true
+OK=false
+[[ "${T4_NOTOKEN}" == "403" || "${T4_NOTOKEN}" == "401" ]] && OK=true
 verdict "${OK}" "unauthenticated direct call blocked before the container (T3)"
 
 T4_CLIENTJWT="$(ssh_cmd "curl -s --max-time 10 -o /dev/null -w '%{http_code}' -H 'Authorization: Bearer ${JWT_VALID}' ${AUTH_ECHO_URL}/" || true)"
 echo "  valid CLIENT jwt:    HTTP ${T4_CLIENTJWT}"
-OK=false; [[ "${T4_CLIENTJWT}" == "403" || "${T4_CLIENTJWT}" == "401" ]] && OK=true
+OK=false
+[[ "${T4_CLIENTJWT}" == "403" || "${T4_CLIENTJWT}" == "401" ]] && OK=true
 verdict "${OK}" "a valid client JWT means nothing to Cloud Run IAM — still blocked"
 
 # Informational: a GOOGLE ID token from the VM's SA. In this PoC project the
@@ -229,9 +238,11 @@ echo "=========================================="
 if [[ -n "${INSTANCE_IP}" ]]; then
   E1_OUT="$(ssh_cmd "curl -sk --max-time 20 -H 'Host: ${APIGEE_ENV_GROUP_HOSTNAME}' -H 'Authorization: Bearer ${JWT_VALID}' https://${INSTANCE_IP}/auth-echo-envoy" || true)"
   echo "${E1_OUT}"
-  OK=false; echo "${E1_OUT}" | grep -q '"mode":"off' && OK=true
+  OK=false
+  echo "${E1_OUT}" | grep -q '"mode":"off' && OK=true
   verdict "${OK}" "request passed Envoy jwt_authn; app middleware off (sidecar enforced)"
-  OK=false; echo "${E1_OUT}" | grep -q '"authorization":true' && OK=true
+  OK=false
+  echo "${E1_OUT}" | grep -q '"authorization":true' && OK=true
   verdict "${OK}" "client JWT arrived intact in Authorization (forward: true)"
 else
   echo "  SKIPPED (no Apigee)"
@@ -248,14 +259,15 @@ echo ""
 echo "=========================================="
 echo "  Test E2: Envoy edge rejection (direct, IAM satisfied)"
 echo "=========================================="
-e2_call() {  # e2_call <extra-curl-args> → "code body"
+e2_call() { # e2_call <extra-curl-args> → "code body"
   ssh_cmd "ID_TOKEN=\$(curl -sf -H 'Metadata-Flavor: Google' 'http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/identity?audience=${ENVOY_URL}') && curl -s --max-time 10 -o /tmp/e2-body -w '%{http_code}' -H \"X-Serverless-Authorization: Bearer \$ID_TOKEN\" $1 ${ENVOY_URL}/; echo ''; head -c 120 /tmp/e2-body" 2>/dev/null || true
 }
 
 E2_VALID="$(e2_call "-H 'Authorization: Bearer ${JWT_VALID}'")"
 CODE="$(echo "${E2_VALID}" | head -1)"
 echo "  valid:     HTTP ${CODE}"
-OK=false; [[ "${CODE}" == "200" ]] && OK=true
+OK=false
+[[ "${CODE}" == "200" ]] && OK=true
 verdict "${OK}" "valid client JWT passes Envoy (control)"
 
 # Envoy's rejection taxonomy differs from Apigee VerifyJWT and the library
@@ -273,7 +285,8 @@ for CASE in "expired:401:${JWT_EXPIRED}" "wrong-aud:403:${JWT_WRONG_AUD}" "missi
   CODE="$(echo "${E2_OUT}" | head -1)"
   BODY="$(echo "${E2_OUT}" | tail -n +2)"
   echo "  ${LABEL}: HTTP ${CODE}  (${BODY})"
-  OK=false; [[ "${CODE}" == "${WANT}" ]] && OK=true
+  OK=false
+  [[ "${CODE}" == "${WANT}" ]] && OK=true
   verdict "${OK}" "${LABEL} token rejected ${WANT} by the Envoy ingress container"
 done
 echo ""

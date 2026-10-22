@@ -19,7 +19,7 @@ echo ""
 echo "--- Step 1: Delete DNS records and zone ---"
 
 if gcloud dns record-sets describe "*.run.app." \
-    --zone="run-app-pga" --type=A --project="${PROJECT_ID}" &>/dev/null; then
+  --zone="run-app-pga" --type=A --project="${PROJECT_ID}" &>/dev/null; then
   gcloud dns record-sets delete "*.run.app." \
     --zone="run-app-pga" --type=A --project="${PROJECT_ID}" --quiet
   echo "DNS record '*.run.app' deleted."
@@ -28,7 +28,7 @@ else
 fi
 
 if gcloud dns record-sets describe "run.app." \
-    --zone="run-app-pga" --type=A --project="${PROJECT_ID}" &>/dev/null; then
+  --zone="run-app-pga" --type=A --project="${PROJECT_ID}" &>/dev/null; then
   gcloud dns record-sets delete "run.app." \
     --zone="run-app-pga" --type=A --project="${PROJECT_ID}" --quiet
   echo "DNS record 'run.app' deleted."

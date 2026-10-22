@@ -185,11 +185,11 @@ if [[ -n "${EVIDENCE_DIR:-}" ]]; then
     echo "authorized_net:   ${APIGEE_NETWORK}"
     echo "cloud_run_url:    ${SERVICE_URL}"
     echo "cloud_run_ingress: $(gcloud run services describe cr-hello --region="${REGION}" \
-        --project="${PROJECT_ID}" --format='value(spec.template.metadata.annotations["run.googleapis.com/ingress"])' 2>/dev/null || echo '?')"
+      --project="${PROJECT_ID}" --format='value(spec.template.metadata.annotations["run.googleapis.com/ingress"])' 2>/dev/null || echo '?')"
     echo "gapi_target:      ${GAPI_TARGET}"
     echo "gcloud_version:   $(gcloud version --format='value(\"Google Cloud SDK\")' 2>/dev/null | head -1)"
     echo "transcript:       ${EVIDENCE_TRANSCRIPT:-<none>}"
-  } > "${_mf}"
+  } >"${_mf}"
   if [[ -n "${EVIDENCE_REDACT:-}" ]]; then
     sed -i.bak -e "s/${PROJECT_ID}/<PROJECT_ID>/g" -e "s/${PROJECT_NUMBER}/<PROJECT_NUMBER>/g" "${_mf}" 2>/dev/null \
       || sed -i '' -e "s/${PROJECT_ID}/<PROJECT_ID>/g" -e "s/${PROJECT_NUMBER}/<PROJECT_NUMBER>/g" "${_mf}"
@@ -279,10 +279,10 @@ print(d[0].get('revision','') if d else '')
   local bundle_dir
   bundle_dir="$(mktemp -d)"
   mkdir -p "${bundle_dir}/apiproxy/proxies" \
-           "${bundle_dir}/apiproxy/targets" \
-           "${bundle_dir}/apiproxy/policies"
+    "${bundle_dir}/apiproxy/targets" \
+    "${bundle_dir}/apiproxy/policies"
 
-  cat > "${bundle_dir}/apiproxy/policies/SetHostHeader.xml" << XMLEOF
+  cat >"${bundle_dir}/apiproxy/policies/SetHostHeader.xml" <<XMLEOF
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <AssignMessage name="SetHostHeader">
   <Set>
@@ -293,7 +293,7 @@ print(d[0].get('revision','') if d else '')
 </AssignMessage>
 XMLEOF
 
-  cat > "${bundle_dir}/apiproxy/proxies/default.xml" << XMLEOF
+  cat >"${bundle_dir}/apiproxy/proxies/default.xml" <<XMLEOF
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <ProxyEndpoint name="default">
   <PreFlow name="PreFlow"><Request/><Response/></PreFlow>
@@ -310,7 +310,7 @@ XMLEOF
 
   # Deliberately unauthenticated: a 401 from the storage API is proof the
   # tenant reached Google's front end, which is the only thing being measured.
-  cat > "${bundle_dir}/apiproxy/targets/default.xml" << XMLEOF
+  cat >"${bundle_dir}/apiproxy/targets/default.xml" <<XMLEOF
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <TargetEndpoint name="default">
   <PreFlow name="PreFlow">
@@ -325,7 +325,7 @@ XMLEOF
 </TargetEndpoint>
 XMLEOF
 
-  cat > "${bundle_dir}/apiproxy/${GAPI_PROXY}.xml" << XMLEOF
+  cat >"${bundle_dir}/apiproxy/${GAPI_PROXY}.xml" <<XMLEOF
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <APIProxy name="${GAPI_PROXY}">
   <Description>Experiment fixture: pass-through to a googleapis.com host</Description>
@@ -365,12 +365,16 @@ XMLEOF
     state="$(curl -s -H "Authorization: Bearer ${TOKEN}" \
       "${APIGEE_API}/organizations/${PROJECT_ID}/environments/${APIGEE_ENV}/apis/${GAPI_PROXY}/revisions/${new_rev}/deployments" \
       | python3 -c "import sys,json; print(json.load(sys.stdin).get('state',''))" 2>/dev/null || true)"
-    [[ "${state}" == "READY" ]] && { echo "Deployment READY."; break; }
-    if (( elapsed >= 180 )); then
+    [[ "${state}" == "READY" ]] && {
+      echo "Deployment READY."
+      break
+    }
+    if ((elapsed >= 180)); then
       echo "WARNING: not READY after 180s (state: ${state:-unknown})."
       break
     fi
-    sleep 10; elapsed=$((elapsed + 10))
+    sleep 10
+    elapsed=$((elapsed + 10))
   done
   sleep 10
   echo ""
@@ -551,8 +555,8 @@ add_dns_peering() {
   echo "dns.peer granted to ${APIGEE_AGENT_SA}."
 
   if gcloud services peered-dns-domains list \
-      --network="${APIGEE_NETWORK}" --project="${PROJECT_ID}" \
-      --format='value(name)' 2>/dev/null | grep -qx "run-app"; then
+    --network="${APIGEE_NETWORK}" --project="${PROJECT_ID}" \
+    --format='value(name)' 2>/dev/null | grep -qx "run-app"; then
     echo "Peered DNS domain 'run-app' already exists."
   else
     gcloud services peered-dns-domains create "run-app" \

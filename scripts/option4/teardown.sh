@@ -40,7 +40,7 @@ if [[ "${APIGEE_HTTP}" == "200" ]]; then
   TIMEOUT=300
   INTERVAL=15
   ELAPSED=0
-  while (( ELAPSED < TIMEOUT )); do
+  while ((ELAPSED < TIMEOUT)); do
     TOKEN="$(gcloud auth print-access-token)"
     CHECK_HTTP="$(curl -s -o /dev/null -w '%{http_code}' \
       -H "Authorization: Bearer ${TOKEN}" \
@@ -64,7 +64,7 @@ echo ""
 echo "--- Step 2: Delete DNS ---"
 
 if gcloud dns record-sets describe "api.internal.example.com." \
-    --zone="api-internal-zone" --type=A --project="${PROJECT_ID}" &>/dev/null; then
+  --zone="api-internal-zone" --type=A --project="${PROJECT_ID}" &>/dev/null; then
   gcloud dns record-sets delete "api.internal.example.com." \
     --zone="api-internal-zone" --type=A --project="${PROJECT_ID}" --quiet
   echo "DNS record 'api.internal.example.com' deleted."
@@ -86,7 +86,7 @@ echo ""
 echo "--- Step 3: Delete PSC endpoint ---"
 
 if resource_exists gcloud compute forwarding-rules describe "psc-endpoint-apigee" \
-    --region="${REGION}" --project="${PROJECT_ID}"; then
+  --region="${REGION}" --project="${PROJECT_ID}"; then
   gcloud compute forwarding-rules delete "psc-endpoint-apigee" \
     --region="${REGION}" --project="${PROJECT_ID}" --quiet
   echo "PSC endpoint 'psc-endpoint-apigee' deleted."
@@ -95,7 +95,7 @@ else
 fi
 
 if resource_exists gcloud compute addresses describe "psc-consumer-ip" \
-    --region="${REGION}" --project="${PROJECT_ID}"; then
+  --region="${REGION}" --project="${PROJECT_ID}"; then
   gcloud compute addresses delete "psc-consumer-ip" \
     --region="${REGION}" --project="${PROJECT_ID}" --quiet
   echo "Address 'psc-consumer-ip' deleted."
@@ -109,7 +109,7 @@ fi
 echo ""
 echo "--- Step 4: Delete Service Attachment ---"
 if resource_exists gcloud compute service-attachments describe "sa-workloads" \
-    --region="${REGION}" --project="${PROJECT_ID}"; then
+  --region="${REGION}" --project="${PROJECT_ID}"; then
   gcloud compute service-attachments delete "sa-workloads" \
     --region="${REGION}" --project="${PROJECT_ID}" --quiet
   echo "Service Attachment 'sa-workloads' deleted."
@@ -138,7 +138,7 @@ else
 fi
 
 if resource_exists gcloud compute networks subnets describe "psc-nat-workloads" \
-    --region="${REGION}" --project="${PROJECT_ID}"; then
+  --region="${REGION}" --project="${PROJECT_ID}"; then
   delete_subnet_with_retry "psc-nat-workloads"
 else
   echo "Subnet 'psc-nat-workloads' does not exist, skipping."

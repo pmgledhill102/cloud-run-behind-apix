@@ -100,7 +100,7 @@ if [[ -n "${INST_ATTACHMENT_NAME}" ]]; then
   TIMEOUT=300
   INTERVAL=15
   ELAPSED=0
-  while (( ELAPSED < TIMEOUT )); do
+  while ((ELAPSED < TIMEOUT)); do
     TOKEN="$(gcloud auth print-access-token)"
     CHECK="$(curl -s \
       -H "Authorization: Bearer ${TOKEN}" \
@@ -133,7 +133,7 @@ apigee_api DELETE "organizations/${PROJECT_ID}/instances/${INSTANCE_NAME}" >/dev
 TIMEOUT=2400
 INTERVAL=30
 ELAPSED=0
-while (( ELAPSED < TIMEOUT )); do
+while ((ELAPSED < TIMEOUT)); do
   TOKEN="$(gcloud auth print-access-token)"
   INST_HTTP="$(curl -s -o /dev/null -w '%{http_code}' \
     -H "Authorization: Bearer ${TOKEN}" \

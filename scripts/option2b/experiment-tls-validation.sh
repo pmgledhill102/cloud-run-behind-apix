@@ -88,7 +88,10 @@ api() {
 SERVICE_URL="$(gcloud run services describe cr-hello \
   --region="${REGION}" --project="${PROJECT_ID}" \
   --format='value(status.url)')"
-[[ -n "${SERVICE_URL}" ]] || { echo "ERROR: cr-hello not found"; exit 1; }
+[[ -n "${SERVICE_URL}" ]] || {
+  echo "ERROR: cr-hello not found"
+  exit 1
+}
 SERVICE_HOST="${SERVICE_URL#https://}"
 BAD_HOST="nomatch.${SERVICE_HOST}"
 # n5/n6: the restricted VIP by address. Field notes §4.1 recorded a
@@ -126,7 +129,7 @@ probe_spec() {
 # The self-signed fixture is not Cloud Run: do not hand it a cr-hello ID token.
 auth_xml() {
   [[ "$1" == "${SELF_HOST}" ]] && return 0
-  cat << X
+  cat <<X
     <Authentication>
       <GoogleIDToken><Audience>${SERVICE_URL}</Audience></GoogleIDToken>
     </Authentication>
@@ -136,50 +139,56 @@ X
 sslinfo_xml() {
   case "$1" in
     none) ;;
-    ignore) cat << 'X'
+    ignore)
+      cat <<'X'
     <SSLInfo>
       <Enabled>true</Enabled>
       <IgnoreValidationErrors>true</IgnoreValidationErrors>
     </SSLInfo>
 X
-    ;;
-    enforce) cat << 'X'
+      ;;
+    enforce)
+      cat <<'X'
     <SSLInfo>
       <Enabled>true</Enabled>
       <Enforce>true</Enforce>
     </SSLInfo>
 X
-    ;;
-    enforce-good-ts) cat << X
+      ;;
+    enforce-good-ts)
+      cat <<X
     <SSLInfo>
       <Enabled>true</Enabled>
       <Enforce>true</Enforce>
       <TrustStore>${KS_GOOD}</TrustStore>
     </SSLInfo>
 X
-    ;;
-    enforce-wrong-ts) cat << X
+      ;;
+    enforce-wrong-ts)
+      cat <<X
     <SSLInfo>
       <Enabled>true</Enabled>
       <Enforce>true</Enforce>
       <TrustStore>${KS_WRONG}</TrustStore>
     </SSLInfo>
 X
-    ;;
-    good-ts-no-enforce) cat << X
+      ;;
+    good-ts-no-enforce)
+      cat <<X
     <SSLInfo>
       <Enabled>true</Enabled>
       <TrustStore>${KS_GOOD}</TrustStore>
     </SSLInfo>
 X
-    ;;
-    wrong-ts-no-enforce) cat << X
+      ;;
+    wrong-ts-no-enforce)
+      cat <<X
     <SSLInfo>
       <Enabled>true</Enabled>
       <TrustStore>${KS_WRONG}</TrustStore>
     </SSLInfo>
 X
-    ;;
+      ;;
   esac
 }
 
@@ -207,7 +216,9 @@ ensure_cert_alias() {
   out="$(api POST "/environments/${APIGEE_ENV}/keystores/${ks}/aliases?alias=${alias}&format=keycertfile" \
     -F "certFile=@${pem}")"
   if echo "${out}" | grep -q '"error"'; then
-    echo "ERROR uploading ${alias} to ${ks}:"; echo "${out}"; exit 1
+    echo "ERROR uploading ${alias} to ${ks}:"
+    echo "${out}"
+    exit 1
   fi
   echo "  alias '${alias}' uploaded."
 }
@@ -215,23 +226,23 @@ ensure_cert_alias() {
 deploy_probe() {
   local id="$1" spec host kind desc name bundle zip out rev
   spec="$(probe_spec "${id}")"
-  IFS='|' read -r host kind _ desc <<< "${spec}"
+  IFS='|' read -r host kind _ desc <<<"${spec}"
   name="tls-probe-${id}"
   echo "--- ${name}: /tls/${id} → https://${host}/ (${desc}) ---"
 
   bundle="$(mktemp -d)"
   mkdir -p "${bundle}/apiproxy/proxies" "${bundle}/apiproxy/targets" "${bundle}/apiproxy/policies"
-  cat > "${bundle}/apiproxy/${name}.xml" << X
+  cat >"${bundle}/apiproxy/${name}.xml" <<X
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <APIProxy name="${name}"><Description>TLS validation probe ${id}: $(printf '%s' "${desc}" | sed 's/</\&lt;/g; s/>/\&gt;/g')</Description></APIProxy>
 X
-  cat > "${bundle}/apiproxy/policies/SetHostHeader.xml" << X
+  cat >"${bundle}/apiproxy/policies/SetHostHeader.xml" <<X
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <AssignMessage name="SetHostHeader">
   <Set><Headers><Header name="Host">${SERVICE_HOST}</Header></Headers></Set>
 </AssignMessage>
 X
-  cat > "${bundle}/apiproxy/proxies/default.xml" << X
+  cat >"${bundle}/apiproxy/proxies/default.xml" <<X
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <ProxyEndpoint name="default">
   <PreFlow name="PreFlow"><Request/><Response/></PreFlow>
@@ -241,7 +252,7 @@ X
   <RouteRule name="default"><TargetEndpoint>default</TargetEndpoint></RouteRule>
 </ProxyEndpoint>
 X
-  cat > "${bundle}/apiproxy/targets/default.xml" << X
+  cat >"${bundle}/apiproxy/targets/default.xml" <<X
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <TargetEndpoint name="default">
   <PreFlow name="PreFlow">
@@ -265,17 +276,26 @@ X
   out="$(api POST "/apis?name=${name}&action=import" \
     -H 'Content-Type: application/octet-stream' --data-binary "@${zip}")"
   rm -rf "${bundle}" "${zip}"
-  if echo "${out}" | grep -q '"error"'; then echo "ERROR importing ${name}:"; echo "${out}"; exit 1; fi
+  if echo "${out}" | grep -q '"error"'; then
+    echo "ERROR importing ${name}:"
+    echo "${out}"
+    exit 1
+  fi
   rev="$(echo "${out}" | python3 -c 'import sys,json; print(json.load(sys.stdin)["revision"])')"
   out="$(api POST "/environments/${APIGEE_ENV}/apis/${name}/revisions/${rev}/deployments?override=true&serviceAccount=${SA_EMAIL}")"
-  if echo "${out}" | grep -q '"error"'; then echo "ERROR deploying ${name}:"; echo "${out}"; exit 1; fi
+  if echo "${out}" | grep -q '"error"'; then
+    echo "ERROR deploying ${name}:"
+    echo "${out}"
+    exit 1
+  fi
   echo "  revision ${rev} deploying."
 }
 
 wait_ready() {
   local id name rev state elapsed
   for id in "${PROBES[@]}"; do
-    name="tls-probe-${id}"; elapsed=0
+    name="tls-probe-${id}"
+    elapsed=0
     # The env-level deployments list carries no "state"; only the
     # per-revision deployment resource does.
     rev="$(api GET "/environments/${APIGEE_ENV}/apis/${name}/deployments" \
@@ -283,9 +303,16 @@ wait_ready() {
     while :; do
       state="$(api GET "/environments/${APIGEE_ENV}/apis/${name}/revisions/${rev}/deployments" \
         | python3 -c 'import sys,json; print(json.load(sys.stdin).get("state",""))' 2>/dev/null || true)"
-      [[ "${state}" == "READY" ]] && { echo "  ${name}: READY"; break; }
-      (( elapsed >= 300 )) && { echo "  ${name}: not READY after 300s (${state:-unknown})"; break; }
-      sleep 10; elapsed=$((elapsed + 10))
+      [[ "${state}" == "READY" ]] && {
+        echo "  ${name}: READY"
+        break
+      }
+      ((elapsed >= 300)) && {
+        echo "  ${name}: not READY after 300s (${state:-unknown})"
+        break
+      }
+      sleep 10
+      elapsed=$((elapsed + 10))
     done
   done
 }
@@ -296,7 +323,7 @@ ensure_selfsigned_fixture() {
     --project="${PROJECT_ID}" --format='value(networkInterfaces[0].networkIP)')"
   echo "--- Self-signed fixture: https://${SELF_HOST}/ → vm-test (${vm_ip}) ---"
   if gcloud dns record-sets describe "${SELF_HOST}." --zone="${DNS_ZONE}" --type=A \
-      --project="${PROJECT_ID}" &>/dev/null; then
+    --project="${PROJECT_ID}" &>/dev/null; then
     echo "  DNS ${SELF_HOST} exists."
   else
     gcloud dns record-sets create "${SELF_HOST}." --zone="${DNS_ZONE}" --type=A \
@@ -334,7 +361,7 @@ PY
 
 remove_selfsigned_fixture() {
   if gcloud dns record-sets describe "${SELF_HOST}." --zone="${DNS_ZONE}" --type=A \
-      --project="${PROJECT_ID}" &>/dev/null; then
+    --project="${PROJECT_ID}" &>/dev/null; then
     gcloud dns record-sets delete "${SELF_HOST}." --zone="${DNS_ZONE}" --type=A \
       --project="${PROJECT_ID}" >/dev/null
     echo "  DNS ${SELF_HOST} deleted."
@@ -358,7 +385,8 @@ do_setup() {
 
   echo "--- Truststore '${KS_WRONG}': a freshly minted, unrelated self-signed CA ---"
   ensure_keystore "${KS_WRONG}"
-  local tmp; tmp="$(mktemp -d)"
+  local tmp
+  tmp="$(mktemp -d)"
   openssl req -x509 -newkey rsa:2048 -nodes -days 7 -subj "/CN=tls-probe unrelated CA" \
     -keyout "${tmp}/ca.key" -out "${tmp}/ca.pem" 2>/dev/null
   ensure_cert_alias "${KS_WRONG}" "unrelated-ca" "${tmp}/ca.pem"
@@ -370,7 +398,7 @@ do_setup() {
   echo ""
   echo "--- Waiting for deployments ---"
   wait_ready
-  sleep 15   # runtime routing settle
+  sleep 15 # runtime routing settle
 }
 
 # ============================================================
@@ -402,7 +430,10 @@ do_test() {
   echo "Run at: $(date -u '+%Y-%m-%dT%H:%M:%SZ')"
   local instance_ip
   instance_ip="$(api GET "/instances/${INSTANCE_NAME}" | python3 -c 'import sys,json; print(json.load(sys.stdin).get("host",""))')"
-  [[ -n "${instance_ip}" ]] || { echo "ERROR: Apigee instance not ACTIVE"; exit 1; }
+  [[ -n "${instance_ip}" ]] || {
+    echo "ERROR: Apigee instance not ACTIVE"
+    exit 1
+  }
   echo "Apigee instance: ${instance_ip}   env group host: ${APIGEE_ENV_GROUP_HOSTNAME}"
   echo "(northbound VM→Apigee uses curl -k: the PoC env group has a self-signed cert;"
   echo " this experiment is about the SOUTHBOUND Apigee→Cloud Run hop)"
@@ -410,7 +441,7 @@ do_test() {
   local rows=() id spec host kind expect desc out code verdict result fails=0
   for id in "${PROBES[@]}"; do
     spec="$(probe_spec "${id}")"
-    IFS='|' read -r host kind expect desc <<< "${spec}"
+    IFS='|' read -r host kind expect desc <<<"${spec}"
     echo ""
     echo "--- ${id}: ${desc}  [target https://${host}/] ---"
     out="$(ssh_cmd "curl -sk --max-time 30 -w '\nHTTP_STATUS:%{http_code} TIME:%{time_total}s' \
@@ -436,10 +467,11 @@ do_test() {
     fi
     if [[ "${expect}" == "?" ]]; then
       verdict="(observed)"
-    elif [[ "${result}" == "${expect}" || ( "${expect}" == "TLS_OK" && "${result}" == "OK" ) ]]; then
+    elif [[ "${result}" == "${expect}" || ("${expect}" == "TLS_OK" && "${result}" == "OK") ]]; then
       verdict="PASS"
     else
-      verdict="FAIL"; fails=$((fails + 1))
+      verdict="FAIL"
+      fails=$((fails + 1))
     fi
     rows+=("$(printf '%-3s %-7s %-9s %-10s %-10s %s' "${id}" "${code:-000}" "${result}" "${expect}" "${verdict}" "${desc}")")
   done
@@ -449,7 +481,7 @@ do_test() {
   printf '%-3s %-7s %-9s %-10s %-10s %s\n' "id" "HTTP" "result" "expect" "verdict" "variant"
   printf '%s\n' "${rows[@]}"
   echo "=========================================================================="
-  if (( fails > 0 )); then
+  if ((fails > 0)); then
     echo "${fails} probe(s) did not match expectation (a fresh deploy can take a"
     echo "minute to route — re-run 'test' once before diagnosing)."
     exit 1
@@ -489,10 +521,19 @@ do_teardown() {
 }
 
 case "${MODE}" in
-  setup)    do_setup ;;
-  observe)  do_observe ;;
-  test)     do_test ;;
+  setup) do_setup ;;
+  observe) do_observe ;;
+  test) do_test ;;
   teardown) do_teardown ;;
-  all)      do_setup; echo ""; do_observe; echo ""; do_test ;;
-  *) echo "Usage: $0 {setup|observe|test|teardown|all}"; exit 2 ;;
+  all)
+    do_setup
+    echo ""
+    do_observe
+    echo ""
+    do_test
+    ;;
+  *)
+    echo "Usage: $0 {setup|observe|test|teardown|all}"
+    exit 2
+    ;;
 esac

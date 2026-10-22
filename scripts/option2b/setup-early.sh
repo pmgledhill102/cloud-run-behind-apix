@@ -126,7 +126,7 @@ else
       echo "'${POLICY_SCOPES:-<none>}', not projects/${PROJECT_NUMBER} — stale from an"
       echo "earlier sandbox. Deleting stale perimeter + policy and recreating..."
       if resource_exists gcloud access-context-manager perimeters describe \
-          "${PERIMETER_NAME}" --policy="${POLICY_ID}" --billing-project="${PROJECT_ID}"; then
+        "${PERIMETER_NAME}" --policy="${POLICY_ID}" --billing-project="${PROJECT_ID}"; then
         gcloud access-context-manager perimeters delete "${PERIMETER_NAME}" \
           --policy="${POLICY_ID}" \
           --billing-project="${PROJECT_ID}" \
@@ -149,10 +149,10 @@ else
     # org-wide policy that may exist. Requires org-level
     # roles/accesscontextmanager.policyAdmin.
     if ! gcloud access-context-manager policies create \
-        --organization="${ORG_ID}" \
-        --scopes="projects/${PROJECT_NUMBER}" \
-        --title="${POLICY_TITLE}" \
-        --billing-project="${PROJECT_ID}"; then
+      --organization="${ORG_ID}" \
+      --scopes="projects/${PROJECT_NUMBER}" \
+      --title="${POLICY_TITLE}" \
+      --billing-project="${PROJECT_ID}"; then
       echo ""
       echo "ERROR: could not create access policy."
       echo "You need org-level roles/accesscontextmanager.policyAdmin, or"
@@ -225,7 +225,7 @@ echo "--- Step 5: Create service perimeter ---"
 # egress methodSelector for run.googleapis.com (INVALID_ARGUMENT, found
 # live). Scoping is by target project instead.
 EGRESS_FILE="$(mktemp)"
-cat > "${EGRESS_FILE}" << YAMLEOF
+cat >"${EGRESS_FILE}" <<YAMLEOF
 - egressFrom:
     identityType: ANY_IDENTITY
   egressTo:
@@ -251,10 +251,10 @@ CALLER_ACCOUNT="$(gcloud config get-value account 2>/dev/null)"
 # another (an agent sandbox, CI) — so derive the prefix instead of assuming.
 case "${CALLER_ACCOUNT}" in
   *.gserviceaccount.com) CALLER_PRINCIPAL="serviceAccount:${CALLER_ACCOUNT}" ;;
-  *)                     CALLER_PRINCIPAL="user:${CALLER_ACCOUNT}" ;;
+  *) CALLER_PRINCIPAL="user:${CALLER_ACCOUNT}" ;;
 esac
 INGRESS_FILE="$(mktemp)"
-cat > "${INGRESS_FILE}" << YAMLEOF
+cat >"${INGRESS_FILE}" <<YAMLEOF
 - ingressFrom:
     identities:
     - ${CALLER_PRINCIPAL}
@@ -269,7 +269,7 @@ cat > "${INGRESS_FILE}" << YAMLEOF
 YAMLEOF
 
 if resource_exists gcloud access-context-manager perimeters describe \
-    "${PERIMETER_NAME}" --policy="${POLICY_ID}" --billing-project="${PROJECT_ID}"; then
+  "${PERIMETER_NAME}" --policy="${POLICY_ID}" --billing-project="${PROJECT_ID}"; then
   echo "Perimeter '${PERIMETER_NAME}' already exists — ensuring project + egress allow-list..."
   # Belt and braces: an existing perimeter may predate this project (stale
   # reuse) — make sure this project is actually inside it.

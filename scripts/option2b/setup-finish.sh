@@ -56,8 +56,8 @@ echo "--- Step 1: Enable VPC-SC on servicenetworking peering ---"
 # the perimeter. Idempotent; non-fatal so a transient failure doesn't block
 # the perimeter demo — but Apigee E2E (test 4) may fail until this succeeds.
 if gcloud services vpc-peerings enable-vpc-service-controls \
-    --network="${APIGEE_NETWORK}" \
-    --project="${PROJECT_ID}"; then
+  --network="${APIGEE_NETWORK}" \
+  --project="${PROJECT_ID}"; then
   echo "VPC-SC enabled on peering for '${APIGEE_NETWORK}'."
 else
   echo "WARNING: could not enable VPC-SC on the servicenetworking peering."
@@ -82,10 +82,10 @@ APIGEE_AGENT_SA="service-${PROJECT_NUMBER}@gcp-sa-apigee.iam.gserviceaccount.com
 if [[ "${SKIP_TENANT_DNS:-}" == "1" ]]; then
   echo "SKIP_TENANT_DNS=1 — omitting the dns.peer grant."
 elif gcloud projects add-iam-policy-binding "${PROJECT_ID}" \
-    --member="serviceAccount:${APIGEE_AGENT_SA}" \
-    --role="roles/dns.peer" \
-    --condition=None \
-    --quiet >/dev/null 2>&1; then
+  --member="serviceAccount:${APIGEE_AGENT_SA}" \
+  --role="roles/dns.peer" \
+  --condition=None \
+  --quiet >/dev/null 2>&1; then
   echo "Apigee service agent granted dns.peer."
 else
   echo "WARNING: could not grant dns.peer to '${APIGEE_AGENT_SA}'."
@@ -135,8 +135,8 @@ echo "--- Step 4: Peered DNS domain (run.app) ---"
 if [[ "${SKIP_TENANT_DNS:-}" == "1" ]]; then
   echo "SKIP_TENANT_DNS=1 — omitting the peered DNS domain 'run-app'."
 elif gcloud services peered-dns-domains list \
-    --network="${APIGEE_NETWORK}" --project="${PROJECT_ID}" \
-    --format='value(name)' 2>/dev/null | grep -qx "run-app"; then
+  --network="${APIGEE_NETWORK}" --project="${PROJECT_ID}" \
+  --format='value(name)' 2>/dev/null | grep -qx "run-app"; then
   echo "Peered DNS domain 'run-app' already exists, skipping."
 else
   gcloud services peered-dns-domains create "run-app" \

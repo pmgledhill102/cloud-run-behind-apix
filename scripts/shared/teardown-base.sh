@@ -26,7 +26,7 @@ FAILED_RESOURCES=()
 # ============================================================
 echo "--- Step 1: Delete Cloud Run service ---"
 if resource_exists gcloud run services describe "cr-hello" \
-    --region="${REGION}" --project="${PROJECT_ID}"; then
+  --region="${REGION}" --project="${PROJECT_ID}"; then
   gcloud run services delete "cr-hello" \
     --region="${REGION}" --project="${PROJECT_ID}" --quiet
   echo "Service 'cr-hello' deleted."
@@ -40,7 +40,7 @@ fi
 echo ""
 echo "--- Step 2: Delete Compute VM ---"
 if resource_exists gcloud compute instances describe "vm-test" \
-    --zone="${ZONE}" --project="${PROJECT_ID}"; then
+  --zone="${ZONE}" --project="${PROJECT_ID}"; then
   gcloud compute instances delete "vm-test" \
     --zone="${ZONE}" --project="${PROJECT_ID}" --quiet
   echo "Instance 'vm-test' deleted."
@@ -55,7 +55,7 @@ echo ""
 echo "--- Step 3: Delete Cloud NAT ---"
 
 if gcloud compute routers nats describe "public-nat-apigee" \
-    --router="nat-router-apigee" --region="${REGION}" --project="${PROJECT_ID}" &>/dev/null; then
+  --router="nat-router-apigee" --region="${REGION}" --project="${PROJECT_ID}" &>/dev/null; then
   gcloud compute routers nats delete "public-nat-apigee" \
     --router="nat-router-apigee" --region="${REGION}" --project="${PROJECT_ID}" --quiet
   echo "NAT gateway 'public-nat-apigee' deleted."
@@ -64,7 +64,7 @@ else
 fi
 
 if resource_exists gcloud compute routers describe "nat-router-apigee" \
-    --region="${REGION}" --project="${PROJECT_ID}"; then
+  --region="${REGION}" --project="${PROJECT_ID}"; then
   gcloud compute routers delete "nat-router-apigee" \
     --region="${REGION}" --project="${PROJECT_ID}" --quiet
   echo "Cloud Router 'nat-router-apigee' deleted."
@@ -92,7 +92,7 @@ done
 echo ""
 echo "--- Step 5: Delete subnet ---"
 if resource_exists gcloud compute networks subnets describe "compute-apigee" \
-    --region="${REGION}" --project="${PROJECT_ID}"; then
+  --region="${REGION}" --project="${PROJECT_ID}"; then
   delete_subnet_with_retry "compute-apigee"
 else
   echo "Subnet 'compute-apigee' does not exist, skipping."
@@ -106,7 +106,7 @@ echo "--- Step 6: Delete VPC ---"
 if resource_exists gcloud compute networks describe "${APIGEE_NETWORK}" --project="${PROJECT_ID}"; then
   # Check for Apigee servicenetworking peering — VPC must stay if Apigee is still provisioned
   if gcloud compute networks peerings list --network="${APIGEE_NETWORK}" --project="${PROJECT_ID}" \
-      --format="value(name)" 2>/dev/null | grep -q servicenetworking; then
+    --format="value(name)" 2>/dev/null | grep -q servicenetworking; then
     echo "VPC '${APIGEE_NETWORK}' has Apigee peering — skipping (run teardown-slow.sh first to remove)."
   elif gcloud compute networks delete "${APIGEE_NETWORK}" --project="${PROJECT_ID}" --quiet 2>/dev/null; then
     echo "VPC '${APIGEE_NETWORK}' deleted."
@@ -124,7 +124,7 @@ fi
 echo ""
 echo "--- Step 7: Delete Artifact Registry ---"
 if resource_exists gcloud artifacts repositories describe "${REPO_NAME}" \
-    --location="${REGION}" --project="${PROJECT_ID}"; then
+  --location="${REGION}" --project="${PROJECT_ID}"; then
   gcloud artifacts repositories delete "${REPO_NAME}" \
     --location="${REGION}" --project="${PROJECT_ID}" --quiet
   echo "Repository '${REPO_NAME}' deleted."
@@ -138,7 +138,7 @@ fi
 echo ""
 echo "--- Step 8: Delete Cloud Build staging bucket ---"
 if gcloud storage buckets describe "gs://${CLOUDBUILD_BUCKET}" \
-    --project="${PROJECT_ID}" &>/dev/null; then
+  --project="${PROJECT_ID}" &>/dev/null; then
   gcloud storage rm --recursive "gs://${CLOUDBUILD_BUCKET}" --project="${PROJECT_ID}" --quiet
   echo "Cloud Build staging bucket 'gs://${CLOUDBUILD_BUCKET}' deleted."
 else

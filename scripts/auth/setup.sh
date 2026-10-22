@@ -86,7 +86,7 @@ build_image "auth-envoy" "${ENVOY_IMAGE_URL}" "${SCRIPT_DIR}/envoy"
 echo ""
 echo "--- Step 3: Deploy ${IDP_MOCK_SERVICE} ---"
 if resource_exists gcloud run services describe "${IDP_MOCK_SERVICE}" \
-    --region="${REGION}" --project="${PROJECT_ID}"; then
+  --region="${REGION}" --project="${PROJECT_ID}"; then
   echo "Service '${IDP_MOCK_SERVICE}' already exists, skipping."
 else
   # allow-unauthenticated: a JWKS is public material — the interesting posture
@@ -115,7 +115,7 @@ echo "JWKS URL: ${JWKS_URL}"
 echo ""
 echo "--- Step 4: Deploy ${AUTH_ECHO_SERVICE} (library variant) ---"
 if resource_exists gcloud run services describe "${AUTH_ECHO_SERVICE}" \
-    --region="${REGION}" --project="${PROJECT_ID}"; then
+  --region="${REGION}" --project="${PROJECT_ID}"; then
   echo "Service '${AUTH_ECHO_SERVICE}' already exists, skipping."
 else
   # JWKS_JSON is also passed as fallback: if the run→run fetch of JWKS_URL
@@ -221,11 +221,11 @@ print(d[0]['revision'] if d else '')" 2>/dev/null || true)"
     local current_target
     current_target="$(curl -s -H "Authorization: Bearer ${TOKEN}" \
       "${APIGEE_API}/organizations/${PROJECT_ID}/apis/${name}/revisions/${deployed_rev}?format=bundle" \
-      -o "/tmp/auth-proxy-check-${name}.zip" 2>/dev/null && \
-      unzip -p "/tmp/auth-proxy-check-${name}.zip" apiproxy/targets/default.xml 2>/dev/null || true)"
+      -o "/tmp/auth-proxy-check-${name}.zip" 2>/dev/null \
+      && unzip -p "/tmp/auth-proxy-check-${name}.zip" apiproxy/targets/default.xml 2>/dev/null || true)"
     rm -f "/tmp/auth-proxy-check-${name}.zip"
-    if echo "${current_target}" | grep -q "${target_url}" && \
-       echo "${current_target}" | grep -q "<Audience>${GOOGLE_CUSTOM_AUDIENCE}</Audience>"; then
+    if echo "${current_target}" | grep -q "${target_url}" \
+      && echo "${current_target}" | grep -q "<Audience>${GOOGLE_CUSTOM_AUDIENCE}</Audience>"; then
       echo "Proxy '${name}' already deployed with correct target, skipping."
       return 0
     fi
@@ -236,7 +236,7 @@ print(d[0]['revision'] if d else '')" 2>/dev/null || true)"
   bundle_dir="$(mktemp -d)"
   mkdir -p "${bundle_dir}/apiproxy/proxies" "${bundle_dir}/apiproxy/targets"
 
-  cat > "${bundle_dir}/apiproxy/proxies/default.xml" << XMLEOF
+  cat >"${bundle_dir}/apiproxy/proxies/default.xml" <<XMLEOF
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <ProxyEndpoint name="default">
   <PreFlow name="PreFlow">
@@ -257,7 +257,7 @@ print(d[0]['revision'] if d else '')" 2>/dev/null || true)"
 </ProxyEndpoint>
 XMLEOF
 
-  cat > "${bundle_dir}/apiproxy/targets/default.xml" << XMLEOF
+  cat >"${bundle_dir}/apiproxy/targets/default.xml" <<XMLEOF
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <TargetEndpoint name="default">
   <PreFlow name="PreFlow">
@@ -281,7 +281,7 @@ XMLEOF
 </TargetEndpoint>
 XMLEOF
 
-  cat > "${bundle_dir}/apiproxy/${name}.xml" << XMLEOF
+  cat >"${bundle_dir}/apiproxy/${name}.xml" <<XMLEOF
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <APIProxy name="${name}">
   <Description>${description}</Description>
@@ -341,14 +341,14 @@ print(d[0]['revision'] if d else '')" 2>/dev/null || true)"
     SF_DIR="$(mktemp -d)"
     mkdir -p "${SF_DIR}/sharedflowbundle/sharedflows" "${SF_DIR}/sharedflowbundle/policies"
 
-    cat > "${SF_DIR}/sharedflowbundle/${AUTH_SHAREDFLOW}.xml" << XMLEOF
+    cat >"${SF_DIR}/sharedflowbundle/${AUTH_SHAREDFLOW}.xml" <<XMLEOF
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <SharedFlowBundle name="${AUTH_SHAREDFLOW}">
   <Description>VerifyJWT vs mock IdP JWKS — attached via env flow hook</Description>
 </SharedFlowBundle>
 XMLEOF
 
-    cat > "${SF_DIR}/sharedflowbundle/sharedflows/default.xml" << 'XMLEOF'
+    cat >"${SF_DIR}/sharedflowbundle/sharedflows/default.xml" <<'XMLEOF'
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <SharedFlow name="default">
   <Step>
@@ -361,7 +361,7 @@ XMLEOF
     # Authorization header (which stays untouched for the target — the
     # Google ID token rides X-Serverless-Authorization instead).
     # Algorithm pinned per design doc §8.4.
-    cat > "${SF_DIR}/sharedflowbundle/policies/VJ-VerifyClientJWT.xml" << XMLEOF
+    cat >"${SF_DIR}/sharedflowbundle/policies/VJ-VerifyClientJWT.xml" <<XMLEOF
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <VerifyJWT async="false" continueOnError="false" enabled="true" name="VJ-VerifyClientJWT">
   <DisplayName>VJ-VerifyClientJWT</DisplayName>

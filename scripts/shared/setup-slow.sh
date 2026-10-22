@@ -81,7 +81,7 @@ echo ""
 echo "--- Step 3: Allocate peering IP ranges ---"
 
 if gcloud compute addresses describe "${APIGEE_PEERING_RANGE_NAME}" \
-    --global --project="${PROJECT_ID}" &>/dev/null; then
+  --global --project="${PROJECT_ID}" &>/dev/null; then
   echo "Peering range '${APIGEE_PEERING_RANGE_NAME}' already exists, skipping."
 else
   PREFIX_LENGTH="${APIGEE_PEERING_CIDR##*/}"
@@ -98,7 +98,7 @@ else
 fi
 
 if gcloud compute addresses describe "${APIGEE_INSTANCE_RANGE_NAME}" \
-    --global --project="${PROJECT_ID}" &>/dev/null; then
+  --global --project="${PROJECT_ID}" &>/dev/null; then
   echo "Instance range '${APIGEE_INSTANCE_RANGE_NAME}' already exists, skipping."
 else
   INST_PREFIX="${APIGEE_INSTANCE_CIDR##*/}"
@@ -219,7 +219,7 @@ TIMEOUT=3600
 INTERVAL=30
 ELAPSED=0
 while true; do
-  if (( ELAPSED > 0 && ELAPSED % 1800 == 0 )); then
+  if ((ELAPSED > 0 && ELAPSED % 1800 == 0)); then
     TOKEN="$(gcloud auth print-access-token)"
   fi
 
@@ -232,7 +232,7 @@ while true; do
     echo "Apigee org is ACTIVE."
     break
   fi
-  if (( ELAPSED >= TIMEOUT )); then
+  if ((ELAPSED >= TIMEOUT)); then
     echo "ERROR: Timed out after ${TIMEOUT}s waiting for Apigee org to become ACTIVE."
     echo "Current state: ${STATE}"
     exit 1
@@ -254,7 +254,7 @@ TIMEOUT=1800
 INTERVAL=30
 ELAPSED=0
 while true; do
-  if (( ELAPSED > 0 && ELAPSED % 1800 == 0 )); then
+  if ((ELAPSED > 0 && ELAPSED % 1800 == 0)); then
     TOKEN="$(gcloud auth print-access-token)"
   fi
 
@@ -270,7 +270,7 @@ print(' '.join(o['name'] for o in ops if not o.get('done')))" 2>/dev/null || tru
     echo "No in-flight org operations."
     break
   fi
-  if (( ELAPSED >= TIMEOUT )); then
+  if ((ELAPSED >= TIMEOUT)); then
     echo "ERROR: Timed out after ${TIMEOUT}s waiting for org operations to finish:"
     echo "  ${PENDING}"
     exit 1
@@ -346,7 +346,7 @@ if [[ "${INSTANCE_STATE}" != "ACTIVE" ]]; then
   INTERVAL=30
   ELAPSED=0
   while true; do
-    if (( ELAPSED > 0 && ELAPSED % 1800 == 0 )); then
+    if ((ELAPSED > 0 && ELAPSED % 1800 == 0)); then
       TOKEN="$(gcloud auth print-access-token)"
     fi
 
@@ -359,7 +359,7 @@ if [[ "${INSTANCE_STATE}" != "ACTIVE" ]]; then
       echo "Apigee instance is ACTIVE."
       break
     fi
-    if (( ELAPSED >= TIMEOUT )); then
+    if ((ELAPSED >= TIMEOUT)); then
       echo "ERROR: Timed out after ${TIMEOUT}s waiting for instance."
       echo "Current state: ${INST_STATE}"
       exit 1
@@ -472,7 +472,7 @@ if [[ "${ENV_HTTP}" == "200" ]]; then
         echo "Environment '${APIGEE_ENV}' upgraded to INTERMEDIATE."
         break
       fi
-      if (( TYPE_ELAPSED >= TYPE_TIMEOUT )); then
+      if ((TYPE_ELAPSED >= TYPE_TIMEOUT)); then
         echo "ERROR: environment type still '${ENV_TYPE}' after ${TYPE_TIMEOUT}s."
         exit 1
       fi
@@ -545,7 +545,7 @@ else
       echo "Environment '${APIGEE_ENV}' attached to '${INSTANCE_NAME}'."
       break
     fi
-    if (( ELAPSED >= TIMEOUT )); then
+    if ((ELAPSED >= TIMEOUT)); then
       echo "WARNING: Attachment may still be in progress. Check manually."
       break
     fi
@@ -637,7 +637,7 @@ else
   mkdir -p "${BUNDLE_DIR}/apiproxy/targets"
   mkdir -p "${BUNDLE_DIR}/apiproxy/policies"
 
-  cat > "${BUNDLE_DIR}/apiproxy/proxies/default.xml" << 'XMLEOF'
+  cat >"${BUNDLE_DIR}/apiproxy/proxies/default.xml" <<'XMLEOF'
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <ProxyEndpoint name="default">
   <PreFlow name="PreFlow">
@@ -658,7 +658,7 @@ else
 </ProxyEndpoint>
 XMLEOF
 
-  cat > "${BUNDLE_DIR}/apiproxy/targets/default.xml" << 'XMLEOF'
+  cat >"${BUNDLE_DIR}/apiproxy/targets/default.xml" <<'XMLEOF'
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <TargetEndpoint name="default">
   <PreFlow name="PreFlow">
@@ -676,7 +676,7 @@ XMLEOF
 </TargetEndpoint>
 XMLEOF
 
-  cat > "${BUNDLE_DIR}/apiproxy/${PROXY_NAME}.xml" << XMLEOF
+  cat >"${BUNDLE_DIR}/apiproxy/${PROXY_NAME}.xml" <<XMLEOF
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <APIProxy name="${PROXY_NAME}">
   <Description>Pass-through proxy to Cloud Run cr-hello service</Description>

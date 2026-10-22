@@ -25,7 +25,7 @@ echo ""
 # ============================================================
 echo "--- Step 1: Artifact Registry ---"
 if resource_exists gcloud artifacts repositories describe "${REPO_NAME}" \
-    --location="${REGION}" --project="${PROJECT_ID}"; then
+  --location="${REGION}" --project="${PROJECT_ID}"; then
   echo "Repository '${REPO_NAME}' already exists, skipping."
 else
   gcloud artifacts repositories create "${REPO_NAME}" \
@@ -51,7 +51,7 @@ else
   # location is used because the default US Cloud Build bucket is rejected by
   # constraints/gcp.resourceLocations in EU-only orgs.
   if ! gcloud storage buckets describe "gs://${CLOUDBUILD_BUCKET}" \
-      --project="${PROJECT_ID}" &>/dev/null; then
+    --project="${PROJECT_ID}" &>/dev/null; then
     gcloud storage buckets create "gs://${CLOUDBUILD_BUCKET}" \
       --location="${BUILD_REGION}" \
       --project="${PROJECT_ID}"
@@ -91,7 +91,7 @@ fi
 echo ""
 echo "--- Step 4: Create subnet (compute-apigee) ---"
 if resource_exists gcloud compute networks subnets describe "compute-apigee" \
-    --region="${REGION}" --project="${PROJECT_ID}"; then
+  --region="${REGION}" --project="${PROJECT_ID}"; then
   echo "Subnet 'compute-apigee' already exists, skipping."
 else
   gcloud compute networks subnets create "compute-apigee" \
@@ -143,7 +143,7 @@ fi
 echo ""
 echo "--- Step 6: Deploy Cloud Run service ---"
 if resource_exists gcloud run services describe "cr-hello" \
-    --region="${REGION}" --project="${PROJECT_ID}"; then
+  --region="${REGION}" --project="${PROJECT_ID}"; then
   echo "Service 'cr-hello' already exists, skipping."
 else
   echo "Deploying 'cr-hello'..."
@@ -167,7 +167,7 @@ echo ""
 echo "--- Step 7: Configure Cloud NAT ---"
 
 if resource_exists gcloud compute routers describe "nat-router-apigee" \
-    --region="${REGION}" --project="${PROJECT_ID}"; then
+  --region="${REGION}" --project="${PROJECT_ID}"; then
   echo "Cloud Router 'nat-router-apigee' already exists, skipping."
 else
   gcloud compute routers create "nat-router-apigee" \
@@ -178,7 +178,7 @@ else
 fi
 
 if gcloud compute routers nats describe "public-nat-apigee" \
-    --router="nat-router-apigee" --region="${REGION}" --project="${PROJECT_ID}" &>/dev/null; then
+  --router="nat-router-apigee" --region="${REGION}" --project="${PROJECT_ID}" &>/dev/null; then
   echo "NAT gateway 'public-nat-apigee' already exists, skipping."
 else
   gcloud compute routers nats create "public-nat-apigee" \
@@ -196,7 +196,7 @@ fi
 echo ""
 echo "--- Step 8: Create Compute VM ---"
 if resource_exists gcloud compute instances describe "vm-test" \
-    --zone="${ZONE}" --project="${PROJECT_ID}"; then
+  --zone="${ZONE}" --project="${PROJECT_ID}"; then
   echo "Instance 'vm-test' already exists, skipping."
 else
   gcloud compute instances create "vm-test" \

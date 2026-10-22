@@ -24,7 +24,7 @@ echo ""
 
 echo "--- Step 1: Delete gateway VM ---"
 if resource_exists gcloud compute instances describe "${MOCK_GW_VM}" \
-    --zone="${ZONE}" --project="${PROJECT_ID}"; then
+  --zone="${ZONE}" --project="${PROJECT_ID}"; then
   gcloud compute instances delete "${MOCK_GW_VM}" \
     --zone="${ZONE}" --project="${PROJECT_ID}" --quiet
   echo "Instance '${MOCK_GW_VM}' deleted."
@@ -45,7 +45,7 @@ fi
 echo ""
 echo "--- Step 3: Delete Cloud NAT + router ---"
 if gcloud compute routers nats describe "${MOCK_NAT}" \
-    --router="${MOCK_ROUTER}" --region="${REGION}" --project="${PROJECT_ID}" &>/dev/null; then
+  --router="${MOCK_ROUTER}" --region="${REGION}" --project="${PROJECT_ID}" &>/dev/null; then
   gcloud compute routers nats delete "${MOCK_NAT}" \
     --router="${MOCK_ROUTER}" --region="${REGION}" --project="${PROJECT_ID}" --quiet
   echo "NAT '${MOCK_NAT}' deleted."
@@ -53,7 +53,7 @@ else
   echo "NAT '${MOCK_NAT}' not found, skipping."
 fi
 if resource_exists gcloud compute routers describe "${MOCK_ROUTER}" \
-    --region="${REGION}" --project="${PROJECT_ID}"; then
+  --region="${REGION}" --project="${PROJECT_ID}"; then
   gcloud compute routers delete "${MOCK_ROUTER}" \
     --region="${REGION}" --project="${PROJECT_ID}" --quiet
   echo "Router '${MOCK_ROUTER}' deleted."
@@ -75,7 +75,7 @@ echo "--- Step 5: Delete DNS zone (records first) ---"
 if resource_exists gcloud dns managed-zones describe "${MOCK_DNS_ZONE}" --project="${PROJECT_ID}"; then
   for record in "*.run.app." "run.app."; do
     if gcloud dns record-sets describe "${record}" --type=A \
-        --zone="${MOCK_DNS_ZONE}" --project="${PROJECT_ID}" &>/dev/null; then
+      --zone="${MOCK_DNS_ZONE}" --project="${PROJECT_ID}" &>/dev/null; then
       gcloud dns record-sets delete "${record}" --type=A \
         --zone="${MOCK_DNS_ZONE}" --project="${PROJECT_ID}"
       echo "DNS record '${record}' deleted."
@@ -127,7 +127,7 @@ done
 echo ""
 echo "--- Step 8: Delete subnet + VPC ---"
 if resource_exists gcloud compute networks subnets describe "${MOCK_SUBNET}" \
-    --region="${REGION}" --project="${PROJECT_ID}"; then
+  --region="${REGION}" --project="${PROJECT_ID}"; then
   delete_subnet_with_retry "${MOCK_SUBNET}"
 else
   echo "Subnet '${MOCK_SUBNET}' not found, skipping."
