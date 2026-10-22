@@ -21,3 +21,11 @@ indent_size = 4
 
 [Makefile]
 indent_style = tab
+
+# shfmt reads these. The keys follow the setup-shell skill. space_redirects is
+# deliberately absent: this repository writes `>/dev/null`, and turning it on
+# would rewrite hundreds of lines for style alone. Also deliberately NOT
+# keep_padding: it is deprecated and produces cascading indentation.
+[*.sh]
+binary_next_line = true
+switch_case_indent = true

@@ -1,0 +1,52 @@
+name: Shell
+
+# Path-filtered and separate from ci.yml, like actionlint.yml. A path-filtered
+# workflow cannot be a required status check: on a PR that touches no shell
+# script it never runs and the check never reports, so do not add it to a
+# required-checks list without removing the path filter.
+#
+# .editorconfig is in the filter because shfmt reads it for its settings: a
+# change to the [*.sh] keys there alters the expected formatting of every script
+# in the repository. .shellcheckrc is in it for the same reason.
+on:
+  push:
+    branches: [main]
+    paths: ['**.sh', '.editorconfig', '.shellcheckrc', '.github/workflows/shell.yml']
+  pull_request:
+    paths: ['**.sh', '.editorconfig', '.shellcheckrc', '.github/workflows/shell.yml']
+
+jobs:
+  shellcheck:
+    name: ShellCheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # severity=warning matches the pre-commit hook. Keep the two in step: a CI
+      # run stricter than the local hook turns every push into the place
+      # findings are discovered. Dialects come from each script's shebang.
+      - uses: ludeeus/action-shellcheck@00cae500b08a931fb5698e11e79bfbd38e612a38 # v2.0.0
+        with:
+          severity: warning
+
+  # Formatting is a separate job from linting: the two answer different
+  # questions, and as siblings a formatting failure still lets the lint result
+  # report, instead of one masking the other.
+  shfmt:
+    name: shfmt
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # There is no first-party shfmt action and a floating tag is not allowed,
+      # so this is a digest-pinned container step, commented with its version.
+      #
+      # THE VERSION MUST TRACK the pre-commit-shfmt rev in
+      # .pre-commit-config.yaml: a CI formatter and a local hook at different
+      # shfmt versions produce a loop where CI demands a change the hook then
+      # reverts. Both are v3.13.1.
+      #
+      # -d rather than -l: it puts the actual formatting delta in the log, so the
+      # fix is readable without reproducing the run locally. Settings come from
+      # .editorconfig, which shfmt reads natively.
+      - uses: docker://mvdan/shfmt@sha256:f22f3936140be1ba02d493b5d2b91d0e8b4af93fd903e7f46c477822bca4a3be # v3.13.1
+        with:
+          args: -d .
