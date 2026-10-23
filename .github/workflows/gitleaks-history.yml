@@ -1,0 +1,62 @@
+name: Gitleaks history
+
+# Scheduled, not on pull_request: never add this context to the ruleset's
+# required checks. A PR would block on a Pending check forever.
+on:
+  schedule:
+    - cron: '37 5 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  GITLEAKS_VERSION: 8.30.1
+  GITLEAKS_SHA256: 551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
+
+jobs:
+  history:
+    name: Gitleaks history
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Install gitleaks
+        run: |
+          tarball="gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          mkdir -p "$RUNNER_TEMP/bin"
+          curl -fsSL -o "$RUNNER_TEMP/$tarball" \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/$tarball"
+          echo "$GITLEAKS_SHA256  $RUNNER_TEMP/$tarball" | sha256sum -c -
+          tar -xzf "$RUNNER_TEMP/$tarball" -C "$RUNNER_TEMP/bin" gitleaks
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+          # The canary scans a different directory, so the repo's config has
+          # to be passed explicitly for it to judge the same rules.
+          if [ -f .gitleaks.toml ]; then
+            echo "GITLEAKS_CONFIG=$PWD/.gitleaks.toml" >> "$GITHUB_ENV"
+          fi
+
+      - name: Canary - a history-only secret must be found
+        run: |
+          canary="$RUNNER_TEMP/canary"
+          git init -q "$canary"
+          # Random per run: a fixed or low-entropy token is suppressed by the
+          # rule's entropy floor, and a committed one would trip the scan.
+          printf 'token = "ghp_%s"\n' "$(openssl rand -hex 18)" > "$canary/leak.txt"
+          git -C "$canary" add leak.txt
+          git -C "$canary" -c user.name=canary -c user.email=canary@example.invalid commit -qm plant
+          git -C "$canary" rm -q leak.txt
+          git -C "$canary" -c user.name=canary -c user.email=canary@example.invalid commit -qm remove
+          # --exit-code 0 so a gitleaks error (also exit 1) can't pass as a find.
+          gitleaks git --redact --no-banner --exit-code 0 \
+            --report-format json --report-path "$RUNNER_TEMP/canary.json" "$canary"
+          found=$(jq '[.[] | select(.RuleID == "github-pat")] | length' "$RUNNER_TEMP/canary.json")
+          if [ "$found" -lt 1 ]; then
+            echo "::error::gitleaks missed the canary secret, so a clean history scan would prove nothing"
+            exit 1
+          fi
+
+      - name: Scan full history
+        run: gitleaks git --redact --no-banner --verbose --log-opts="--all" .

@@ -1,0 +1,49 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      # Two things here are not hand-written and must not be reformatted:
+      # docs/diagrams/*.svg is the sole output of the drawio-export workflow, so
+      # a local rewrite would be overwritten on the next merge; and
+      # docs/repro/evidence/ holds raw captured transcripts, whose whitespace is
+      # part of the evidence.
+      - id: trailing-whitespace
+        exclude: ^docs/(diagrams/.*\.svg|repro/evidence/)
+      - id: end-of-file-fixer
+        exclude: ^docs/(diagrams/.*\.svg|repro/evidence/)
+      - id: check-yaml
+      - id: check-added-large-files
+      - id: check-merge-conflict
+
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.30.1
+    hooks:
+      # `gitleaks git` takes no file arguments, so pre-commit's appended
+      # filenames would fail every run.
+      - id: gitleaks-system
+        pass_filenames: false
+
+  - repo: https://github.com/streetsidesoftware/cspell-cli
+    rev: v10.0.0
+    hooks:
+      - id: cspell
+        types_or: [markdown, plain-text, yaml]
+
+  - repo: https://github.com/rhysd/actionlint
+    rev: v1.7.12
+    hooks:
+      - id: actionlint-system
+
+  # semgrep runs as a system tool: the upstream hook builds a venv inside a
+  # clone of the whole semgrep repository. `args` replaces the upstream
+  # defaults, and --error is what makes findings fail the hook at all.
+  # pass_filenames: false keeps the hook and CI scanning the same thing, since
+  # explicit paths bypass semgrep's default excludes.
+  - repo: local
+    hooks:
+      - id: semgrep
+        name: semgrep
+        entry: semgrep
+        language: system
+        args: ['--config', 'auto', '--error']
+        pass_filenames: false

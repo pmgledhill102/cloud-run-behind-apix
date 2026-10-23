@@ -283,6 +283,8 @@ func main() {
 
 	fmt.Printf("auth-echo listening on port %s (iss=%s aud=%s jwks=%s)\n",
 		port, wantIss, wantAud, ks.source)
+	// Cloud Run terminates TLS in front of the container, which speaks plain HTTP on $PORT.
+	// nosemgrep: go.lang.security.audit.net.use-tls.use-tls
 	if err := http.ListenAndServe(":"+port, nil); err != nil {
 		fmt.Fprintf(os.Stderr, "Server error: %v\n", err)
 		os.Exit(1)

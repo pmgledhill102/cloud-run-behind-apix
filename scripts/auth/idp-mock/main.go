@@ -38,16 +38,22 @@ func main() {
 		// Real mirrors would set long max-age + stale-on-error semantics
 		// (design doc §7.4); a modest TTL keeps the PoC's rotation loop fast.
 		w.Header().Set("Cache-Control", "public, max-age=300")
+		// application/json is set explicitly, and the body is operator-supplied environment, not request input.
+		// nosemgrep: go.lang.security.audit.xss.no-fprintf-to-responsewriter.no-fprintf-to-responsewriter
 		fmt.Fprintln(w, jwksJSON)
 	})
 
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/plain")
+		// text/plain is set explicitly, and the value written is server-side environment, not request input.
+		// nosemgrep: go.lang.security.audit.xss.no-fprintf-to-responsewriter.no-fprintf-to-responsewriter
 		fmt.Fprintf(w, "idp-mock (JWKS at /.well-known/jwks.json)\nService: %s\n",
 			os.Getenv("K_SERVICE"))
 	})
 
 	fmt.Printf("idp-mock listening on port %s\n", port)
+	// Cloud Run terminates TLS in front of the container, which speaks plain HTTP on $PORT.
+	// nosemgrep: go.lang.security.audit.net.use-tls.use-tls
 	if err := http.ListenAndServe(":"+port, nil); err != nil {
 		fmt.Fprintf(os.Stderr, "Server error: %v\n", err)
 		os.Exit(1)
