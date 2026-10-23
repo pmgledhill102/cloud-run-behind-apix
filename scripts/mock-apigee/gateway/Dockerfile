@@ -18,6 +18,6 @@ COPY envoy.yaml.tmpl /etc/envoy/envoy.yaml.tmpl
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
-# nosemgrep: dockerfile.security.last-user-is-root.last-user-is-root
+# hadolint ignore=DL3002,DL3066
 USER root
 ENTRYPOINT ["/entrypoint.sh"]

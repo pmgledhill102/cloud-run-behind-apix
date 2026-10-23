@@ -52,6 +52,14 @@ repos:
     hooks:
       - id: shfmt
 
+  # hadolint runs as a system tool: `id: hadolint` uses the binary on PATH, where
+  # `hadolint-docker` would abort the whole pre-commit run on a machine with no
+  # Docker daemon. Install it with `brew install hadolint`.
+  - repo: https://github.com/hadolint/hadolint
+    rev: v2.15.1
+    hooks:
+      - id: hadolint
+
   # semgrep runs as a system tool: the upstream hook builds a venv inside a
   # clone of the whole semgrep repository. `args` replaces the upstream
   # defaults, and --error is what makes findings fail the hook at all.
@@ -63,5 +71,10 @@ repos:
         name: semgrep
         entry: semgrep
         language: system
-        args: ['--config', 'auto', '--error']
+        # last-user-is-root is excluded on purpose: hadolint (DL3002) and trivy
+        # (DS-0002) check the same property, and both take a scoped exemption for
+        # the mock gateway that binds :443 as root. Semgrep's inline marker cannot
+        # sit beside hadolint's pragma, since each only works on the line directly
+        # above the instruction, so the duplicate rule is the one dropped.
+        args: ['--config', 'auto', '--error', '--exclude-rule', 'dockerfile.security.last-user-is-root.last-user-is-root']
         pass_filenames: false

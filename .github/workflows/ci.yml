@@ -39,4 +39,6 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       # --error: without it semgrep exits 0 on findings and the job is decorative.
-      - run: semgrep scan --config auto --error
+      # last-user-is-root is excluded because hadolint and trivy check the same
+      # property with a scoped exemption; see .pre-commit-config.yaml.
+      - run: semgrep scan --config auto --error --exclude-rule dockerfile.security.last-user-is-root.last-user-is-root

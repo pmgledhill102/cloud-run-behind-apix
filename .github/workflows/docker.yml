@@ -1,0 +1,60 @@
+name: Docker
+
+# Path-filtered and separate from ci.yml, like actionlint.yml and shell.yml. A
+# path-filtered workflow cannot be a required status check: on a PR that touches
+# no Dockerfile it never runs and the check never reports, so do not add it to a
+# required-checks list without removing the path filter.
+#
+# .hadolint.yaml and .trivyignore.yaml are in the filter because changing either
+# changes what the jobs below accept.
+on:
+  push:
+    branches: [main]
+    paths:
+      - '**/Dockerfile*'
+      - '**/docker-compose*.yml'
+      - '.hadolint.yaml'
+      - '.trivyignore.yaml'
+      - '.github/workflows/docker.yml'
+  pull_request:
+    paths:
+      - '**/Dockerfile*'
+      - '**/docker-compose*.yml'
+      - '.hadolint.yaml'
+      - '.trivyignore.yaml'
+      - '.github/workflows/docker.yml'
+
+jobs:
+  hadolint:
+    name: Hadolint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # recursive expands **/Dockerfile from the repository root, so it covers
+      # every image whatever directory it lives in. It matches files named exactly
+      # Dockerfile: a differently named one (Dockerfile.dev) needs its own step.
+      - uses: hadolint/hadolint-action@06be81baf89a55ffd0e24b8f04a4185738dd3387 # v3.5.0
+        with:
+          dockerfile: Dockerfile
+          recursive: true
+          config: .hadolint.yaml
+
+  trivy:
+    name: Trivy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # exit-code and severity are what make this a gate: the action exits 0 on
+      # findings by default, which would leave the job passing whatever it found.
+      # Gated at HIGH and CRITICAL; the LOW notes (a missing HEALTHCHECK, which
+      # Cloud Run does not use) are not worth failing a build over. The version
+      # is the one the configuration was tested against.
+      - uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          scanners: misconfig
+          severity: HIGH,CRITICAL
+          exit-code: '1'
+          trivyignores: .trivyignore.yaml
+          version: v0.76.1

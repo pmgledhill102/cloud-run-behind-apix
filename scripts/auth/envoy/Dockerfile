@@ -11,10 +11,10 @@ COPY envoy.yaml.tmpl /etc/envoy/envoy.yaml.tmpl
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
-# Run as the image's own unprivileged user. The stock entrypoint does this too,
+# Run as the image's own unprivileged user (envoy, uid/gid 101). The stock entrypoint does this too,
 # after chown-ing stdout and stderr, which this config never opens by path;
 # this image replaces that entrypoint, so without USER Envoy would run as root.
 # Everything it needs is unprivileged: the listener and admin ports are above
 # 1024 and the rendered config goes to /tmp.
-USER envoy
+USER 101:101
 ENTRYPOINT ["/entrypoint.sh"]
