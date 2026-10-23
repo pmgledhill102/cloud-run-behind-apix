@@ -8,7 +8,7 @@
 # Same base/version as the proven sidecar variant (scripts/auth/envoy/).
 # gettext-base provides envsubst; openssl generates the self-signed cert at
 # startup. USER root so Envoy can bind :443 on the host network (COS VM).
-FROM envoyproxy/envoy:v1.31-latest
+FROM envoyproxy/envoy:v1.36-latest
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends gettext-base openssl \
