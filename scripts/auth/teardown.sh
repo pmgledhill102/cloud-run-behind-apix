@@ -86,7 +86,7 @@ echo ""
 echo "--- Step 4: Delete Cloud Run services ---"
 for SVC in "${AUTH_ECHO_SERVICE}" "${AUTH_ECHO_ENVOY_SERVICE}" "${IDP_MOCK_SERVICE}"; do
   if resource_exists gcloud run services describe "${SVC}" \
-      --region="${REGION}" --project="${PROJECT_ID}"; then
+    --region="${REGION}" --project="${PROJECT_ID}"; then
     gcloud run services delete "${SVC}" \
       --region="${REGION}" --project="${PROJECT_ID}" --quiet
     echo "Service '${SVC}' deleted."

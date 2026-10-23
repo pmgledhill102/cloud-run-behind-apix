@@ -29,11 +29,13 @@ source "${SCRIPT_DIR}/lib-proxy.sh"
 
 PASS=0
 FAIL=0
-verdict() {  # verdict <ok-bool> <label>
+verdict() { # verdict <ok-bool> <label>
   if [[ "$1" == "true" ]]; then
-    echo "  PASS: $2"; PASS=$((PASS+1))
+    echo "  PASS: $2"
+    PASS=$((PASS + 1))
   else
-    echo "  FAIL: $2"; FAIL=$((FAIL+1))
+    echo "  FAIL: $2"
+    FAIL=$((FAIL + 1))
   fi
 }
 
@@ -44,7 +46,10 @@ echo ""
 INSTANCE_IP="$(curl -s -H "Authorization: Bearer $(apigee_token)" \
   "${APIGEE_API}/organizations/${PROJECT_ID}/instances/${INSTANCE_NAME}" \
   | python3 -c "import sys,json; print(json.load(sys.stdin).get('host',''))" 2>/dev/null || true)"
-[[ -n "${INSTANCE_IP}" ]] || { echo "ERROR: no Apigee instance."; exit 1; }
+[[ -n "${INSTANCE_IP}" ]] || {
+  echo "ERROR: no Apigee instance."
+  exit 1
+}
 
 # Client JWT if the auth flow hook is live (harmless extra header if not)
 AUTH_HEADER=""
@@ -62,7 +67,7 @@ call() {
   ssh_cmd "curl -sk --max-time 15 -D /tmp/pr-headers -o /tmp/pr-body -w '%{http_code}' -H 'Host: ${APIGEE_ENV_GROUP_HOSTNAME}' ${AUTH_HEADER} https://${INSTANCE_IP}${path}; printf '|'; grep -i '^x-served-by:' /tmp/pr-headers | tr -d '\r' | cut -d' ' -f2; printf '|'; grep '^Service:' /tmp/pr-body | cut -d' ' -f2" 2>/dev/null | tr -d '\n'
 }
 
-check_route() {  # check_route <path> <want-proxy> <want-service> <label>
+check_route() { # check_route <path> <want-proxy> <want-service> <label>
   local out code served svc
   out="$(call "$1")"
   code="${out%%|*}"
@@ -134,7 +139,7 @@ ISSUING_URL="$(gcloud run services describe "${SVC_ISSUING}" --region="${REGION}
 
 echo "Starting ${PROBE_SECONDS}s probe loop (1/s) against /payments/cards/issuing/ping..."
 PROBE_FILE="$(mktemp)"
-ssh_cmd "for i in \$(seq 1 ${PROBE_SECONDS}); do ts=\$(date '+%H:%M:%S'); code=\$(curl -sk --max-time 5 -D /tmp/pr-probe-h -o /dev/null -w '%{http_code}' -H 'Host: ${APIGEE_ENV_GROUP_HOSTNAME}' ${AUTH_HEADER} https://${INSTANCE_IP}/payments/cards/issuing/ping); hdr=\$(grep -i '^x-served-by:' /tmp/pr-probe-h | tr -d '\r\n' | cut -d' ' -f2); echo \"\$ts \$code \$hdr\"; sleep 1; done" > "${PROBE_FILE}" 2>/dev/null &
+ssh_cmd "for i in \$(seq 1 ${PROBE_SECONDS}); do ts=\$(date '+%H:%M:%S'); code=\$(curl -sk --max-time 5 -D /tmp/pr-probe-h -o /dev/null -w '%{http_code}' -H 'Host: ${APIGEE_ENV_GROUP_HOSTNAME}' ${AUTH_HEADER} https://${INSTANCE_IP}/payments/cards/issuing/ping); hdr=\$(grep -i '^x-served-by:' /tmp/pr-probe-h | tr -d '\r\n' | cut -d' ' -f2); echo \"\$ts \$code \$hdr\"; sleep 1; done" >"${PROBE_FILE}" 2>/dev/null &
 PROBE_PID=$!
 sleep 5
 
@@ -142,7 +147,7 @@ echo "Deploying dedicated proxy '${PROXY_ISSUING}' (/payments/cards/issuing)..."
 BUNDLE_DIR="$(mktemp -d)"
 build_single_bundle "${BUNDLE_DIR}" "${PROXY_ISSUING}" "/payments/cards/issuing" "${ISSUING_URL}"
 REV="$(import_proxy "${PROXY_ISSUING}" "${BUNDLE_DIR}")"
-deploy_proxy "${PROXY_ISSUING}" "${REV}" > /dev/null
+deploy_proxy "${PROXY_ISSUING}" "${REV}" >/dev/null
 wait_deployment_ready "${PROXY_ISSUING}" "${REV}"
 rm -rf "${BUNDLE_DIR}"
 
@@ -151,7 +156,7 @@ CARDS_URL="$(gcloud run services describe "${SVC_CARDS}" --region="${REGION}" --
 BUNDLE_DIR="$(mktemp -d)"
 build_cards_bundle "${BUNDLE_DIR}" "false" "${CARDS_URL}" ""
 REV="$(import_proxy "${PROXY_CARDS}" "${BUNDLE_DIR}")"
-deploy_proxy "${PROXY_CARDS}" "${REV}" > /dev/null
+deploy_proxy "${PROXY_CARDS}" "${REV}" >/dev/null
 wait_deployment_ready "${PROXY_CARDS}" "${REV}"
 rm -rf "${BUNDLE_DIR}"
 
@@ -169,9 +174,11 @@ if [[ "${NON200}" != "0" ]]; then
   echo "  non-200 samples:"
   awk 'NF && $2 != "200" {print "    " $0}' "${PROBE_FILE}"
 fi
-OK=false; [[ "${NON200}" == "0" && "${TOTAL}" -gt 100 ]] && OK=true
+OK=false
+[[ "${NON200}" == "0" && "${TOTAL}" -gt 100 ]] && OK=true
 verdict "${OK}" "no 404/5xx window during the carve-out (${TOTAL} samples at 1/s)"
-OK=false; [[ -n "${FIRST_NEW}" ]] && OK=true
+OK=false
+[[ -n "${FIRST_NEW}" ]] && OK=true
 verdict "${OK}" "traffic flipped to the dedicated proxy (most-specific match re-won)"
 rm -f "${PROBE_FILE}"
 echo ""

@@ -19,7 +19,7 @@ write_bundle_common() {
   local dir="$1" name="$2" base_path="$3"
   mkdir -p "${dir}/apiproxy/proxies" "${dir}/apiproxy/targets" "${dir}/apiproxy/policies"
 
-  cat > "${dir}/apiproxy/${name}.xml" << XMLEOF
+  cat >"${dir}/apiproxy/${name}.xml" <<XMLEOF
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <APIProxy name="${name}">
   <Description>Path-routing PoC (#62): ${base_path}</Description>
@@ -27,7 +27,7 @@ write_bundle_common() {
 </APIProxy>
 XMLEOF
 
-  cat > "${dir}/apiproxy/policies/AM-ServedBy.xml" << XMLEOF
+  cat >"${dir}/apiproxy/policies/AM-ServedBy.xml" <<XMLEOF
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <AssignMessage continueOnError="false" enabled="true" name="AM-ServedBy">
   <Set>
@@ -45,7 +45,7 @@ XMLEOF
 # GoogleIDToken audience = service URL (scenario A in the design doc §4).
 write_target() {
   local dir="$1" endpoint="$2" url="$3"
-  cat > "${dir}/apiproxy/targets/${endpoint}.xml" << XMLEOF
+  cat >"${dir}/apiproxy/targets/${endpoint}.xml" <<XMLEOF
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <TargetEndpoint name="${endpoint}">
   <PreFlow name="PreFlow"><Request/><Response/></PreFlow>
@@ -68,7 +68,7 @@ XMLEOF
 # FIRST (route rules evaluate in order; the unconditional default last).
 write_proxy_endpoint() {
   local dir="$1" base_path="$2" route_rules="$3"
-  cat > "${dir}/apiproxy/proxies/default.xml" << XMLEOF
+  cat >"${dir}/apiproxy/proxies/default.xml" <<XMLEOF
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <ProxyEndpoint name="default">
   <PreFlow name="PreFlow"><Request/><Response/></PreFlow>
@@ -151,7 +151,7 @@ d = json.load(sys.stdin).get('deployments', [])
 print(d[0]['revision'] if d else '')" 2>/dev/null || true)"
   if [[ -n "${rev}" ]]; then
     curl -s -X DELETE -H "Authorization: Bearer $(apigee_token)" \
-      "${APIGEE_API}/organizations/${PROJECT_ID}/environments/${APIGEE_ENV}/apis/${name}/revisions/${rev}/deployments" > /dev/null
+      "${APIGEE_API}/organizations/${PROJECT_ID}/environments/${APIGEE_ENV}/apis/${name}/revisions/${rev}/deployments" >/dev/null
     echo "  '${name}' rev ${rev} undeployed."
   fi
   local http_code

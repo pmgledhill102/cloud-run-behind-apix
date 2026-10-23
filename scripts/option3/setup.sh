@@ -33,7 +33,7 @@ if [[ "${SERVICE_COUNT}" -gt 1 ]]; then
   for i in $(seq -w 1 "${SERVICE_COUNT}"); do
     svc="cr-svc-${i}"
     if resource_exists gcloud run services describe "${svc}" \
-        --region="${REGION}" --project="${PROJECT_ID}"; then
+      --region="${REGION}" --project="${PROJECT_ID}"; then
       echo "Service '${svc}' already exists, skipping."
     else
       echo "Deploying '${svc}'..."
@@ -58,7 +58,7 @@ fi
 # ============================================================
 echo "--- Step 2: Reserve internal IP for PSC endpoint ---"
 if resource_exists gcloud compute addresses describe "pscgoogleapisip" \
-    --global --project="${PROJECT_ID}"; then
+  --global --project="${PROJECT_ID}"; then
   echo "Address 'pscgoogleapisip' already exists, skipping."
 else
   gcloud compute addresses create "pscgoogleapisip" \
@@ -76,7 +76,7 @@ fi
 echo ""
 echo "--- Step 3: Create PSC forwarding rule ---"
 if resource_exists gcloud compute forwarding-rules describe "pscgoogleapis" \
-    --global --project="${PROJECT_ID}"; then
+  --global --project="${PROJECT_ID}"; then
   echo "Forwarding rule 'pscgoogleapis' already exists, skipping."
 else
   gcloud compute forwarding-rules create "pscgoogleapis" \
@@ -111,7 +111,7 @@ fi
 echo ""
 echo "--- Step 5: Create DNS record *.run.app → ${PSC_IP} ---"
 if gcloud dns record-sets describe "*.run.app." \
-    --zone="run-app-psc" --type=A --project="${PROJECT_ID}" &>/dev/null; then
+  --zone="run-app-psc" --type=A --project="${PROJECT_ID}" &>/dev/null; then
   echo "DNS record '*.run.app' already exists, skipping."
 else
   gcloud dns record-sets create "*.run.app." \

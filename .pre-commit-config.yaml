@@ -34,6 +34,24 @@ repos:
     hooks:
       - id: actionlint-system
 
+  # shellcheck at --severity=warning, matching the rest of the estate. Dialects
+  # come from each script's shebang, which is what keeps the POSIX scripts
+  # checked as POSIX: do not set `shell=` in .shellcheckrc, because it overrides
+  # the shebang and silently turns that check off.
+  - repo: https://github.com/shellcheck-py/shellcheck-py
+    rev: v0.11.0.1
+    hooks:
+      - id: shellcheck
+        args: ['--severity=warning']
+
+  # Formatting, kept separate from the linting above. Settings live in
+  # .editorconfig, which shfmt reads natively, so the command line and this hook
+  # agree without repeating the flags.
+  - repo: https://github.com/scop/pre-commit-shfmt
+    rev: v3.13.1-1
+    hooks:
+      - id: shfmt
+
   # semgrep runs as a system tool: the upstream hook builds a venv inside a
   # clone of the whole semgrep repository. `args` replaces the upstream
   # defaults, and --error is what makes findings fail the hook at all.

@@ -63,8 +63,8 @@ print(d[0].get('revision','') if d else '')
     current_target="$(curl -s \
       -H "Authorization: Bearer ${TOKEN}" \
       "${APIGEE_API}/organizations/${PROJECT_ID}/apis/${name}/revisions/${deployed_rev}?format=bundle" \
-      -o "/tmp/fixture-rev-check-$$.zip" 2>/dev/null && \
-      unzip -p "/tmp/fixture-rev-check-$$.zip" apiproxy/targets/default.xml 2>/dev/null || true)"
+      -o "/tmp/fixture-rev-check-$$.zip" 2>/dev/null \
+      && unzip -p "/tmp/fixture-rev-check-$$.zip" apiproxy/targets/default.xml 2>/dev/null || true)"
     rm -f "/tmp/fixture-rev-check-$$.zip"
     if echo "${current_target}" | grep -qF "<URL>${target_url}</URL>"; then
       echo "Deployed revision ${deployed_rev} already targets ${target_url}, skipping."
@@ -77,7 +77,7 @@ print(d[0].get('revision','') if d else '')
   bundle_dir="$(mktemp -d)"
   mkdir -p "${bundle_dir}/apiproxy/proxies" "${bundle_dir}/apiproxy/targets"
 
-  cat > "${bundle_dir}/apiproxy/proxies/default.xml" << XMLEOF
+  cat >"${bundle_dir}/apiproxy/proxies/default.xml" <<XMLEOF
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <ProxyEndpoint name="default">
   <PreFlow name="PreFlow"><Request/><Response/></PreFlow>
@@ -94,7 +94,7 @@ XMLEOF
 
   # No <Authentication> block: both external endpoints are public, so the
   # governance test exercises the network path in isolation (no token minting).
-  cat > "${bundle_dir}/apiproxy/targets/default.xml" << XMLEOF
+  cat >"${bundle_dir}/apiproxy/targets/default.xml" <<XMLEOF
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <TargetEndpoint name="default">
   <PreFlow name="PreFlow"><Request/><Response/></PreFlow>
@@ -106,7 +106,7 @@ XMLEOF
 </TargetEndpoint>
 XMLEOF
 
-  cat > "${bundle_dir}/apiproxy/${name}.xml" << XMLEOF
+  cat >"${bundle_dir}/apiproxy/${name}.xml" <<XMLEOF
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <APIProxy name="${name}">
   <Description>Test fixture: pass-through to out-of-perimeter Cloud Run</Description>
@@ -151,14 +151,18 @@ XMLEOF
       -H "Authorization: Bearer ${TOKEN}" \
       "${APIGEE_API}/organizations/${PROJECT_ID}/environments/${APIGEE_ENV}/apis/${name}/revisions/${new_rev}/deployments" \
       | python3 -c "import sys,json; print(json.load(sys.stdin).get('state',''))" 2>/dev/null || true)"
-    [[ "${state}" == "READY" ]] && { echo "Deployment READY."; break; }
-    if (( elapsed >= 180 )); then
+    [[ "${state}" == "READY" ]] && {
+      echo "Deployment READY."
+      break
+    }
+    if ((elapsed >= 180)); then
       echo "WARNING: deployment not READY after 180s (state: ${state:-unknown})."
       break
     fi
-    sleep 10; elapsed=$((elapsed + 10))
+    sleep 10
+    elapsed=$((elapsed + 10))
   done
-  sleep 10  # small settle for runtime routing
+  sleep 10 # small settle for runtime routing
 }
 
 deploy_fixture_proxy "cr-external-blocked" "/external-blocked" "${BLOCKED_RUN_URL}"

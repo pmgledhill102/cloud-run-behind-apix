@@ -25,7 +25,7 @@ echo ""
 echo "--- Step 2: Cloud Run clones ---"
 for svc in "${SVC_PAYMENTS}" "${SVC_CARDS}" "${SVC_ISSUING}"; do
   if resource_exists gcloud run services describe "${svc}" \
-      --region="${REGION}" --project="${PROJECT_ID}"; then
+    --region="${REGION}" --project="${PROJECT_ID}"; then
     gcloud run services delete "${svc}" \
       --region="${REGION}" --project="${PROJECT_ID}" --quiet
     echo "Service '${svc}' deleted."

@@ -16,7 +16,7 @@ create_ilb_stack() {
 
   # Reserve ILB IP
   if resource_exists gcloud compute addresses describe "ilb-ip-workloads" \
-      --region="${REGION}" --project="${PROJECT_ID}"; then
+    --region="${REGION}" --project="${PROJECT_ID}"; then
     echo "Address 'ilb-ip-workloads' already exists, skipping."
   else
     gcloud compute addresses create "ilb-ip-workloads" \
@@ -29,7 +29,7 @@ create_ilb_stack() {
 
   # Serverless NEG
   if resource_exists gcloud compute network-endpoint-groups describe "neg-cr-hello" \
-      --region="${REGION}" --project="${PROJECT_ID}"; then
+    --region="${REGION}" --project="${PROJECT_ID}"; then
     echo "NEG 'neg-cr-hello' already exists, skipping."
   else
     gcloud compute network-endpoint-groups create "neg-cr-hello" \
@@ -42,7 +42,7 @@ create_ilb_stack() {
 
   # Backend service
   if resource_exists gcloud compute backend-services describe "backend-cr-hello" \
-      --region="${REGION}" --project="${PROJECT_ID}"; then
+    --region="${REGION}" --project="${PROJECT_ID}"; then
     echo "Backend service 'backend-cr-hello' already exists, skipping."
   else
     gcloud compute backend-services create "backend-cr-hello" \
@@ -60,7 +60,7 @@ create_ilb_stack() {
 
   # URL map
   if resource_exists gcloud compute url-maps describe "urlmap-workloads" \
-      --region="${REGION}" --project="${PROJECT_ID}"; then
+    --region="${REGION}" --project="${PROJECT_ID}"; then
     echo "URL map 'urlmap-workloads' already exists, skipping."
   else
     gcloud compute url-maps create "urlmap-workloads" \
@@ -72,7 +72,7 @@ create_ilb_stack() {
 
   # Self-signed SSL certificate
   if resource_exists gcloud compute ssl-certificates describe "cert-workloads" \
-      --region="${REGION}" --project="${PROJECT_ID}"; then
+    --region="${REGION}" --project="${PROJECT_ID}"; then
     echo "SSL certificate 'cert-workloads' already exists, skipping."
   else
     CERT_DIR="$(mktemp -d)"
@@ -92,7 +92,7 @@ create_ilb_stack() {
 
   # Target HTTPS proxy
   if resource_exists gcloud compute target-https-proxies describe "proxy-workloads" \
-      --region="${REGION}" --project="${PROJECT_ID}"; then
+    --region="${REGION}" --project="${PROJECT_ID}"; then
     echo "Target HTTPS proxy 'proxy-workloads' already exists, skipping."
   else
     gcloud compute target-https-proxies create "proxy-workloads" \
@@ -105,7 +105,7 @@ create_ilb_stack() {
 
   # Forwarding rule
   if resource_exists gcloud compute forwarding-rules describe "fwd-rule-workloads" \
-      --region="${REGION}" --project="${PROJECT_ID}"; then
+    --region="${REGION}" --project="${PROJECT_ID}"; then
     echo "Forwarding rule 'fwd-rule-workloads' already exists, skipping."
   else
     gcloud compute forwarding-rules create "fwd-rule-workloads" \
@@ -129,7 +129,7 @@ delete_ilb_stack() {
 
   # Forwarding rule
   if resource_exists gcloud compute forwarding-rules describe "fwd-rule-workloads" \
-      --region="${REGION}" --project="${PROJECT_ID}"; then
+    --region="${REGION}" --project="${PROJECT_ID}"; then
     gcloud compute forwarding-rules delete "fwd-rule-workloads" \
       --region="${REGION}" --project="${PROJECT_ID}" --quiet
     echo "Forwarding rule 'fwd-rule-workloads' deleted."
@@ -139,7 +139,7 @@ delete_ilb_stack() {
 
   # Target HTTPS proxy
   if resource_exists gcloud compute target-https-proxies describe "proxy-workloads" \
-      --region="${REGION}" --project="${PROJECT_ID}"; then
+    --region="${REGION}" --project="${PROJECT_ID}"; then
     gcloud compute target-https-proxies delete "proxy-workloads" \
       --region="${REGION}" --project="${PROJECT_ID}" --quiet
     echo "Target HTTPS proxy 'proxy-workloads' deleted."
@@ -149,7 +149,7 @@ delete_ilb_stack() {
 
   # SSL certificate
   if resource_exists gcloud compute ssl-certificates describe "cert-workloads" \
-      --region="${REGION}" --project="${PROJECT_ID}"; then
+    --region="${REGION}" --project="${PROJECT_ID}"; then
     gcloud compute ssl-certificates delete "cert-workloads" \
       --region="${REGION}" --project="${PROJECT_ID}" --quiet
     echo "SSL certificate 'cert-workloads' deleted."
@@ -159,7 +159,7 @@ delete_ilb_stack() {
 
   # URL map
   if resource_exists gcloud compute url-maps describe "urlmap-workloads" \
-      --region="${REGION}" --project="${PROJECT_ID}"; then
+    --region="${REGION}" --project="${PROJECT_ID}"; then
     gcloud compute url-maps delete "urlmap-workloads" \
       --region="${REGION}" --project="${PROJECT_ID}" --quiet
     echo "URL map 'urlmap-workloads' deleted."
@@ -169,7 +169,7 @@ delete_ilb_stack() {
 
   # Backend service
   if resource_exists gcloud compute backend-services describe "backend-cr-hello" \
-      --region="${REGION}" --project="${PROJECT_ID}"; then
+    --region="${REGION}" --project="${PROJECT_ID}"; then
     gcloud compute backend-services delete "backend-cr-hello" \
       --region="${REGION}" --project="${PROJECT_ID}" --quiet
     echo "Backend service 'backend-cr-hello' deleted."
@@ -179,7 +179,7 @@ delete_ilb_stack() {
 
   # Serverless NEG
   if resource_exists gcloud compute network-endpoint-groups describe "neg-cr-hello" \
-      --region="${REGION}" --project="${PROJECT_ID}"; then
+    --region="${REGION}" --project="${PROJECT_ID}"; then
     gcloud compute network-endpoint-groups delete "neg-cr-hello" \
       --region="${REGION}" --project="${PROJECT_ID}" --quiet
     echo "NEG 'neg-cr-hello' deleted."
@@ -189,7 +189,7 @@ delete_ilb_stack() {
 
   # ILB IP
   if resource_exists gcloud compute addresses describe "ilb-ip-workloads" \
-      --region="${REGION}" --project="${PROJECT_ID}"; then
+    --region="${REGION}" --project="${PROJECT_ID}"; then
     gcloud compute addresses delete "ilb-ip-workloads" \
       --region="${REGION}" --project="${PROJECT_ID}" --quiet
     echo "Address 'ilb-ip-workloads' deleted."

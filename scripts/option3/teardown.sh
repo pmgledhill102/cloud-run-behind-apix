@@ -24,7 +24,7 @@ echo ""
 echo "--- Step 1: Delete DNS records and zone ---"
 
 if gcloud dns record-sets describe "*.run.app." \
-    --zone="run-app-psc" --type=A --project="${PROJECT_ID}" &>/dev/null; then
+  --zone="run-app-psc" --type=A --project="${PROJECT_ID}" &>/dev/null; then
   gcloud dns record-sets delete "*.run.app." \
     --zone="run-app-psc" --type=A --project="${PROJECT_ID}" --quiet
   echo "DNS record '*.run.app' deleted."
@@ -46,7 +46,7 @@ echo ""
 echo "--- Step 2: Delete PSC endpoint ---"
 
 if resource_exists gcloud compute forwarding-rules describe "pscgoogleapis" \
-    --global --project="${PROJECT_ID}"; then
+  --global --project="${PROJECT_ID}"; then
   gcloud compute forwarding-rules delete "pscgoogleapis" \
     --global --project="${PROJECT_ID}" --quiet
   echo "Forwarding rule 'pscgoogleapis' deleted."
@@ -55,7 +55,7 @@ else
 fi
 
 if resource_exists gcloud compute addresses describe "pscgoogleapisip" \
-    --global --project="${PROJECT_ID}"; then
+  --global --project="${PROJECT_ID}"; then
   gcloud compute addresses delete "pscgoogleapisip" \
     --global --project="${PROJECT_ID}" --quiet
   echo "Address 'pscgoogleapisip' deleted."
@@ -72,7 +72,7 @@ if [[ "${SERVICE_COUNT}" -gt 1 ]]; then
   for i in $(seq -w 1 "${SERVICE_COUNT}"); do
     svc="cr-svc-${i}"
     if resource_exists gcloud run services describe "${svc}" \
-        --region="${REGION}" --project="${PROJECT_ID}"; then
+      --region="${REGION}" --project="${PROJECT_ID}"; then
       gcloud run services delete "${svc}" \
         --region="${REGION}" --project="${PROJECT_ID}" --quiet
       echo "Service '${svc}' deleted."

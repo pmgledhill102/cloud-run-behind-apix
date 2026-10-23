@@ -56,7 +56,7 @@ VM_EXEC_TIMEOUT="${VM_EXEC_TIMEOUT:-120}"
 # Written to be dash-safe and to survive the metadata server being briefly
 # unavailable — a `set -e` here would kill the loop on the first transient.
 _vm_exec_agent_script() {
-  cat << 'AGENTEOF'
+  cat <<'AGENTEOF'
 #!/bin/bash
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -qq >/dev/null 2>&1
@@ -96,7 +96,7 @@ vm_exec_setup() {
 
   local script_file
   script_file="$(mktemp)"
-  _vm_exec_agent_script > "${script_file}"
+  _vm_exec_agent_script >"${script_file}"
 
   gcloud compute instances add-metadata "${VM_EXEC_INSTANCE}" \
     --zone="${zone}" --project="${PROJECT_ID}" \
@@ -114,7 +114,7 @@ vm_exec_setup() {
 
   echo -n "Waiting for the agent to report ready"
   local waited=0 status
-  while (( waited < 300 )); do
+  while ((waited < 300)); do
     status="$(gcloud compute instances get-guest-attributes "${VM_EXEC_INSTANCE}" \
       --zone="${zone}" --project="${PROJECT_ID}" \
       --query-path='probe/agent-status' --format='value(value)' 2>/dev/null || true)"
@@ -122,7 +122,9 @@ vm_exec_setup() {
       echo " — ready after ${waited}s."
       return 0
     fi
-    sleep 10; waited=$((waited + 10)); echo -n "."
+    sleep 10
+    waited=$((waited + 10))
+    echo -n "."
   done
   echo ""
   echo "ERROR: agent did not report ready within 300s."
@@ -134,19 +136,20 @@ vm_exec_setup() {
 vm_exec() {
   local cmd="$1"
   local zone="${ZONE}"
-  local id="p$(date +%s)$$"
+  local id
+  id="p$(date +%s)$$"
 
   local cmd_file
   cmd_file="$(mktemp)"
-  printf '%s' "${cmd}" > "${cmd_file}"
+  printf '%s' "${cmd}" >"${cmd_file}"
 
   # Both keys in ONE call: the agent triggers on a changed probe-id and reads
   # probe-cmd only after seeing it, so a split update could race and re-run
   # the previous command against the new id.
   if ! gcloud compute instances add-metadata "${VM_EXEC_INSTANCE}" \
-      --zone="${zone}" --project="${PROJECT_ID}" \
-      --metadata="probe-id=${id}" \
-      --metadata-from-file="probe-cmd=${cmd_file}" >/dev/null 2>&1; then
+    --zone="${zone}" --project="${PROJECT_ID}" \
+    --metadata="probe-id=${id}" \
+    --metadata-from-file="probe-cmd=${cmd_file}" >/dev/null 2>&1; then
     rm -f "${cmd_file}"
     echo "VM-EXEC-ERROR: could not set metadata"
     return 1
@@ -154,7 +157,7 @@ vm_exec() {
   rm -f "${cmd_file}"
 
   local waited=0 out
-  while (( waited < VM_EXEC_TIMEOUT )); do
+  while ((waited < VM_EXEC_TIMEOUT)); do
     out="$(gcloud compute instances get-guest-attributes "${VM_EXEC_INSTANCE}" \
       --zone="${zone}" --project="${PROJECT_ID}" \
       --query-path="probe/${id}" --format='value(value)' 2>/dev/null || true)"
@@ -162,7 +165,8 @@ vm_exec() {
       echo "${out}"
       return 0
     fi
-    sleep 5; waited=$((waited + 5))
+    sleep 5
+    waited=$((waited + 5))
   done
   echo "VM-EXEC-TIMEOUT after ${VM_EXEC_TIMEOUT}s (agent may be down)"
   return 1
@@ -173,7 +177,8 @@ vm_exec() {
 if [[ "${VM_CHANNEL:-}" == "metadata" ]]; then
   ssh_cmd() { vm_exec "$1"; }
   ssh_curl_auth() {
-    local audience="$1"; shift
+    local audience="$1"
+    shift
     vm_exec "ID_TOKEN=\$(curl -sf -H 'Metadata-Flavor: Google' 'http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/identity?audience=${audience}') && curl -H \"Authorization: Bearer \$ID_TOKEN\" $*"
   }
 fi

@@ -24,7 +24,7 @@ create_workloads_vpc() {
 
   # Subnet: compute-workloads
   if resource_exists gcloud compute networks subnets describe "compute-workloads" \
-      --region="${REGION}" --project="${PROJECT_ID}"; then
+    --region="${REGION}" --project="${PROJECT_ID}"; then
     echo "Subnet 'compute-workloads' already exists, skipping."
   else
     gcloud compute networks subnets create "compute-workloads" \
@@ -37,7 +37,7 @@ create_workloads_vpc() {
 
   # Subnet: proxy-only-workloads (for ILB)
   if resource_exists gcloud compute networks subnets describe "proxy-only-workloads" \
-      --region="${REGION}" --project="${PROJECT_ID}"; then
+    --region="${REGION}" --project="${PROJECT_ID}"; then
     echo "Subnet 'proxy-only-workloads' already exists, skipping."
   else
     gcloud compute networks subnets create "proxy-only-workloads" \
@@ -95,7 +95,7 @@ delete_workloads_vpc() {
   # Subnets (reverse order)
   for subnet in proxy-only-workloads compute-workloads; do
     if resource_exists gcloud compute networks subnets describe "${subnet}" \
-        --region="${REGION}" --project="${PROJECT_ID}"; then
+      --region="${REGION}" --project="${PROJECT_ID}"; then
       delete_subnet_with_retry "${subnet}"
     else
       echo "Subnet '${subnet}' does not exist, skipping."

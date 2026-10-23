@@ -84,7 +84,7 @@ else
 fi
 
 if resource_exists gcloud compute networks subnets describe "${MOCK_SUBNET}" \
-    --region="${REGION}" --project="${PROJECT_ID}"; then
+  --region="${REGION}" --project="${PROJECT_ID}"; then
   echo "Subnet '${MOCK_SUBNET}' already exists, skipping."
 else
   gcloud compute networks subnets create "${MOCK_SUBNET}" \
@@ -171,7 +171,7 @@ else
 fi
 for record in "*.run.app." "run.app."; do
   if gcloud dns record-sets describe "${record}" --type=A \
-      --zone="${MOCK_DNS_ZONE}" --project="${PROJECT_ID}" &>/dev/null; then
+    --zone="${MOCK_DNS_ZONE}" --project="${PROJECT_ID}" &>/dev/null; then
     echo "DNS record '${record}' already exists, skipping."
   else
     gcloud dns record-sets create "${record}" \
@@ -200,7 +200,7 @@ fi
 echo ""
 echo "--- Step 4: Cloud NAT for ${MOCK_VPC} ---"
 if resource_exists gcloud compute routers describe "${MOCK_ROUTER}" \
-    --region="${REGION}" --project="${PROJECT_ID}"; then
+  --region="${REGION}" --project="${PROJECT_ID}"; then
   echo "Cloud Router '${MOCK_ROUTER}' already exists, skipping."
 else
   gcloud compute routers create "${MOCK_ROUTER}" \
@@ -210,7 +210,7 @@ else
   echo "Cloud Router '${MOCK_ROUTER}' created."
 fi
 if gcloud compute routers nats describe "${MOCK_NAT}" \
-    --router="${MOCK_ROUTER}" --region="${REGION}" --project="${PROJECT_ID}" &>/dev/null; then
+  --router="${MOCK_ROUTER}" --region="${REGION}" --project="${PROJECT_ID}" &>/dev/null; then
   echo "NAT gateway '${MOCK_NAT}' already exists, skipping."
 else
   gcloud compute routers nats create "${MOCK_NAT}" \
@@ -244,7 +244,7 @@ else
 fi
 
 if resource_exists gcloud compute instances describe "${MOCK_GW_VM}" \
-    --zone="${ZONE}" --project="${PROJECT_ID}"; then
+  --zone="${ZONE}" --project="${PROJECT_ID}"; then
   echo "Instance '${MOCK_GW_VM}' already exists, skipping."
 else
   # Container env via file: JWKS_JSON contains commas/quotes that the
@@ -260,7 +260,7 @@ else
     echo "AUTH_ECHO_HOST=${AUTH_ECHO_HOST}"
     echo "HELLO_AUDIENCE=${HELLO_URL}"
     echo "AUTH_ECHO_AUDIENCE=${GOOGLE_CUSTOM_AUDIENCE}"
-  } > "${ENV_FILE}"
+  } >"${ENV_FILE}"
   # COS + konlet runs the container on the host network, so Envoy's :443
   # binds the VM's ${MOCK_GW_IP} directly (image sets USER root for <1024).
   # No external IP: image pull goes via the mock VPC's NAT. The default

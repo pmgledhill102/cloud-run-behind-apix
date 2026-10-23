@@ -18,9 +18,18 @@ update_apigee_proxy_target() {
   local audience=""
   while [[ $# -gt 0 ]]; do
     case "$1" in
-      --ssl-ignore) ssl_ignore="true"; shift ;;
-      --audience=*) audience="${1#--audience=}"; shift ;;
-      --audience) audience="$2"; shift 2 ;;
+      --ssl-ignore)
+        ssl_ignore="true"
+        shift
+        ;;
+      --audience=*)
+        audience="${1#--audience=}"
+        shift
+        ;;
+      --audience)
+        audience="$2"
+        shift 2
+        ;;
       *) shift ;;
     esac
   done
@@ -58,8 +67,8 @@ if deploys:
     CURRENT_TARGET="$(curl -s \
       -H "Authorization: Bearer ${TOKEN}" \
       "${APIGEE_API}/organizations/${PROJECT_ID}/apis/${PROXY_NAME}/revisions/${DEPLOYED_REV}?format=bundle" \
-      -o /tmp/apigee-rev-check.zip 2>/dev/null && \
-      unzip -p /tmp/apigee-rev-check.zip apiproxy/targets/default.xml 2>/dev/null || true)"
+      -o /tmp/apigee-rev-check.zip 2>/dev/null \
+      && unzip -p /tmp/apigee-rev-check.zip apiproxy/targets/default.xml 2>/dev/null || true)"
     rm -f /tmp/apigee-rev-check.zip
     local URL_MATCH=false
     local AUTH_MATCH=false
@@ -97,7 +106,7 @@ if deploys:
     TARGET_HOST="${TARGET_HOST#http://}"
     TARGET_HOST="${TARGET_HOST%%/*}"
 
-    cat > "${BUNDLE_DIR}/apiproxy/policies/SetHostHeader.xml" << XMLEOF
+    cat >"${BUNDLE_DIR}/apiproxy/policies/SetHostHeader.xml" <<XMLEOF
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <AssignMessage name="SetHostHeader">
   <Set>
@@ -108,7 +117,7 @@ if deploys:
 </AssignMessage>
 XMLEOF
 
-    cat > "${BUNDLE_DIR}/apiproxy/proxies/default.xml" << 'XMLEOF'
+    cat >"${BUNDLE_DIR}/apiproxy/proxies/default.xml" <<'XMLEOF'
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <ProxyEndpoint name="default">
   <PreFlow name="PreFlow">
@@ -149,7 +158,7 @@ XMLEOF
     </Authentication>"
     fi
 
-    cat > "${BUNDLE_DIR}/apiproxy/targets/default.xml" << XMLEOF
+    cat >"${BUNDLE_DIR}/apiproxy/targets/default.xml" <<XMLEOF
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <TargetEndpoint name="default">
   <PreFlow name="PreFlow">
@@ -169,7 +178,7 @@ XMLEOF
 </TargetEndpoint>
 XMLEOF
 
-    cat > "${BUNDLE_DIR}/apiproxy/${PROXY_NAME}.xml" << XMLEOF
+    cat >"${BUNDLE_DIR}/apiproxy/${PROXY_NAME}.xml" <<XMLEOF
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <APIProxy name="${PROXY_NAME}">
   <Description>Pass-through proxy to Cloud Run cr-hello service</Description>

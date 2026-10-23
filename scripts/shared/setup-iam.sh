@@ -51,8 +51,9 @@ fi
 # account ... does not exist" (observed live on a greenfield project). The
 # same applies to the default compute SA right after API enablement. Retry
 # with backoff; surface the last error if all attempts fail.
-retry_iam() {  # retry_iam <description> <command...>
-  local desc="$1"; shift
+retry_iam() { # retry_iam <description> <command...>
+  local desc="$1"
+  shift
   local attempt out
   for attempt in 1 2 3 4 5 6; do
     if out="$("$@" 2>&1)"; then

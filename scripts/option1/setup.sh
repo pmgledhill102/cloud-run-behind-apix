@@ -47,7 +47,7 @@ echo "--- Step 2: HA VPN with BGP ---"
 
 # Cloud Routers
 if resource_exists gcloud compute routers describe "router-apigee" \
-    --region="${REGION}" --project="${PROJECT_ID}"; then
+  --region="${REGION}" --project="${PROJECT_ID}"; then
   echo "Cloud Router 'router-apigee' already exists, skipping."
 else
   gcloud compute routers create "router-apigee" \
@@ -59,7 +59,7 @@ else
 fi
 
 if resource_exists gcloud compute routers describe "router-workloads" \
-    --region="${REGION}" --project="${PROJECT_ID}"; then
+  --region="${REGION}" --project="${PROJECT_ID}"; then
   echo "Cloud Router 'router-workloads' already exists, skipping."
 else
   gcloud compute routers create "router-workloads" \
@@ -81,7 +81,7 @@ echo "Custom route advertisement configured."
 
 # VPN Gateways
 if resource_exists gcloud compute vpn-gateways describe "vpn-gw-apigee" \
-    --region="${REGION}" --project="${PROJECT_ID}"; then
+  --region="${REGION}" --project="${PROJECT_ID}"; then
   echo "VPN gateway 'vpn-gw-apigee' already exists, skipping."
 else
   gcloud compute vpn-gateways create "vpn-gw-apigee" \
@@ -92,7 +92,7 @@ else
 fi
 
 if resource_exists gcloud compute vpn-gateways describe "vpn-gw-workloads" \
-    --region="${REGION}" --project="${PROJECT_ID}"; then
+  --region="${REGION}" --project="${PROJECT_ID}"; then
   echo "VPN gateway 'vpn-gw-workloads' already exists, skipping."
 else
   gcloud compute vpn-gateways create "vpn-gw-workloads" \
@@ -110,10 +110,10 @@ for dir_gw_peer_iface in \
   "apigee:vpn-gw-apigee:vpn-gw-workloads:router-apigee:1" \
   "workloads:vpn-gw-workloads:vpn-gw-apigee:router-workloads:0" \
   "workloads:vpn-gw-workloads:vpn-gw-apigee:router-workloads:1"; do
-  IFS=: read -r dir gw peer router iface <<< "${dir_gw_peer_iface}"
+  IFS=: read -r dir gw peer router iface <<<"${dir_gw_peer_iface}"
   tunnel="vpn-tunnel-${dir}-if${iface}"
   if resource_exists gcloud compute vpn-tunnels describe "${tunnel}" \
-      --region="${REGION}" --project="${PROJECT_ID}"; then
+    --region="${REGION}" --project="${PROJECT_ID}"; then
     echo "VPN tunnel '${tunnel}' already exists, skipping."
   else
     gcloud compute vpn-tunnels create "${tunnel}" \
@@ -131,13 +131,13 @@ done
 
 # BGP peers on router-apigee
 for idx_local_remote in "0:169.254.0.1:169.254.0.2" "1:169.254.1.1:169.254.1.2"; do
-  IFS=: read -r idx local_ip remote_ip <<< "${idx_local_remote}"
+  IFS=: read -r idx local_ip remote_ip <<<"${idx_local_remote}"
   if_name="bgp-if${idx}"
   peer_name="bgp-peer-workloads-${idx}"
 
   if gcloud compute routers describe "router-apigee" \
-      --region="${REGION}" --project="${PROJECT_ID}" \
-      --format="value(interfaces[].name)" 2>/dev/null | grep -q "${if_name}"; then
+    --region="${REGION}" --project="${PROJECT_ID}" \
+    --format="value(interfaces[].name)" 2>/dev/null | grep -q "${if_name}"; then
     echo "Interface '${if_name}' already exists on router-apigee, skipping."
   else
     gcloud compute routers add-interface "router-apigee" \
@@ -151,8 +151,8 @@ for idx_local_remote in "0:169.254.0.1:169.254.0.2" "1:169.254.1.1:169.254.1.2";
   fi
 
   if gcloud compute routers describe "router-apigee" \
-      --region="${REGION}" --project="${PROJECT_ID}" \
-      --format="value(bgpPeers[].name)" 2>/dev/null | grep -q "${peer_name}"; then
+    --region="${REGION}" --project="${PROJECT_ID}" \
+    --format="value(bgpPeers[].name)" 2>/dev/null | grep -q "${peer_name}"; then
     echo "BGP peer '${peer_name}' already exists on router-apigee, skipping."
   else
     gcloud compute routers add-bgp-peer "router-apigee" \
@@ -168,13 +168,13 @@ done
 
 # BGP peers on router-workloads
 for idx_local_remote in "0:169.254.0.2:169.254.0.1" "1:169.254.1.2:169.254.1.1"; do
-  IFS=: read -r idx local_ip remote_ip <<< "${idx_local_remote}"
+  IFS=: read -r idx local_ip remote_ip <<<"${idx_local_remote}"
   if_name="bgp-if${idx}"
   peer_name="bgp-peer-apigee-${idx}"
 
   if gcloud compute routers describe "router-workloads" \
-      --region="${REGION}" --project="${PROJECT_ID}" \
-      --format="value(interfaces[].name)" 2>/dev/null | grep -q "${if_name}"; then
+    --region="${REGION}" --project="${PROJECT_ID}" \
+    --format="value(interfaces[].name)" 2>/dev/null | grep -q "${if_name}"; then
     echo "Interface '${if_name}' already exists on router-workloads, skipping."
   else
     gcloud compute routers add-interface "router-workloads" \
@@ -188,8 +188,8 @@ for idx_local_remote in "0:169.254.0.2:169.254.0.1" "1:169.254.1.2:169.254.1.1";
   fi
 
   if gcloud compute routers describe "router-workloads" \
-      --region="${REGION}" --project="${PROJECT_ID}" \
-      --format="value(bgpPeers[].name)" 2>/dev/null | grep -q "${peer_name}"; then
+    --region="${REGION}" --project="${PROJECT_ID}" \
+    --format="value(bgpPeers[].name)" 2>/dev/null | grep -q "${peer_name}"; then
     echo "BGP peer '${peer_name}' already exists on router-workloads, skipping."
   else
     gcloud compute routers add-bgp-peer "router-workloads" \
@@ -251,7 +251,7 @@ else
 fi
 
 if gcloud dns record-sets describe "api.internal.example.com." \
-    --zone="api-internal-zone" --type=A --project="${PROJECT_ID}" &>/dev/null; then
+  --zone="api-internal-zone" --type=A --project="${PROJECT_ID}" &>/dev/null; then
   echo "DNS record 'api.internal.example.com' already exists, skipping."
 else
   gcloud dns record-sets create "api.internal.example.com." \

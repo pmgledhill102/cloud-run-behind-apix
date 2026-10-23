@@ -44,7 +44,7 @@ fi
 echo ""
 echo "--- Step 2: Create DNS record *.run.app → restricted VIP ---"
 if gcloud dns record-sets describe "*.run.app." \
-    --zone="run-app-pga" --type=A --project="${PROJECT_ID}" &>/dev/null; then
+  --zone="run-app-pga" --type=A --project="${PROJECT_ID}" &>/dev/null; then
   echo "DNS record '*.run.app' already exists, skipping."
 else
   gcloud dns record-sets create "*.run.app." \
@@ -62,7 +62,7 @@ fi
 echo ""
 echo "--- Step 3: Create DNS record run.app → restricted VIP ---"
 if gcloud dns record-sets describe "run.app." \
-    --zone="run-app-pga" --type=A --project="${PROJECT_ID}" &>/dev/null; then
+  --zone="run-app-pga" --type=A --project="${PROJECT_ID}" &>/dev/null; then
   echo "DNS record 'run.app' already exists, skipping."
 else
   gcloud dns record-sets create "run.app." \

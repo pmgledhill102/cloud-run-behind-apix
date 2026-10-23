@@ -35,9 +35,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/../shared/env.sh"
 source "${SHARED_DIR}/lib/helpers.sh"
 
-INTERVAL="${INTERVAL:-60}"        # seconds between probes
-MAX_MINUTES="${MAX_MINUTES:-60}"  # give up after this long
-CONFIRM="${CONFIRM:-3}"           # consecutive probes to confirm a new state
+INTERVAL="${INTERVAL:-60}"       # seconds between probes
+MAX_MINUTES="${MAX_MINUTES:-60}" # give up after this long
+CONFIRM="${CONFIRM:-3}"          # consecutive probes to confirm a new state
 EXTERNAL_BUCKET="gcp-public-data-landsat"
 NEGATIVE_URL="https://storage.googleapis.com/storage/v1/b/${EXTERNAL_BUCKET}"
 
@@ -45,7 +45,7 @@ TARGET_STATE=""
 if [[ $# -ge 1 ]]; then
   case "$(echo "$1" | tr '[:lower:]' '[:upper:]')" in
     BLOCKED) TARGET_STATE="BLOCKED" ;;
-    OPEN)    TARGET_STATE="OPEN" ;;
+    OPEN) TARGET_STATE="OPEN" ;;
     *)
       echo "Usage: $0 [blocked|open]"
       echo "  blocked — expect enforcement to arrive (run after setup.sh)"
@@ -64,7 +64,7 @@ state_of() {
   case "$1" in
     403) echo "BLOCKED" ;;
     200) echo "OPEN" ;;
-    *)   echo "ERROR($1)" ;;
+    *) echo "ERROR($1)" ;;
   esac
 }
 
@@ -94,9 +94,12 @@ if [[ -n "${TARGET_STATE}" && "${INITIAL_STATE}" == "${TARGET_STATE}" ]]; then
     sleep 10
     CODE="$(probe)"
     STATE="$(state_of "${CODE}")"
-    ELAPSED=$(( $(date +%s) - START_EPOCH ))
+    ELAPSED=$(($(date +%s) - START_EPOCH))
     echo "[$(date '+%H:%M:%S') +$((ELAPSED / 60))m$((ELAPSED % 60))s] HTTP ${CODE} — ${STATE}"
-    [[ "${STATE}" == "${TARGET_STATE}" ]] || { STABLE=false; break; }
+    [[ "${STATE}" == "${TARGET_STATE}" ]] || {
+      STABLE=false
+      break
+    }
   done
   if [[ "${STABLE}" == "true" ]]; then
     echo ""
@@ -123,10 +126,10 @@ FLIP_ELAPSED=""
 
 while true; do
   sleep "${INTERVAL}"
-  ELAPSED=$(( $(date +%s) - START_EPOCH ))
+  ELAPSED=$(($(date +%s) - START_EPOCH))
   ELAPSED_FMT="$((ELAPSED / 60))m$((ELAPSED % 60))s"
 
-  if (( ELAPSED > MAX_MINUTES * 60 )); then
+  if ((ELAPSED > MAX_MINUTES * 60)); then
     echo ""
     echo "=== Target not reached after ${MAX_MINUTES} minutes ==="
     if [[ -n "${TARGET_STATE}" ]]; then
@@ -173,7 +176,7 @@ while true; do
   fi
   echo "[$(date '+%H:%M:%S') +${ELAPSED_FMT}] HTTP ${CODE} — ${STATE} (confirmation ${STREAK}/${CONFIRM})"
 
-  if (( STREAK >= CONFIRM )); then
+  if ((STREAK >= CONFIRM)); then
     echo ""
     echo "=== Propagation measured ==="
     echo "State change:   ${INITIAL_STATE} → ${NEW_STATE}"

@@ -75,8 +75,11 @@ set -euo pipefail
 
 PHASE="${1:-after}"
 case "${PHASE}" in
-  before|enable|after) ;;
-  *) echo "Usage: $0 {before|enable|after}" >&2; exit 2 ;;
+  before | enable | after) ;;
+  *)
+    echo "Usage: $0 {before|enable|after}" >&2
+    exit 2
+    ;;
 esac
 
 source "$(dirname "${BASH_SOURCE[0]}")/../shared/env.sh"
@@ -133,7 +136,8 @@ fi
 #   DOC-VAGUE   — would have to fall under "other necessary domains"
 #   CONTROL     — definitely not a VPC-SC domain; must fail once the default
 #                 route is removed
-PROBES="$(cat <<EOF
+PROBES="$(
+  cat <<EOF
 gapi|/scope-gapi|https://storage.googleapis.com/storage/v1/b/gcp-public-data-landsat|DOC-NAMED googleapis.com
 pkgdev|/scope-pkgdev|https://${REGION}-docker.pkg.dev/v2/|DOC-NAMED pkg.dev
 gcrio|/scope-gcrio|https://gcr.io/v2/|DOC-NAMED gcr.io
@@ -187,12 +191,12 @@ print(d[0].get('revision','') if d else '')
   local bundle_dir
   bundle_dir="$(mktemp -d)"
   mkdir -p "${bundle_dir}/apiproxy/proxies" \
-           "${bundle_dir}/apiproxy/targets" \
-           "${bundle_dir}/apiproxy/policies"
+    "${bundle_dir}/apiproxy/targets" \
+    "${bundle_dir}/apiproxy/policies"
 
   # Apigee sends the env-group hostname as Host unless told otherwise; the
   # target front end needs its own name to route and to serve the right cert.
-  cat > "${bundle_dir}/apiproxy/policies/SetHostHeader.xml" << XMLEOF
+  cat >"${bundle_dir}/apiproxy/policies/SetHostHeader.xml" <<XMLEOF
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <AssignMessage name="SetHostHeader">
   <Set>
@@ -203,7 +207,7 @@ print(d[0].get('revision','') if d else '')
 </AssignMessage>
 XMLEOF
 
-  cat > "${bundle_dir}/apiproxy/proxies/default.xml" << XMLEOF
+  cat >"${bundle_dir}/apiproxy/proxies/default.xml" <<XMLEOF
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <ProxyEndpoint name="default">
   <PreFlow name="PreFlow"><Request/><Response/></PreFlow>
@@ -221,7 +225,7 @@ XMLEOF
   # Deliberately unauthenticated. Any HTTP status proves a socket was opened,
   # which is the only thing being measured; authenticating would add a failure
   # mode that has nothing to do with DNS scope.
-  cat > "${bundle_dir}/apiproxy/targets/default.xml" << XMLEOF
+  cat >"${bundle_dir}/apiproxy/targets/default.xml" <<XMLEOF
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <TargetEndpoint name="default">
   <PreFlow name="PreFlow">
@@ -236,7 +240,7 @@ XMLEOF
 </TargetEndpoint>
 XMLEOF
 
-  cat > "${bundle_dir}/apiproxy/${proxy}.xml" << XMLEOF
+  cat >"${bundle_dir}/apiproxy/${proxy}.xml" <<XMLEOF
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <APIProxy name="${proxy}">
   <Description>VPC-SC DNS scope probe: ${target_host}</Description>
@@ -276,11 +280,12 @@ XMLEOF
       "${APIGEE_API}/organizations/${PROJECT_ID}/environments/${APIGEE_ENV}/apis/${proxy}/revisions/${new_rev}/deployments" \
       | python3 -c "import sys,json; print(json.load(sys.stdin).get('state',''))" 2>/dev/null || true)"
     [[ "${state}" == "READY" ]] && break
-    if (( elapsed >= 180 )); then
+    if ((elapsed >= 180)); then
       echo "  WARNING: ${proxy} not READY after 180s (state ${state:-unknown})"
       break
     fi
-    sleep 10; elapsed=$((elapsed + 10))
+    sleep 10
+    elapsed=$((elapsed + 10))
   done
   echo "  ${proxy}: deployed rev ${new_rev} (${basepath} -> ${target_host})"
 }
@@ -310,7 +315,10 @@ import sys,json
 d = json.load(sys.stdin).get('deployments', [])
 print(d[0].get('revision','') if d else '')
 " 2>/dev/null || true)"
-  [[ -n "${rev}" ]] || { echo "      (no deployed revision; no trace)"; return 0; }
+  [[ -n "${rev}" ]] || {
+    echo "      (no deployed revision; no trace)"
+    return 0
+  }
 
   local session
   session="$(curl -s -X POST -H "Authorization: Bearer ${TOKEN}" \
@@ -318,7 +326,10 @@ print(d[0].get('revision','') if d else '')
     "${APIGEE_API}/organizations/${PROJECT_ID}/environments/${APIGEE_ENV}/apis/${proxy}/revisions/${rev}/debugsessions?timeout=300" \
     -d '{}' \
     | python3 -c "import sys,json; print(json.load(sys.stdin).get('name',''))" 2>/dev/null || true)"
-  [[ -n "${session}" ]] || { echo "      (could not create debug session)"; return 0; }
+  [[ -n "${session}" ]] || {
+    echo "      (could not create debug session)"
+    return 0
+  }
 
   sleep 75
   apigee_probe "${basepath}" >/dev/null || true
@@ -333,7 +344,10 @@ d = json.load(sys.stdin)
 v = d if isinstance(d, list) else (d.get('responses') or d.get('data') or [])
 print(v[0] if v and isinstance(v[0], str) else '')
 " 2>/dev/null || true)"
-  [[ -n "${txn}" ]] || { echo "      (no transaction captured)"; return 0; }
+  [[ -n "${txn}" ]] || {
+    echo "      (no transaction captured)"
+    return 0
+  }
 
   curl -s -H "Authorization: Bearer ${TOKEN}" \
     "${APIGEE_API}/organizations/${PROJECT_ID}/environments/${APIGEE_ENV}/apis/${proxy}/revisions/${rev}/debugsessions/${session}/data/${txn}" \
@@ -384,7 +398,7 @@ echo "--- Fixtures: one pass-through proxy per probe ---"
 while IFS='|' read -r pname basepath target class; do
   [[ -n "${pname}" ]] || continue
   ensure_probe_proxy "${pname}" "${basepath}" "${target}"
-done <<< "${PROBES}"
+done <<<"${PROBES}"
 echo ""
 sleep 10
 
@@ -397,7 +411,8 @@ printf '%-8s %-34s %-22s %s\n' "-----" "-----------" "------" "--------------"
 RESULT_LINES=""
 while IFS='|' read -r pname basepath target class; do
   [[ -n "${pname}" ]] || continue
-  target_host="${target#https://}"; target_host="${target_host%%/*}"
+  target_host="${target#https://}"
+  target_host="${target_host%%/*}"
 
   out="$(apigee_probe "${basepath}")"
   code="$(echo "${out}" | head -1 | cut -d'|' -f1)"
@@ -414,7 +429,7 @@ while IFS='|' read -r pname basepath target class; do
 
   printf '%-8s %-34s %-22s %s\n' "${pname}" "${target_host:0:34}" "${verdict}" "${class}"
   RESULT_LINES="${RESULT_LINES}${pname}|${target_host}|${verdict}|${class}"$'\n'
-done <<< "${PROBES}"
+done <<<"${PROBES}"
 
 echo ""
 if [[ "${TRACE:-}" == "1" ]]; then
@@ -425,11 +440,12 @@ if [[ "${TRACE:-}" == "1" ]]; then
   echo ""
   while IFS='|' read -r pname basepath target class; do
     [[ -n "${pname}" ]] || continue
-    target_host="${target#https://}"; target_host="${target_host%%/*}"
+    target_host="${target#https://}"
+    target_host="${target_host%%/*}"
     echo "  ${pname} (${target_host}):"
     trace_probe "${pname}" "${basepath}"
     echo ""
-  done <<< "${PROBES}"
+  done <<<"${PROBES}"
 fi
 
 echo "--- VM control: what THIS VPC resolves (should be unaffected throughout) ---"

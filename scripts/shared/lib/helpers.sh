@@ -44,7 +44,7 @@ delete_subnet_with_retry() {
 
   for attempt in $(seq 1 "${max_attempts}"); do
     if gcloud compute networks subnets delete "${subnet}" \
-        --region="${REGION}" --project="${PROJECT_ID}" --quiet 2>/dev/null; then
+      --region="${REGION}" --project="${PROJECT_ID}" --quiet 2>/dev/null; then
       echo "Subnet '${subnet}' deleted."
       return 0
     fi
@@ -56,7 +56,7 @@ delete_subnet_with_retry() {
     else
       echo "  WARNING: Could not delete subnet '${subnet}' — still in use (Cloud Run may need more time to release)."
       FAILED_RESOURCES+=("subnet/${subnet}")
-      return 0  # continue teardown
+      return 0 # continue teardown
     fi
   done
 }
@@ -85,7 +85,7 @@ apigee_api() {
   else
     echo "  WARNING: HTTP ${http_code}"
     echo "${body}" | python3 -m json.tool 2>/dev/null || echo "${body}"
-    return 0  # Don't fail teardown on errors
+    return 0 # Don't fail teardown on errors
   fi
 }
 
@@ -152,13 +152,13 @@ apigee_org_lock_check() {
   release_epoch=$((deleted_epoch + 86400))
   now="$(date -u +%s)"
 
-  if (( now >= release_epoch )); then
+  if ((now >= release_epoch)); then
     return 0
   fi
 
-  remaining=$(( (release_epoch - now + 59) / 60 ))
+  remaining=$(((release_epoch - now + 59) / 60))
   local remaining_fmt
-  if (( remaining >= 60 )); then
+  if ((remaining >= 60)); then
     remaining_fmt="$((remaining / 60))h $((remaining % 60))m"
   else
     remaining_fmt="${remaining}m"

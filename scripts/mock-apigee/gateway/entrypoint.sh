@@ -13,5 +13,5 @@ openssl req -x509 -newkey rsa:2048 -nodes -days 30 \
   -subj "/CN=mock-apigee-gw" 2>/dev/null
 
 envsubst '$GW_PORT $JWT_ISSUER $JWT_AUDIENCE $JWKS_JSON $HELLO_HOST $AUTH_ECHO_HOST $HELLO_AUDIENCE $AUTH_ECHO_AUDIENCE' \
-  < /etc/envoy/envoy.yaml.tmpl > /tmp/envoy.yaml
+  </etc/envoy/envoy.yaml.tmpl >/tmp/envoy.yaml
 exec envoy -c /tmp/envoy.yaml --log-level info

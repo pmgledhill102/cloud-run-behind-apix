@@ -25,11 +25,13 @@ source "${SCRIPT_DIR}/env-mock.sh"
 
 PASS=0
 FAIL=0
-verdict() {  # verdict <ok-bool> <label>
+verdict() { # verdict <ok-bool> <label>
   if [[ "$1" == "true" ]]; then
-    echo "  PASS: $2"; PASS=$((PASS+1))
+    echo "  PASS: $2"
+    PASS=$((PASS + 1))
   else
-    echo "  FAIL: $2"; FAIL=$((FAIL+1))
+    echo "  FAIL: $2"
+    FAIL=$((FAIL + 1))
   fi
 }
 
@@ -42,7 +44,7 @@ if [[ ! -f "${AUTH_PRIVATE_KEY}" ]]; then
   exit 1
 fi
 if ! resource_exists gcloud compute instances describe "${MOCK_GW_VM}" \
-    --zone="${ZONE}" --project="${PROJECT_ID}"; then
+  --zone="${ZONE}" --project="${PROJECT_ID}"; then
   echo "ERROR: gateway VM '${MOCK_GW_VM}' not found — run ./scripts/mock-apigee/setup.sh first."
   exit 1
 fi
@@ -84,11 +86,14 @@ echo "  Test M1: Valid JWT → /auth-echo (combined headers)"
 echo "=========================================="
 M1_OUT="$(ssh_cmd "curl -sk --max-time 15 -H 'Authorization: Bearer ${JWT_VALID}' https://${MOCK_GW_IP}/auth-echo" || true)"
 echo "${M1_OUT}"
-OK=false; echo "${M1_OUT}" | grep -q '"service":"cr-auth-echo"' && OK=true
+OK=false
+echo "${M1_OUT}" | grep -q '"service":"cr-auth-echo"' && OK=true
 verdict "${OK}" "request reached cr-auth-echo through the mock gateway"
-OK=false; echo "${M1_OUT}" | grep -q '"authorization":true' && OK=true
+OK=false
+echo "${M1_OUT}" | grep -q '"authorization":true' && OK=true
 verdict "${OK}" "client JWT arrived intact in Authorization"
-OK=false; echo "${M1_OUT}" | grep -q '"x_serverless_authorization":true' && OK=true
+OK=false
+echo "${M1_OUT}" | grep -q '"x_serverless_authorization":true' && OK=true
 verdict "${OK}" "Google ID token minted into X-Serverless-Authorization (gcp_authn)"
 echo ""
 
@@ -111,7 +116,8 @@ for CASE in "expired:401:${JWT_EXPIRED}" "wrong-aud:403:${JWT_WRONG_AUD}" "missi
   CODE="$(echo "${M2_OUT}" | head -1)"
   BODY="$(echo "${M2_OUT}" | tail -n +2)"
   echo "  ${LABEL}: HTTP ${CODE}  (${BODY})"
-  OK=false; [[ "${CODE}" == "${WANT}" ]] && OK=true
+  OK=false
+  [[ "${CODE}" == "${WANT}" ]] && OK=true
   verdict "${OK}" "${LABEL} token rejected ${WANT} at the mock edge"
 done
 echo ""
@@ -124,7 +130,8 @@ echo "  Test M3: Valid JWT → /hello (passthrough)"
 echo "=========================================="
 M3_OUT="$(ssh_cmd "curl -sk --max-time 15 -H 'Authorization: Bearer ${JWT_VALID}' https://${MOCK_GW_IP}/hello" || true)"
 echo "${M3_OUT}" | head -3
-OK=false; echo "${M3_OUT}" | grep -q "Service: cr-hello" && OK=true
+OK=false
+echo "${M3_OUT}" | grep -q "Service: cr-hello" && OK=true
 verdict "${OK}" "/hello reached cr-hello through the mock gateway (JWT required, ID token minted)"
 echo ""
 
@@ -143,7 +150,8 @@ M4_OUT="$(gcloud compute ssh "${MOCK_GW_VM}" \
   --zone="${ZONE}" --tunnel-through-iap --project="${PROJECT_ID}" \
   --command="docker exec \$(docker ps -q | head -1) getent hosts ${AUTH_ECHO_HOST_ONLY}" 2> >(grep -v 'NumPy' >&2) || true)"
 echo "${M4_OUT}"
-OK=false; echo "${M4_OUT}" | grep -q "199\.36\.153\." && OK=true
+OK=false
+echo "${M4_OUT}" | grep -q "199\.36\.153\." && OK=true
 verdict "${OK}" "gateway VM resolves run.app to 199.36.153.x (restricted VIP, not public)"
 echo ""
 
