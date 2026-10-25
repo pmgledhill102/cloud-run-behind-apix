@@ -1,0 +1,47 @@
+name: Go
+
+# Path-filtered and separate from ci.yml, like shell.yml. A path-filtered
+# workflow cannot be a required status check: on a PR that touches no Go file it
+# never runs and the check never reports.
+on:
+  push:
+    branches: [main]
+    paths: ['**/*.go', 'go.mod', 'go.sum', '.golangci.yml', '.github/workflows/go.yml']
+  pull_request:
+    paths: ['**/*.go', 'go.mod', 'go.sum', '.golangci.yml', '.github/workflows/go.yml']
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: Go Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # Lint asks whether the code holds up under the version the module claims
+      # to support, so it uses the go.mod floor.
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      # The version matches the pre-commit hook's rev.
+      - uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
+        with:
+          version: v2.15.0
+
+  govulncheck:
+    name: Govulncheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # Govulncheck asks whether anything is known-vulnerable today, and scans
+      # the library of the toolchain it runs under: against the go.mod
+      # floor it would report every library fix released since, which the module
+      # cannot act on. So it takes the current stable toolchain.
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: stable
+      - name: Install govulncheck
+        run: go install golang.org/x/vuln/cmd/govulncheck@v1.9.0
+      - name: Run govulncheck
+        run: govulncheck ./...

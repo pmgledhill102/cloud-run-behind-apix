@@ -103,10 +103,10 @@ func loadKeys() *keyStore {
 	if url := os.Getenv("JWKS_URL"); url != "" {
 		start := time.Now()
 		client := &http.Client{Timeout: 5 * time.Second}
-		resp, err := client.Get(url)
+		resp, err := client.Get(url) //nolint:gosec // G704: URL is operator-supplied JWKS_URL environment, not request input
 		if err == nil {
 			body, rerr := io.ReadAll(resp.Body)
-			resp.Body.Close()
+			_ = resp.Body.Close()
 			if rerr == nil && resp.StatusCode == 200 {
 				if keys, perr := parseJWKS(body); perr == nil {
 					fmt.Printf("JWKS fetched from %s in %s (%d keys)\n",
@@ -252,7 +252,7 @@ func main() {
 			// Sidecar variant: Envoy already enforced the JWT; report the
 			// mode so tests can tell which layer did the work.
 			resp["jwt"] = map[string]any{"valid": true, "mode": "off (enforced by ingress container)"}
-			json.NewEncoder(w).Encode(resp)
+			_ = json.NewEncoder(w).Encode(resp)
 			return
 		}
 
@@ -260,14 +260,14 @@ func main() {
 		if !strings.HasPrefix(auth, "Bearer ") {
 			resp["jwt"] = map[string]any{"valid": false, "reason": "no bearer token in Authorization"}
 			w.WriteHeader(http.StatusUnauthorized)
-			json.NewEncoder(w).Encode(resp)
+			_ = json.NewEncoder(w).Encode(resp)
 			return
 		}
 		claims, reason := validateJWT(strings.TrimPrefix(auth, "Bearer "), ks, wantIss, wantAud)
 		if claims == nil {
 			resp["jwt"] = map[string]any{"valid": false, "reason": reason}
 			w.WriteHeader(http.StatusUnauthorized)
-			json.NewEncoder(w).Encode(resp)
+			_ = json.NewEncoder(w).Encode(resp)
 			return
 		}
 		// The fine-grained-authz layer (§4.4) would join these claims with
@@ -278,14 +278,14 @@ func main() {
 			"scope": claims["scope"],
 			"iss":   claims["iss"],
 		}
-		json.NewEncoder(w).Encode(resp)
+		_ = json.NewEncoder(w).Encode(resp)
 	})
 
 	fmt.Printf("auth-echo listening on port %s (iss=%s aud=%s jwks=%s)\n",
 		port, wantIss, wantAud, ks.source)
 	// Cloud Run terminates TLS in front of the container, which speaks plain HTTP on $PORT.
 	// nosemgrep: go.lang.security.audit.net.use-tls.use-tls
-	if err := http.ListenAndServe(":"+port, nil); err != nil {
+	if err := http.ListenAndServe(":"+port, nil); err != nil { //nolint:gosec // G114: PoC mock behind Cloud Run, which enforces request timeouts at the edge
 		fmt.Fprintf(os.Stderr, "Server error: %v\n", err)
 		os.Exit(1)
 	}

@@ -78,3 +78,13 @@ repos:
         # above the instruction, so the duplicate rule is the one dropped.
         args: ['--config', 'auto', '--error', '--exclude-rule', 'dockerfile.security.last-user-is-root.last-user-is-root']
         pass_filenames: false
+
+  # All three hooks come from the one binary, so the hook and CI lint with the
+  # same version (pinned in .github/workflows/go.yml too: keep them in step).
+  # golangci-lint-fmt runs the formatters: block (gofmt, goimports).
+  - repo: https://github.com/golangci/golangci-lint
+    rev: v2.15.0
+    hooks:
+      - id: golangci-lint-config-verify
+      - id: golangci-lint
+      - id: golangci-lint-fmt
