@@ -28,6 +28,7 @@
     "chezmoi",
     "chezmoiexternal",
     "cleanups",
+    "cooldown",
     "clippy",
     "cloudaudit",
     "cloudbuild",

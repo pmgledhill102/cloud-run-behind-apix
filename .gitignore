@@ -16,3 +16,13 @@ Thumbs.db
 .env
 .env.local
 .env.*.local
+
+# Go
+bin/
+dist/
+*.exe
+*.test
+*.out
+coverage.out
+coverage.html
+vendor/
